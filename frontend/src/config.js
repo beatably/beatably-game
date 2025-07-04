@@ -5,8 +5,8 @@ const config = {
     SOCKET_URL: 'http://127.0.0.1:3001'
   },
   production: {
-    API_BASE_URL: 'https://your-render-backend-url.onrender.com',
-    SOCKET_URL: 'https://your-render-backend-url.onrender.com'
+    API_BASE_URL: 'https://beatably-backend.onrender.com',
+    SOCKET_URL: 'https://beatably-backend.onrender.com'
   }
 };
 
