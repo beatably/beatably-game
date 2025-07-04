@@ -75,7 +75,7 @@ function App() {
 
   // Create lobby when we have token + pending name + socket ready
   useEffect(() => {
-    if (spotifyToken && pendingCreate && socketReady) {
+    if (spotifyToken && pendingCreate && socketReady && socketRef.current) {
       console.log("[App] All conditions met, creating lobby for:", pendingCreate);
       const name = pendingCreate;
       setPendingCreate(null);
@@ -89,27 +89,43 @@ function App() {
         maxPlayers: 8,
         difficulty: "normal",
         timeLimit: 30,
+        musicPreferences: {
+          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
+          yearRange: { min: 1980, max: 2024 },
+          markets: ['US'],
+          limit: 50
+        }
       };
       console.log("[Socket] Emitting create_lobby", { name, code, settings });
-      socketRef.current.emit(
-        "create_lobby",
-        {
-          name,
-          code,
-          settings,
-        },
-        ({ error, lobby, player }) => {
-          console.log("[Socket] create_lobby callback", { error, lobby, player });
-          if (error) {
-            alert(error);
-            setView("landing");
-            return;
-          }
-          setPlayers(lobby.players);
-          setGameSettings(lobby.settings);
-          setView("waiting");
+      
+      // Add a small delay to ensure socket is fully ready
+      setTimeout(() => {
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit(
+            "create_lobby",
+            {
+              name,
+              code,
+              settings,
+            },
+            ({ error, lobby, player }) => {
+              console.log("[Socket] create_lobby callback", { error, lobby, player });
+              if (error) {
+                alert(error);
+                setView("landing");
+                return;
+              }
+              setPlayers(lobby.players);
+              setGameSettings(lobby.settings);
+              setView("waiting");
+            }
+          );
+        } else {
+          console.error("[Socket] Socket not connected when trying to create lobby");
+          alert("Connection error. Please try again.");
+          setView("landing");
         }
-      );
+      }, 100);
     }
   }, [spotifyToken, pendingCreate, socketReady]);
 
