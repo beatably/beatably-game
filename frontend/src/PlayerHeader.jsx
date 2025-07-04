@@ -43,7 +43,7 @@ function PlayerHeader({ players, currentPlayerId }) {
   return (
     <header className="relative sticky top-0 z-30 w-full bg-none shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
       <div className="absolute left-16 top-5">
-        <img class="w-24" src="/img/beatably_logo.png" alt="Beatably Logo"></img>
+        <img className="w-24" src="img/beatably_logo.png" alt="Beatably Logo"></img>
       </div>
       <div className="flex flex-wrap gap-4 md:gap-6 text-[10px] md:text-xs">
 

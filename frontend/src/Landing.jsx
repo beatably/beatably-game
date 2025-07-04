@@ -30,7 +30,7 @@ function Landing({ onCreate, onJoin }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
       <div className="items-center justify-center text-center mb-16 px-24">
-        <img src="/img/beatably_logo.png" alt="Beatably Logo"></img>
+        <img src="img/beatably_logo.png" alt="Beatably Logo"></img>
       </div>
       <h1 className="text-5xl font-chewy mb-6">Let's play</h1>
       <div className="w-full max-w-lg p-8">
