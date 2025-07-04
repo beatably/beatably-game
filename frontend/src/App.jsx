@@ -9,6 +9,7 @@ import SpotifyPlayer from "./SpotifyPlayer";
 import './App.css';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { API_BASE_URL, SOCKET_URL } from './config';
 
 // Fake song data for prototyping
 const fakeSongs = [
@@ -162,7 +163,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   useEffect(() => {
     if (!socketRef.current) {
       console.log("[Socket] Connecting to backend...");
-      socketRef.current = io("http://localhost:3001");
+      socketRef.current = io(SOCKET_URL);
       socketRef.current.on("connect", () => {
         console.log("[Socket] Connected, id:", socketRef.current.id);
         setPlayerId(socketRef.current.id);
@@ -406,7 +407,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     localStorage.setItem('pending_reauth', 'true');
     
     // Redirect to Spotify login
-    window.location.href = "http://localhost:3001/login";
+    window.location.href = `${API_BASE_URL}/login`;
   };
 
   // Restore game state after re-authentication
@@ -462,7 +463,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const fetchSpotifySongs = async (musicPreferences = null) => {
     try {
       console.log("[Spotify] Fetching songs from backend with preferences:", musicPreferences);
-      const response = await fetch('http://localhost:3001/api/fetch-songs', {
+      const response = await fetch(`${API_BASE_URL}/api/fetch-songs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -543,7 +544,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     if (!spotifyToken) {
       localStorage.setItem("pending_create", name);
       setPendingCreate(name);               // ensure state updated so post-OAuth effect runs
-      window.location.href = "http://localhost:3001/login";
+      window.location.href = `${API_BASE_URL}/login`;
       return;
     }
     const code = randomCode();
@@ -843,7 +844,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   if (isCreator && !spotifyToken) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900">
-        <a href="http://localhost:3001/login" className="px-6 py-3 bg-green-500 text-white rounded">
+        <a href={`${API_BASE_URL}/login`} className="px-6 py-3 bg-green-500 text-white rounded">
           Login with Spotify
         </a>
       </div>
