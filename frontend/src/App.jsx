@@ -832,6 +832,41 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [phase, currentCard, isCreator, spotifyDeviceId]);
 
+  // Add user interaction listener for Safari audio unlock
+  useEffect(() => {
+    const unlockAudio = () => {
+      // Create a silent audio context to unlock audio on Safari
+      try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        gainNode.gain.value = 0;
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+        
+        console.log('[Audio] Safari audio unlocked');
+        
+        // Remove the listener after first interaction
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('click', unlockAudio);
+      } catch (error) {
+        console.log('[Audio] Error unlocking audio:', error);
+      }
+    };
+
+    // Add listeners for first user interaction
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('click', unlockAudio, { once: true });
+
+    return () => {
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    };
+  }, []);
+
   // Additional effect to trigger playback when device becomes ready
   useEffect(() => {
     if (isCreator && spotifyDeviceId && phase === 'player-turn' && currentCard && currentCard.uri) {

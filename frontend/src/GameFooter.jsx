@@ -344,28 +344,41 @@ function GameFooter({
         }
       }
     } else {
-      // Use simulated playback for non-creators with fallback audio for Safari
+      // For non-creators, try to play preview audio if available
       if (!localIsPlaying && currentCard?.preview_url && userInteracted) {
         // Try to play preview audio on Safari for non-creators
         try {
           const audio = new Audio(currentCard.preview_url);
           audio.volume = 0.3;
-          audio.crossOrigin = 'anonymous';
+          audio.preload = 'auto';
+          
+          // Safari-specific audio setup
+          audio.setAttribute('playsinline', 'true');
+          audio.setAttribute('webkit-playsinline', 'true');
           
           // Add event listeners for better Safari compatibility
-          audio.addEventListener('canplaythrough', () => {
-            console.log('[GameFooter] Audio ready to play');
+          audio.addEventListener('loadeddata', () => {
+            console.log('[GameFooter] Audio data loaded');
+          });
+          
+          audio.addEventListener('canplay', () => {
+            console.log('[GameFooter] Audio can start playing');
           });
           
           audio.addEventListener('error', (e) => {
             console.log('[GameFooter] Audio error:', e);
+            setLocalIsPlaying(true); // Fallback to simulated
           });
           
+          // For Safari, we need to call play() directly from user interaction
           const playPromise = audio.play();
           if (playPromise !== undefined) {
             playPromise.then(() => {
               console.log('[GameFooter] Preview audio started successfully');
               setLocalIsPlaying(true);
+              
+              // Store audio reference for cleanup
+              window.currentGameAudio = audio;
             }).catch(error => {
               console.log('[GameFooter] Preview audio failed, using simulated playback:', error);
               setLocalIsPlaying(true);
@@ -377,6 +390,15 @@ function GameFooter({
           console.log('[GameFooter] Audio creation failed, using simulated playback:', error);
           setLocalIsPlaying(true);
         }
+      } else if (localIsPlaying && window.currentGameAudio) {
+        // Pause current audio if playing
+        try {
+          window.currentGameAudio.pause();
+          window.currentGameAudio = null;
+        } catch (error) {
+          console.log('[GameFooter] Error pausing audio:', error);
+        }
+        setLocalIsPlaying(false);
       } else {
         // Toggle simulated playback
         setLocalIsPlaying((p) => !p);

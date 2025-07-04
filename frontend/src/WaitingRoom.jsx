@@ -56,8 +56,21 @@ function WaitingRoom({
           </div>
         </div>
         {isCreator && showSettings && (
-          <div className="px-4 pb-2">
-            <GameSettings settings={settings} onUpdate={onUpdateSettings} />
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 md:relative md:inset-auto md:bg-transparent md:flex-none md:items-stretch md:justify-stretch md:z-auto md:p-0">
+            <div className="bg-gray-900 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto md:bg-transparent md:rounded-none md:max-w-none md:max-h-none md:overflow-visible">
+              <div className="p-4 md:p-0">
+                <div className="flex justify-between items-center mb-4 md:hidden">
+                  <h3 className="text-lg font-semibold text-white">Game Settings</h3>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="text-gray-400 hover:text-white text-2xl"
+                  >
+                    ×
+                  </button>
+                </div>
+                <GameSettings settings={settings} onUpdate={onUpdateSettings} />
+              </div>
+            </div>
           </div>
         )}
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 justify-between items-center px-4 pb-6">

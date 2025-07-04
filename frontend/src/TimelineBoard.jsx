@@ -122,6 +122,7 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
           feedback={feedback}
           visible={isDragging}
           disabled={isDisabled}
+          isDragging={isDragging}
         />
         {i < timeline.length && (
           <TimelineCard
@@ -175,7 +176,7 @@ function TimelineCard({ card, outline, animateRemove, hideYear }) {
   );
 }
 
-function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback, visible, disabled }) {
+function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback, visible, disabled, isDragging }) {
   const [{ isOver, canDrop: monitorCanDrop }, drop] = useDrop({
     accept: CARD_TYPE,
     canDrop: () => canDrop,
@@ -196,34 +197,51 @@ function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback,
   });
 
   let borderColor = "border-transparent";
+  let backgroundColor = "bg-transparent";
+  let opacity = "opacity-30";
+  
   if (disabled) {
     borderColor = "border-red-300";
+    backgroundColor = "bg-red-100";
+    opacity = "opacity-50";
   } else if (isActive && feedback) {
     borderColor = feedback.correct ? "border-green-500" : "border-red-500";
+    backgroundColor = "bg-gray-600";
+    opacity = "opacity-100";
   } else if (isActive || isOver) {
     borderColor = "border-blue-400";
+    backgroundColor = "bg-gray-600";
+    opacity = "opacity-100";
+  } else if (isDragging && canDrop) {
+    // Show all drop zones when dragging on mobile
+    borderColor = "border-gray-500";
+    backgroundColor = "bg-gray-700";
+    opacity = "opacity-60";
   }
 
   const baseHeight = 8;
   const expandedHeight = 48;
+  const mobileHeight = isDragging && canDrop ? 32 : baseHeight; // Larger on mobile when dragging
 
   return (
     <div
       ref={disabled ? null : drop}
       data-drop-zone={canDrop && !disabled ? "true" : undefined}
       data-drop-index={canDrop && !disabled ? index : undefined}
-      className={`transition-all duration-200 w-32 rounded-lg my-[1px] flex items-center justify-center border-2 border-dashed ${borderColor} ${
-        disabled ? "bg-red-100 opacity-50" : 
-        (isActive || isOver) ? "bg-gray-600 scale-105 opacity-100 px-2 py-4" : "bg-transparent opacity-30"
+      className={`transition-all duration-200 w-32 rounded-lg my-[1px] flex items-center justify-center border-2 border-dashed ${borderColor} ${backgroundColor} ${opacity} ${
+        (isActive || isOver) && !disabled ? "scale-105 px-2 py-4" : ""
       }`}
       style={{ 
-        height: (isActive || isOver) && !disabled ? expandedHeight : baseHeight,
+        height: (isActive || isOver) && !disabled ? expandedHeight : mobileHeight,
         minHeight: baseHeight,
-        zIndex: (isActive || isOver) && !disabled ? 10 : 1,
+        zIndex: (isActive || isOver) && !disabled ? 10 : (isDragging && canDrop ? 5 : 1),
         pointerEvents: canDrop && !disabled ? "auto" : "none",
       }}
     >
       {(isActive || isOver) && !disabled && <span className="text-xs text-gray-300">Place here</span>}
+      {isDragging && canDrop && !isActive && !isOver && !disabled && (
+        <span className="text-xs text-gray-400">Drop zone</span>
+      )}
       {disabled && <span className="text-xs text-red-400">Blocked</span>}
     </div>
   );
