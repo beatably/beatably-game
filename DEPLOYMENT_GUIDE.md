@@ -1,6 +1,6 @@
-# Hitster Game Deployment Guide
+# Beatably Game Deployment Guide
 
-This guide will walk you through deploying your Hitster game to the web using free hosting services.
+This guide will walk you through deploying your Beatably game to the web using free hosting services.
 
 ## 🎯 Overview
 
@@ -23,7 +23,7 @@ You'll need accounts for:
 
 1. Go to [GitHub](https://github.com) and sign up/login
 2. Click "New repository"
-3. Name it `hitster-game` (or your preferred name)
+3. Name it `beatably-game` (or your preferred name)
 4. Make it **Public** (required for free hosting)
 5. **Don't** initialize with README (we already have one)
 6. Click "Create repository"
@@ -33,7 +33,7 @@ You'll need accounts for:
 Copy the commands from your new GitHub repository page and run them:
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/hitster-game.git
+git remote add origin https://github.com/YOUR_USERNAME/beatably-game.git
 git push -u origin main
 ```
 
@@ -43,7 +43,7 @@ git push -u origin main
 2. Click "New +" → "Web Service"
 3. Connect your GitHub repository
 4. Configure the service:
-   - **Name**: `hitster-backend`
+   - **Name**: `beatably-backend`
    - **Environment**: `Node`
    - **Build Command**: `cd backend && npm install`
    - **Start Command**: `cd backend && npm start`
@@ -58,7 +58,7 @@ git push -u origin main
 
 6. Click "Create Web Service"
 
-**Note**: Save your Render backend URL (e.g., `https://hitster-backend-xyz.onrender.com`)
+**Note**: Save your Render backend URL (e.g., `https://beatably-backend-xyz.onrender.com`)
 
 ### Step 4: Update Frontend Configuration
 
@@ -176,4 +176,4 @@ If you encounter issues:
 **Your URLs:**
 - Frontend: `https://your-netlify-url.netlify.app`
 - Backend: `https://your-render-backend-url.onrender.com`
-- Repository: `https://github.com/YOUR_USERNAME/hitster-game`
+- Repository: `https://github.com/YOUR_USERNAME/beatably-game`

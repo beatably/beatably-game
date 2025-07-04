@@ -53,7 +53,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
 
     function createPlayer() {
       const spotifyPlayer = new window.Spotify.Player({
-        name: 'Hitster Game Player',
+        name: 'Beatably Game Player',
         getOAuthToken: cb => { cb(token); },
         volume: 0.5
       });
@@ -161,7 +161,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         <div className="text-sm text-yellow-400">
           <div>Spotify Player Connected</div>
           <div className="text-xs text-gray-400 mt-1">
-            Transfer playback to "Hitster Game Player" in your Spotify app to start playing music
+            Transfer playback to "Beatably Game Player" in your Spotify app to start playing music
           </div>
         </div>
       </div>

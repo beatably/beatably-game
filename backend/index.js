@@ -403,13 +403,13 @@ io.on('connection', (socket) => {
     { id: 15, title: "Take On Me", artist: "a-ha", year: 1985 },
   ];
 
-  // Hitster cards - special action cards
-  const hitsterCards = [
-    { id: 'h1', type: 'hitster', action: 'extra_turn', description: 'Take another turn' },
-    { id: 'h2', type: 'hitster', action: 'steal_token', description: 'Steal a token from another player' },
-    { id: 'h3', type: 'hitster', action: 'bonus_token', description: 'Gain an extra token' },
-    { id: 'h4', type: 'hitster', action: 'skip_challenge', description: 'Skip next challenge against you' },
-    { id: 'h5', type: 'hitster', action: 'double_points', description: 'Next correct guess counts double' },
+  // Beatably cards - special action cards
+  const beatablyCards = [
+    { id: 'h1', type: 'beatably', action: 'extra_turn', description: 'Take another turn' },
+    { id: 'h2', type: 'beatably', action: 'steal_token', description: 'Steal a token from another player' },
+    { id: 'h3', type: 'beatably', action: 'bonus_token', description: 'Gain an extra token' },
+    { id: 'h4', type: 'beatably', action: 'skip_challenge', description: 'Skip next challenge against you' },
+    { id: 'h5', type: 'beatably', action: 'double_points', description: 'Next correct guess counts double' },
   ];
 
   // Start game (host only)
@@ -461,7 +461,7 @@ io.on('connection', (socket) => {
     games[code] = {
       timelines, // { [playerId]: [cards] } - each player has their own timeline
       sharedDeck, // All players draw from the same deck
-      hitsterDeck: shuffle([...hitsterCards]), // Shuffled hitster cards
+      beatablyDeck: shuffle([...beatablyCards]), // Shuffled beatably cards
       currentCardIndex: 0, // Index of current card in shared deck
       lastPlaced: null,
       feedback: null,
@@ -473,7 +473,7 @@ io.on('connection', (socket) => {
         name: p.name,
         score: 0,
         tokens: 3,
-        hitsterCards: [], // Player's hitster cards
+        beatablyCards: [], // Player's beatably cards
         bonusTokens: 0, // Bonus tokens from correct song guesses
         doublePoints: false, // Next correct guess counts double
         skipChallenge: false, // Skip next challenge against this player
@@ -1126,8 +1126,8 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Use Hitster card
-  socket.on('use_hitster_card', ({ code, cardId, targetPlayerId }) => {
+  // Use Beatably card
+  socket.on('use_beatably_card', ({ code, cardId, targetPlayerId }) => {
     const game = games[code];
     if (!game) return;
     
@@ -1135,13 +1135,13 @@ io.on('connection', (socket) => {
     const playerIdx = game.players.findIndex(p => p.id === playerId);
     if (playerIdx === -1) return;
     
-    const cardIdx = game.players[playerIdx].hitsterCards.findIndex(c => c.id === cardId);
+    const cardIdx = game.players[playerIdx].beatablyCards.findIndex(c => c.id === cardId);
     if (cardIdx === -1) return;
     
-    const card = game.players[playerIdx].hitsterCards[cardIdx];
-    
+    const card = game.players[playerIdx].beatablyCards[cardIdx];
+
     // Remove card from player's hand
-    game.players[playerIdx].hitsterCards.splice(cardIdx, 1);
+    game.players[playerIdx].beatablyCards.splice(cardIdx, 1);
     
     // Execute card action
     switch (card.action) {
@@ -1263,7 +1263,7 @@ io.on('connection', (socket) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Hitster backend running');
+  res.send('Beatably backend running');
 });
 
 app.get('/debug', (req, res) => {

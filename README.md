@@ -1,6 +1,6 @@
-# Hitster - Digital Music Timeline Game
+# Beatably - Digital Music Timeline Game
 
-A web-based multiplayer version of the popular Hitster board game. Players guess where songs fit chronologically in a timeline, with real-time Spotify integration for music playback.
+A web-based multiplayer version of the popular Beatably board game. Players guess where songs fit chronologically in a timeline, with real-time Spotify integration for music playback.
 
 ## 🎮 Game Features
 
@@ -34,7 +34,7 @@ A web-based multiplayer version of the popular Hitster board game. Players guess
 1. **Clone the repository**
    ```bash
    git clone [your-repo-url]
-   cd hitster-game
+   cd beatably-game
    ```
 
 2. **Install dependencies**
