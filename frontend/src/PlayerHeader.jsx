@@ -1,5 +1,5 @@
 import React from "react";
-import beatablyLogo from "/img/beatably_logo.png";
+import beatablyLogo from "./assets/beatably_logo.png";
 
 const CoinIcon = ({ className = "" }) => (
   <span className={`inline-block w-5 h-5 align-middle ${className}`}>

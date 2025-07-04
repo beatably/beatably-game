@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import beatablyLogo from "/img/beatably_logo.png";
+import beatablyLogo from "./assets/beatably_logo.png";
 
 function Landing({ onCreate, onJoin }) {
   const [name, setName] = useState("");
