@@ -296,6 +296,9 @@ function GameFooter({
 
   // Handle play/pause button click with token validation
   const handlePlayPauseClick = async () => {
+    // Add user interaction flag for Safari
+    const userInteracted = true;
+    
     if (isCreator && spotifyDeviceId) {
       if (isPlayingMusic) {
         // Currently playing, so pause
@@ -341,8 +344,43 @@ function GameFooter({
         }
       }
     } else {
-      // Use simulated playback for non-creators
-      setLocalIsPlaying((p) => !p);
+      // Use simulated playback for non-creators with fallback audio for Safari
+      if (!localIsPlaying && currentCard?.preview_url && userInteracted) {
+        // Try to play preview audio on Safari for non-creators
+        try {
+          const audio = new Audio(currentCard.preview_url);
+          audio.volume = 0.3;
+          audio.crossOrigin = 'anonymous';
+          
+          // Add event listeners for better Safari compatibility
+          audio.addEventListener('canplaythrough', () => {
+            console.log('[GameFooter] Audio ready to play');
+          });
+          
+          audio.addEventListener('error', (e) => {
+            console.log('[GameFooter] Audio error:', e);
+          });
+          
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              console.log('[GameFooter] Preview audio started successfully');
+              setLocalIsPlaying(true);
+            }).catch(error => {
+              console.log('[GameFooter] Preview audio failed, using simulated playback:', error);
+              setLocalIsPlaying(true);
+            });
+          } else {
+            setLocalIsPlaying(true);
+          }
+        } catch (error) {
+          console.log('[GameFooter] Audio creation failed, using simulated playback:', error);
+          setLocalIsPlaying(true);
+        }
+      } else {
+        // Toggle simulated playback
+        setLocalIsPlaying((p) => !p);
+      }
     }
   };
 

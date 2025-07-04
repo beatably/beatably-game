@@ -10,6 +10,22 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
 
+  // Listen for custom touch drop events
+  useEffect(() => {
+    const handleCardDrop = (event) => {
+      const { cardId, dropIndex } = event.detail;
+      if (currentCard && currentCard.id === cardId) {
+        playClickSound();
+        onPlaceCard(dropIndex);
+      }
+    };
+
+    document.addEventListener('cardDrop', handleCardDrop);
+    return () => {
+      document.removeEventListener('cardDrop', handleCardDrop);
+    };
+  }, [currentCard, onPlaceCard]);
+
   // Track when a new song is being loaded
   useEffect(() => {
     if (phase === 'player-turn' && currentCard) {
@@ -194,6 +210,8 @@ function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback,
   return (
     <div
       ref={disabled ? null : drop}
+      data-drop-zone={canDrop && !disabled ? "true" : undefined}
+      data-drop-index={canDrop && !disabled ? index : undefined}
       className={`transition-all duration-200 w-32 rounded-lg my-[1px] flex items-center justify-center border-2 border-dashed ${borderColor} ${
         disabled ? "bg-red-100 opacity-50" : 
         (isActive || isOver) ? "bg-gray-600 scale-105 opacity-100 px-2 py-4" : "bg-transparent opacity-30"
