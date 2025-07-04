@@ -43,6 +43,20 @@ async function getClientToken() {
 
 // Spotify OAuth login endpoint
 app.get('/login', (req, res) => {
+  console.log('[Spotify] Login endpoint called');
+  console.log('[Spotify] Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ? 'SET' : 'MISSING',
+    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ? 'SET' : 'MISSING',
+    SPOTIFY_REDIRECT_URI: process.env.SPOTIFY_REDIRECT_URI,
+    FRONTEND_URI: process.env.FRONTEND_URI
+  });
+  
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    console.error('[Spotify] Missing required environment variables');
+    return res.status(500).send('Spotify configuration error - missing credentials');
+  }
+  
   const scope = 'user-read-private user-read-email streaming user-read-playback-state user-modify-playback-state';
   const params = querystring.stringify({
     client_id: process.env.SPOTIFY_CLIENT_ID,
@@ -50,7 +64,10 @@ app.get('/login', (req, res) => {
     redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
     scope,
   });
-  res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+  
+  const spotifyUrl = `https://accounts.spotify.com/authorize?${params}`;
+  console.log('[Spotify] Redirecting to:', spotifyUrl);
+  res.redirect(spotifyUrl);
 });
 
 // Spotify OAuth callback endpoint
