@@ -385,7 +385,7 @@ function GameFooter({
         setLocalIsPlaying(true);
         console.log('[GameFooter] Local playback started');
         
-        // Try to play preview audio if available
+        // Try to play preview audio if available - using MDN recommended approach
         if (currentCard?.preview_url) {
           try {
             console.log('[GameFooter] Attempting to play preview audio:', currentCard.preview_url);
@@ -393,7 +393,6 @@ function GameFooter({
             // Create and configure audio in the user gesture
             const audio = new Audio(currentCard.preview_url);
             audio.volume = 0.3;
-            audio.preload = 'auto';
             
             // Safari-specific audio setup
             audio.setAttribute('playsinline', 'true');
@@ -403,28 +402,24 @@ function GameFooter({
             // Store audio reference immediately
             window.currentGameAudio = audio;
             
-            // Add event listeners
-            audio.addEventListener('loadeddata', () => {
-              console.log('[GameFooter] Audio data loaded');
-            });
+            // MDN recommended approach: Use play() with Promise handling
+            const startPlayPromise = audio.play();
             
-            audio.addEventListener('canplay', () => {
-              console.log('[GameFooter] Audio can start playing');
-            });
-            
-            audio.addEventListener('error', (e) => {
-              console.log('[GameFooter] Audio error:', e);
-            });
-            
-            // CRITICAL: Call play() immediately in the user gesture
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise.then(() => {
-                console.log('[GameFooter] Preview audio started successfully');
-              }).catch(error => {
-                console.log('[GameFooter] Preview audio failed:', error);
-                // Keep the progress bar running even if audio fails
-              });
+            if (startPlayPromise !== undefined) {
+              startPlayPromise
+                .then(() => {
+                  console.log('[GameFooter] Preview audio started successfully');
+                })
+                .catch((error) => {
+                  if (error.name === "NotAllowedError") {
+                    console.log('[GameFooter] Autoplay was prevented by browser policy');
+                    // Show user that they need to interact to enable audio
+                    alert('Tap the play button again to enable audio');
+                  } else {
+                    console.log('[GameFooter] Audio playback failed:', error);
+                  }
+                  // Keep the progress bar running even if audio fails
+                });
             }
           } catch (error) {
             console.log('[GameFooter] Audio creation failed:', error);
@@ -654,30 +649,12 @@ function GameFooter({
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-lg border-4 border-white/20 flex-shrink-0 focus:outline-none focus:ring-0"
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-lg border-4 border-white/20 flex-shrink-0"
                   onClick={handlePlayPauseClick}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handlePlayPauseClick();
-                  }}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handlePlayPauseClick();
-                  }}
                   aria-label={actualIsPlaying ? "Pause" : "Play"}
                   style={{ 
-                    WebkitTapHighlightColor: 'transparent',
-                    outline: 'none',
-                    border: 'none',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none'
+                    WebkitTapHighlightColor: 'transparent'
                   }}
-                  tabIndex="-1"
                 >
                   {actualIsPlaying ? (
                     <div className="text-white text-2xl md:text-4xl font-bold">⏸</div>
