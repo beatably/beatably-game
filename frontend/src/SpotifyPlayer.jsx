@@ -93,7 +93,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
       // Handle autoplay failures (Safari)
       spotifyPlayer.addListener('autoplay_failed', () => {
         console.log('[SpotifyPlayer] Autoplay failed - browser autoplay rules');
-        // The player will need user interaction to start playing
+        alert('Tap to start audio');
       });
 
       // Error handling
