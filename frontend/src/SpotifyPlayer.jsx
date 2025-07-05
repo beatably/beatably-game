@@ -90,6 +90,12 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         }
       }));
 
+      // Handle autoplay failures (Safari)
+      spotifyPlayer.addListener('autoplay_failed', () => {
+        console.log('[SpotifyPlayer] Autoplay failed - browser autoplay rules');
+        // The player will need user interaction to start playing
+      });
+
       // Error handling
       spotifyPlayer.addListener('initialization_error', ({ message }) => {
         console.error('[SpotifyPlayer] Initialization error:', message);
@@ -116,6 +122,9 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
       });
 
       setPlayer(spotifyPlayer);
+      
+      // Store player instance globally for Safari activateElement() calls
+      window.spotifyPlayerInstance = spotifyPlayer;
     };
 
     return () => {

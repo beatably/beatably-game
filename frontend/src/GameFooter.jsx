@@ -300,6 +300,16 @@ function GameFooter({
     const userInteracted = true;
     
     if (isCreator && spotifyDeviceId) {
+      // CRITICAL: Activate Spotify player element for Safari autoplay
+      if (window.Spotify && window.spotifyPlayerInstance) {
+        try {
+          await window.spotifyPlayerInstance.activateElement();
+          console.log('[GameFooter] Spotify player activated for Safari');
+        } catch (error) {
+          console.log('[GameFooter] Error activating Spotify player:', error);
+        }
+      }
+      
       if (isPlayingMusic) {
         // Currently playing, so pause
         pauseSpotifyPlayback();
@@ -355,6 +365,7 @@ function GameFooter({
           // Safari-specific audio setup
           audio.setAttribute('playsinline', 'true');
           audio.setAttribute('webkit-playsinline', 'true');
+          audio.muted = false; // Ensure not muted
           
           // Add event listeners for better Safari compatibility
           audio.addEventListener('loadeddata', () => {
