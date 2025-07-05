@@ -641,20 +641,36 @@ function GameFooter({
               <>
                 {/* Restart button - moved to left */}
                 <button
-                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-500 transition-colors flex-shrink-0"
+                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-600 active:bg-gray-500 flex-shrink-0"
                   onClick={handleRestartClick}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.backgroundColor = '#6b7280'; // gray-500
+                  }}
+                  onTouchEnd={(e) => {
+                    e.currentTarget.style.backgroundColor = '#4b5563'; // gray-600
+                    handleRestartClick();
+                  }}
+                  onTouchCancel={(e) => {
+                    e.currentTarget.style.backgroundColor = '#4b5563'; // gray-600
+                  }}
                   aria-label="Restart track"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   <div className="text-white text-lg md:text-xl font-bold">⇤</div>
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 active:bg-green-700 transition-colors shadow-lg border-4 border-white/20 flex-shrink-0"
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 active:bg-green-700 shadow-lg border-4 border-white/20 flex-shrink-0"
                   onClick={handlePlayPauseClick}
-                  onTouchEnd={handlePlayPauseClick}
                   onTouchStart={(e) => {
                     e.preventDefault();
                     e.currentTarget.style.backgroundColor = '#15803d'; // green-700
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.backgroundColor = '#16a34a'; // green-600
+                    handlePlayPauseClick();
                   }}
                   onTouchCancel={(e) => {
                     e.currentTarget.style.backgroundColor = '#16a34a'; // green-600

@@ -147,6 +147,25 @@ button:focus-visible {
   user-select: none;
 }
 
+/* Fix iOS Safari hover state getting stuck */
+@media (hover: none) and (pointer: coarse) {
+  button:hover {
+    background-color: inherit !important;
+  }
+  
+  .hover\:bg-green-700:hover {
+    background-color: inherit !important;
+  }
+  
+  .hover\:bg-gray-500:hover {
+    background-color: inherit !important;
+  }
+  
+  .hover\:bg-gray-700:hover {
+    background-color: inherit !important;
+  }
+}
+
 /* Allow text selection for inputs and text areas */
 input, textarea, [contenteditable] {
   -webkit-user-select: text;
