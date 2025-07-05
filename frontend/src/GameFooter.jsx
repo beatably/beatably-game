@@ -649,9 +649,18 @@ function GameFooter({
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 transition-colors shadow-lg border-4 border-white/20 flex-shrink-0"
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 active:bg-green-700 transition-colors shadow-lg border-4 border-white/20 flex-shrink-0"
                   onClick={handlePlayPauseClick}
+                  onTouchEnd={handlePlayPauseClick}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.backgroundColor = '#15803d'; // green-700
+                  }}
+                  onTouchCancel={(e) => {
+                    e.currentTarget.style.backgroundColor = '#16a34a'; // green-600
+                  }}
                   aria-label={actualIsPlaying ? "Pause" : "Play"}
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   {actualIsPlaying ? (
                     <div className="text-white text-2xl md:text-4xl font-bold">⏸</div>
