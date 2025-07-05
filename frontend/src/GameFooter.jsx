@@ -301,7 +301,9 @@ function GameFooter({
       spotifyDeviceId: !!spotifyDeviceId,
       isPlayingMusic,
       localIsPlaying,
-      currentCard: !!currentCard
+      currentCard: !!currentCard,
+      currentCardPreviewUrl: currentCard?.preview_url,
+      currentCardTitle: currentCard?.title
     });
     
     if (isCreator && spotifyDeviceId) {
@@ -360,12 +362,26 @@ function GameFooter({
           }
 
           if (response.ok) {
-            const state = await response.json();
-            if (state && state.item && state.item.uri === currentCard?.uri) {
-              // Same track is loaded, just resume
-              await resumeSpotifyPlayback();
+            // Check if response has content before parsing JSON
+            const text = await response.text();
+            if (text) {
+              try {
+                const state = JSON.parse(text);
+                if (state && state.item && state.item.uri === currentCard?.uri) {
+                  // Same track is loaded, just resume
+                  await resumeSpotifyPlayback();
+                } else {
+                  // No track or different track, start new playback
+                  await triggerSpotifyPlayback();
+                }
+              } catch (error) {
+                console.log('[GameFooter] Error parsing player state JSON:', error);
+                // If JSON parsing fails, start new playback
+                await triggerSpotifyPlayback();
+              }
             } else {
-              // No track or different track, start new playback
+              // Empty response, start new playback
+              console.log('[GameFooter] Empty response from player state, starting new playback');
               await triggerSpotifyPlayback();
             }
           } else {
