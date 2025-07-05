@@ -654,14 +654,30 @@ function GameFooter({
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-lg border-4 border-white/20 flex-shrink-0"
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-lg border-4 border-white/20 flex-shrink-0 focus:outline-none focus:ring-0"
                   onClick={handlePlayPauseClick}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handlePlayPauseClick();
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handlePlayPauseClick();
+                  }}
                   aria-label={actualIsPlaying ? "Pause" : "Play"}
                   style={{ 
                     WebkitTapHighlightColor: 'transparent',
-                    outline: 'none'
+                    outline: 'none',
+                    border: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none'
                   }}
-                  onFocus={(e) => e.target.blur()}
+                  tabIndex="-1"
                 >
                   {actualIsPlaying ? (
                     <div className="text-white text-2xl md:text-4xl font-bold">⏸</div>
