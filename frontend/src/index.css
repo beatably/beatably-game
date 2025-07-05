@@ -147,22 +147,11 @@ button:focus-visible {
   user-select: none;
 }
 
-/* Fix iOS Safari hover state getting stuck */
+/* Fix iOS Safari hover state getting stuck - more targeted approach */
 @media (hover: none) and (pointer: coarse) {
+  /* Only disable hover on touch devices, preserve desktop functionality */
   button:hover {
-    background-color: inherit !important;
-  }
-  
-  .hover\:bg-green-700:hover {
-    background-color: inherit !important;
-  }
-  
-  .hover\:bg-gray-500:hover {
-    background-color: inherit !important;
-  }
-  
-  .hover\:bg-gray-700:hover {
-    background-color: inherit !important;
+    background-color: revert !important;
   }
 }
 
