@@ -104,8 +104,8 @@ function PlayerHeader({ players, currentPlayerId }) {
               />
               
               {/* Modal content */}
-              <div className="fixed inset-0 flex items-center justify-center z-50">
-                <div className="bg-gray-800 rounded-lg shadow-xl p-6 mx-4 w-full max-w-sm">
+              <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+                <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
                   <div className="space-y-3">
                     <button 
                       onClick={players.length > 0 && players[0].id === currentPlayerId ? handleRestart : undefined} 

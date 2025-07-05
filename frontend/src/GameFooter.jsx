@@ -296,6 +296,14 @@ function GameFooter({
 
   // Handle play/pause button click with token validation
   const handlePlayPauseClick = async () => {
+    console.log('[GameFooter] Play button clicked:', {
+      isCreator,
+      spotifyDeviceId: !!spotifyDeviceId,
+      isPlayingMusic,
+      localIsPlaying,
+      currentCard: !!currentCard
+    });
+    
     // Add user interaction flag for Safari
     const userInteracted = true;
     
@@ -354,65 +362,71 @@ function GameFooter({
         }
       }
     } else {
-      // For non-creators, try to play preview audio if available
-      if (!localIsPlaying && currentCard?.preview_url && userInteracted) {
-        // Try to play preview audio on Safari for non-creators
-        try {
-          const audio = new Audio(currentCard.preview_url);
-          audio.volume = 0.3;
-          audio.preload = 'auto';
-          
-          // Safari-specific audio setup
-          audio.setAttribute('playsinline', 'true');
-          audio.setAttribute('webkit-playsinline', 'true');
-          audio.muted = false; // Ensure not muted
-          
-          // Add event listeners for better Safari compatibility
-          audio.addEventListener('loadeddata', () => {
-            console.log('[GameFooter] Audio data loaded');
-          });
-          
-          audio.addEventListener('canplay', () => {
-            console.log('[GameFooter] Audio can start playing');
-          });
-          
-          audio.addEventListener('error', (e) => {
-            console.log('[GameFooter] Audio error:', e);
-            setLocalIsPlaying(true); // Fallback to simulated
-          });
-          
-          // For Safari, we need to call play() directly from user interaction
-          const playPromise = audio.play();
-          if (playPromise !== undefined) {
-            playPromise.then(() => {
-              console.log('[GameFooter] Preview audio started successfully');
-              setLocalIsPlaying(true);
-              
-              // Store audio reference for cleanup
-              window.currentGameAudio = audio;
-            }).catch(error => {
-              console.log('[GameFooter] Preview audio failed, using simulated playback:', error);
-              setLocalIsPlaying(true);
+      // For non-creators or when Spotify isn't available, use local playback
+      console.log('[GameFooter] Using local playback mode');
+      
+      if (!localIsPlaying) {
+        // Start playing
+        console.log('[GameFooter] Starting local playback');
+        setLocalIsPlaying(true);
+        
+        // Try to play preview audio if available
+        if (currentCard?.preview_url && userInteracted) {
+          try {
+            console.log('[GameFooter] Attempting to play preview audio:', currentCard.preview_url);
+            const audio = new Audio(currentCard.preview_url);
+            audio.volume = 0.3;
+            audio.preload = 'auto';
+            
+            // Safari-specific audio setup
+            audio.setAttribute('playsinline', 'true');
+            audio.setAttribute('webkit-playsinline', 'true');
+            audio.muted = false; // Ensure not muted
+            
+            // Add event listeners for better Safari compatibility
+            audio.addEventListener('loadeddata', () => {
+              console.log('[GameFooter] Audio data loaded');
             });
-          } else {
-            setLocalIsPlaying(true);
+            
+            audio.addEventListener('canplay', () => {
+              console.log('[GameFooter] Audio can start playing');
+            });
+            
+            audio.addEventListener('error', (e) => {
+              console.log('[GameFooter] Audio error:', e);
+            });
+            
+            // For Safari, we need to call play() directly from user interaction
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+              playPromise.then(() => {
+                console.log('[GameFooter] Preview audio started successfully');
+                
+                // Store audio reference for cleanup
+                window.currentGameAudio = audio;
+              }).catch(error => {
+                console.log('[GameFooter] Preview audio failed:', error);
+              });
+            }
+          } catch (error) {
+            console.log('[GameFooter] Audio creation failed:', error);
           }
-        } catch (error) {
-          console.log('[GameFooter] Audio creation failed, using simulated playback:', error);
-          setLocalIsPlaying(true);
+        } else {
+          console.log('[GameFooter] No preview URL available, using simulated playback');
         }
-      } else if (localIsPlaying && window.currentGameAudio) {
-        // Pause current audio if playing
-        try {
-          window.currentGameAudio.pause();
-          window.currentGameAudio = null;
-        } catch (error) {
-          console.log('[GameFooter] Error pausing audio:', error);
-        }
-        setLocalIsPlaying(false);
       } else {
-        // Toggle simulated playback
-        setLocalIsPlaying((p) => !p);
+        // Stop playing
+        console.log('[GameFooter] Stopping local playback');
+        setLocalIsPlaying(false);
+        
+        if (window.currentGameAudio) {
+          try {
+            window.currentGameAudio.pause();
+            window.currentGameAudio = null;
+          } catch (error) {
+            console.log('[GameFooter] Error pausing audio:', error);
+          }
+        }
       }
     }
   };
