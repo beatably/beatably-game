@@ -6,6 +6,7 @@ import GameFooter from "./GameFooter";
 import Landing from "./Landing";
 import WaitingRoom from "./WaitingRoom";
 import SpotifyPlayer from "./SpotifyPlayer";
+import spotifyAuth from "./utils/spotifyAuth";
 import './App.css';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -526,31 +527,24 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   };
 
-  // Function to pause Spotify playback
+  // Function to pause Spotify playback with enhanced error handling
   const pauseSpotifyPlayback = async () => {
-    if (!isCreator || !spotifyDeviceId) return;
+    if (!isCreator || !spotifyDeviceId) return false;
 
     try {
       console.log('[App] Pausing Spotify playback');
-      
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-
-      const response = await fetch(`https://api.spotify.com/v1/me/player/pause?device_id=${spotifyDeviceId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-      });
-
-      if (response.ok) {
-        console.log('[App] Successfully paused Spotify playback');
+      const success = await spotifyAuth.pausePlayback(spotifyDeviceId);
+      if (success) {
         setIsPlayingMusic(false);
-      } else {
-        console.error('[App] Failed to pause Spotify playback:', response.status);
       }
+      return success;
     } catch (error) {
       console.error('[App] Error pausing Spotify playback:', error);
+      if (error.message.includes('Token expired')) {
+        // Handle token expiration - could trigger re-auth here if needed
+        console.log('[App] Token expired during pause operation');
+      }
+      return false;
     }
   };
 
