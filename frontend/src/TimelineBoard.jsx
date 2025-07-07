@@ -170,8 +170,8 @@ function TimelineCard({ card, outline, animateRemove, hideYear }) {
   let removeClass = '';
   if (animateRemove) removeClass = 'animate-fadeOutUp';
   return (
-    <div className={`bg-gray-700 px-3 py-4 rounded-lg shadow-xl shadow-black/20 text-center min-w-[120px] my-[1px] flex flex-col items-center transition-all duration-400 ${outlineClass} ${removeClass}`}>
-      <div className="font-bold text-lg">{hideYear ? '?' : card.year}</div>
+    <div className={`bg-gray-700 px-2 py-2 rounded-lg shadow-xl shadow-black/20 text-center min-w-[80px] my-[1px] flex flex-col items-center transition-all duration-400 ${outlineClass} ${removeClass}`}>
+      <div className="font-bold text-md">{hideYear ? '?' : card.year}</div>
     </div>
   );
 }

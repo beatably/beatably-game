@@ -158,7 +158,7 @@ function DraggableCard({ card, type = CARD_TYPE, outline, setIsDragging, isNewCa
     <div
       ref={combinedRef}
       data-draggable="true"
-      className={`bg-gray-600 ring-4 ring-yellow-500 p-4 rounded-lg shadow-md w-28 text-center cursor-move select-none transition-all duration-200 ${outlineClass} ${isDragging || touchDragging ? "opacity-50" : ""} ${showBounce ? "animate-bounce" : ""}`}
+      className={`bg-gray-600 ring-4 ring-yellow-500 p-3 rounded-lg shadow-md w-24 text-center cursor-move select-none transition-all duration-200 ${outlineClass} ${isDragging || touchDragging ? "opacity-50" : ""} ${showBounce ? "animate-bounce" : ""}`}
       style={{ 
         minHeight: 48,
         transform: showBounce ? 'scale(5.5)' : 'scale(1)',
