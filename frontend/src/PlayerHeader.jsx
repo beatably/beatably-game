@@ -83,7 +83,7 @@ function PlayerHeader({ players, currentPlayerId }) {
         ))}
       </div>
       {players.length > 0 && (
-        <div className="absolute left-3 top-4">
+        <div className="absolute left-2 top-2">
           <button 
             onClick={() => setMenuOpen(!menuOpen)} 
             className="bg-gray-700 text-white p-2 rounded hover:bg-gray-600 flex items-center justify-center"

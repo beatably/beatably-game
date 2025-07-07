@@ -228,7 +228,7 @@ function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback,
       ref={disabled ? null : drop}
       data-drop-zone={canDrop && !disabled ? "true" : undefined}
       data-drop-index={canDrop && !disabled ? index : undefined}
-      className={`transition-all duration-200 w-32 rounded-lg my-[1px] flex items-center justify-center border-2 border-dashed ${borderColor} ${backgroundColor} ${opacity} ${
+      className={`transition-all duration-200 w-24 rounded-lg my-[1px] flex items-center justify-center border-2 border-dashed ${borderColor} ${backgroundColor} ${opacity} ${
         (isActive || isOver) && !disabled ? "scale-105 px-2 py-4" : ""
       }`}
       style={{ 
