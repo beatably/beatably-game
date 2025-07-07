@@ -257,19 +257,36 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
 
   // Show connection status and errors
   if (connectionStatus === 'error') {
+    const isTokenExpired = errorMessage && errorMessage.includes('expired');
+    
     return (
       <div className="spotify-player">
         <div className="text-sm text-red-400">
           <div>⚠ Spotify Connection Error</div>
           <div className="text-xs text-gray-400 mt-1">
-            {errorMessage || 'Unknown error occurred'}
+            {isTokenExpired ? 'Your Spotify session has expired' : (errorMessage || 'Unknown error occurred')}
           </div>
-          {retryCount < maxRetries && (
+          {isTokenExpired ? (
+            <button 
+              onClick={() => {
+                // Save current game state before re-auth
+                const gameState = {
+                  view: 'game',
+                  timestamp: Date.now()
+                };
+                localStorage.setItem('game_state_backup', JSON.stringify(gameState));
+                localStorage.setItem('pending_reauth', 'true');
+                window.location.href = "http://localhost:3001/login";
+              }}
+              className="mt-2 px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+            >
+              Re-authenticate with Spotify
+            </button>
+          ) : retryCount < maxRetries ? (
             <div className="text-xs text-gray-500 mt-1">
               Retrying... ({retryCount}/{maxRetries})
             </div>
-          )}
-          {retryCount >= maxRetries && (
+          ) : (
             <button 
               onClick={() => window.location.reload()} 
               className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"

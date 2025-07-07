@@ -106,6 +106,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json()); // Add JSON body parser
 
+// Store fetched songs for debugging (in production, consider using Redis or database)
+let lastFetchedSongs = null;
+let lastFetchMetadata = null;
+let fetchHistory = [];
+
 // Enhanced fetch songs from Spotify with filtering support
 app.post('/api/fetch-songs', async (req, res) => {
   const { musicPreferences = {}, difficulty = 'normal' } = req.body;
@@ -126,35 +131,73 @@ app.post('/api/fetch-songs', async (req, res) => {
       genres: genres.length,
       yearRange,
       markets,
-      limit
+      limit,
+      difficulty
     });
 
     const allTracks = [];
     
-    // Build search queries based on selected genres
+    // Build search queries based on selected genres with randomization
     const searches = [];
     
-    // Add genre-specific searches
+    // Add genre-specific searches with random terms for variety
+    const randomTerms = ['hits', 'popular', 'best', 'top', 'classic', 'greatest', 'chart'];
+    const randomYears = [];
+    
+    // Generate some random year searches within the range for more variety
+    if (yearRange.min && yearRange.max) {
+      const yearSpan = yearRange.max - yearRange.min;
+      const numYearSearches = Math.min(3, Math.floor(yearSpan / 10)); // Max 3 year-specific searches
+      for (let i = 0; i < numYearSearches; i++) {
+        const randomYear = yearRange.min + Math.floor(Math.random() * yearSpan);
+        randomYears.push(randomYear);
+      }
+    }
+    
+    // Add genre-specific searches with random terms
     genres.forEach(genre => {
       searches.push(`genre:${genre}`);
+      // Add some randomized genre searches
+      const randomTerm = randomTerms[Math.floor(Math.random() * randomTerms.length)];
+      searches.push(`genre:${genre} ${randomTerm}`);
     });
     
-    // Add some general popular searches for variety
-    searches.push('top hits', 'popular');
+    // Add year-specific searches for more variety
+    randomYears.forEach(year => {
+      searches.push(`year:${year}`);
+      const randomGenre = genres[Math.floor(Math.random() * genres.length)];
+      searches.push(`year:${year} genre:${randomGenre}`);
+    });
     
-    // Search in each market
+    // Add some general searches with randomization
+    const generalSearches = [
+      'hits', 'popular', 'chart', 'top', 'best', 'classic', 'greatest',
+      'rock hits', 'pop hits', 'dance hits', 'indie hits', 'alternative hits'
+    ];
+    
+    // Randomly select some general searches
+    const shuffledGeneral = generalSearches.sort(() => 0.5 - Math.random());
+    searches.push(...shuffledGeneral.slice(0, 5));
+    
+    // Shuffle all searches to randomize order
+    const shuffledSearches = searches.sort(() => 0.5 - Math.random());
+    
+    // Search in each market with randomized offset for more variety
     for (const market of markets) {
-      for (const search of searches) {
+      for (const search of shuffledSearches) {
         try {
           // Build query with year filter if specified
           let query = search;
-          if (yearRange.min && yearRange.max) {
+          if (yearRange.min && yearRange.max && !search.includes('year:')) {
             query += ` year:${yearRange.min}-${yearRange.max}`;
-          } else if (yearRange.min) {
+          } else if (yearRange.min && !search.includes('year:')) {
             query += ` year:${yearRange.min}-2024`;
-          } else if (yearRange.max) {
+          } else if (yearRange.max && !search.includes('year:')) {
             query += ` year:1950-${yearRange.max}`;
           }
+
+          // Add random offset to get different results each time
+          const randomOffset = Math.floor(Math.random() * 100); // Random offset 0-99
 
           const response = await axios.get('https://api.spotify.com/v1/search', {
             headers: {
@@ -163,8 +206,9 @@ app.post('/api/fetch-songs', async (req, res) => {
             params: {
               q: query,
               type: 'track',
-              limit: 10, // Smaller limit per search for more variety
-              market: market
+              limit: 15, // Slightly larger limit per search
+              market: market,
+              offset: randomOffset
             }
           });
 
@@ -185,12 +229,12 @@ app.post('/api/fetch-songs', async (req, res) => {
               external_url: track.external_urls.spotify,
               album_art: track.album.images && track.album.images.length > 0 ? track.album.images[0].url : null,
               market: market,
-              genre: search.replace('genre:', ''),
+              genre: search.includes('genre:') ? search.split('genre:')[1].split(' ')[0] : 'general',
               popularity: track.popularity
             }));
 
           allTracks.push(...tracks);
-          console.log(`[Spotify] Found ${tracks.length} tracks for "${query}" in ${market}`);
+          console.log(`[Spotify] Found ${tracks.length} tracks for "${query}" in ${market} (offset: ${randomOffset})`);
         } catch (searchError) {
           console.error(`[Spotify] Error searching for "${search}" in ${market}:`, searchError.message);
         }
@@ -204,14 +248,26 @@ app.post('/api/fetch-songs', async (req, res) => {
 
     console.log(`[Spotify] Found ${uniqueTracks.length} unique tracks before filtering`);
 
-    // If we don't have enough tracks, try fallback searches
-    if (uniqueTracks.length < limit * 0.8) {
+    // If we don't have enough tracks, try more aggressive fallback searches
+    if (uniqueTracks.length < Math.max(60, limit * 0.8)) {
       console.log(`[Spotify] Not enough tracks (${uniqueTracks.length}), trying fallback searches...`);
       
-      const fallbackSearches = ['popular', 'hits', 'chart'];
+      const fallbackSearches = [
+        'popular', 'hits', 'chart', 'top', 'best', 'classic', 'greatest',
+        'rock', 'pop', 'dance', 'indie', 'alternative', 'hip hop', 'electronic'
+      ];
+      
+      // Shuffle fallback searches for randomization
+      const shuffledFallbacks = fallbackSearches.sort(() => 0.5 - Math.random());
+      
       for (const market of markets) {
-        for (const search of fallbackSearches) {
+        for (const search of shuffledFallbacks) {
+          if (uniqueTracks.length >= Math.max(60, limit)) break; // Stop when we have enough
+          
           try {
+            // Use random offset for fallback searches too
+            const randomOffset = Math.floor(Math.random() * 200);
+            
             const response = await axios.get('https://api.spotify.com/v1/search', {
               headers: {
                 'Authorization': `Bearer ${clientToken}`
@@ -219,8 +275,9 @@ app.post('/api/fetch-songs', async (req, res) => {
               params: {
                 q: search,
                 type: 'track',
-                limit: 15,
-                market: market
+                limit: 20,
+                market: market,
+                offset: randomOffset
               }
             });
 
@@ -241,12 +298,12 @@ app.post('/api/fetch-songs', async (req, res) => {
                 external_url: track.external_urls.spotify,
                 album_art: track.album.images && track.album.images.length > 0 ? track.album.images[0].url : null,
                 market: market,
-                genre: 'popular',
+                genre: 'fallback',
                 popularity: track.popularity
               }));
 
             uniqueTracks.push(...tracks);
-            console.log(`[Spotify] Added ${tracks.length} fallback tracks from "${search}" in ${market}`);
+            console.log(`[Spotify] Added ${tracks.length} fallback tracks from "${search}" in ${market} (offset: ${randomOffset})`);
           } catch (fallbackError) {
             console.error(`[Spotify] Fallback search error:`, fallbackError.message);
           }
@@ -276,13 +333,22 @@ app.post('/api/fetch-songs', async (req, res) => {
       console.log(`[Spotify] Hard mode: using all ${filteredTracks.length} tracks including niche songs`);
     }
 
-    // Shuffle and limit to requested number
+    // Ensure we have at least 60 songs for a good game experience
+    const minSongs = Math.max(60, limit);
+    
+    // If we still don't have enough songs, log a warning but continue
+    if (filteredTracks.length < minSongs) {
+      console.warn(`[Spotify] Warning: Only found ${filteredTracks.length} songs, but need at least ${minSongs}. Consider broadening your search criteria.`);
+    }
+    
+    // Shuffle and limit to requested number, but ensure at least 60 if possible
+    const targetCount = Math.min(filteredTracks.length, Math.max(minSongs, limit));
     const shuffled = filteredTracks
       .sort(() => 0.5 - Math.random())
-      .slice(0, limit);
+      .slice(0, targetCount);
     
-    console.log(`[Spotify] Returning ${shuffled.length} tracks with difficulty: ${difficulty}`);
-    res.json({ 
+    // Store for debugging purposes
+    const fetchResult = {
       tracks: shuffled,
       metadata: {
         totalFound: uniqueTracks.length,
@@ -290,9 +356,29 @@ app.post('/api/fetch-songs', async (req, res) => {
         difficulty: difficulty,
         preferences: musicPreferences,
         marketsSearched: markets,
-        genresSearched: genres
+        genresSearched: genres,
+        timestamp: new Date().toISOString(),
+        fetchId: Date.now().toString()
       }
+    };
+    
+    lastFetchedSongs = fetchResult;
+    lastFetchMetadata = fetchResult.metadata;
+    
+    // Keep history of last 10 fetches
+    fetchHistory.unshift({
+      ...fetchResult.metadata,
+      trackCount: shuffled.length,
+      sampleTracks: shuffled.slice(0, 5).map(t => ({ title: t.title, artist: t.artist, year: t.year }))
     });
+    if (fetchHistory.length > 10) {
+      fetchHistory = fetchHistory.slice(0, 10);
+    }
+    
+    console.log(`[Spotify] Returning ${shuffled.length} tracks with difficulty: ${difficulty}`);
+    console.log(`[Spotify DEBUG] Sample tracks:`, shuffled.slice(0, 5).map(t => `${t.title} by ${t.artist} (${t.year})`));
+    
+    res.json(fetchResult);
   } catch (error) {
     console.error('Error fetching Spotify tracks:', error);
     res.status(500).json({ error: 'Failed to fetch tracks from Spotify' });
@@ -1286,6 +1372,94 @@ app.get('/', (req, res) => {
   res.send('Beatably backend running');
 });
 
+// Debug endpoint for fetched songs
+app.get('/api/debug/songs', (req, res) => {
+  res.json({
+    lastFetch: lastFetchedSongs,
+    metadata: lastFetchMetadata,
+    history: fetchHistory,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Debug endpoint for current games and their songs
+app.get('/api/debug/games', (req, res) => {
+  const gameDebugInfo = {};
+  
+  Object.keys(games).forEach(code => {
+    const game = games[code];
+    gameDebugInfo[code] = {
+      players: game.players.map(p => ({ id: p.id, name: p.name })),
+      currentPlayerIdx: game.currentPlayerIdx,
+      currentCardIndex: game.currentCardIndex,
+      phase: game.phase,
+      totalSongs: game.sharedDeck.length,
+      currentSong: game.sharedDeck[game.currentCardIndex] ? {
+        title: game.sharedDeck[game.currentCardIndex].title,
+        artist: game.sharedDeck[game.currentCardIndex].artist,
+        year: game.sharedDeck[game.currentCardIndex].year,
+        popularity: game.sharedDeck[game.currentCardIndex].popularity,
+        genre: game.sharedDeck[game.currentCardIndex].genre
+      } : null,
+      nextFewSongs: game.sharedDeck.slice(game.currentCardIndex + 1, game.currentCardIndex + 6).map(song => ({
+        title: song.title,
+        artist: song.artist,
+        year: song.year,
+        popularity: song.popularity,
+        genre: song.genre
+      })),
+      songStats: {
+        yearRange: {
+          min: Math.min(...game.sharedDeck.map(s => s.year)),
+          max: Math.max(...game.sharedDeck.map(s => s.year))
+        },
+        genreDistribution: game.sharedDeck.reduce((acc, song) => {
+          acc[song.genre] = (acc[song.genre] || 0) + 1;
+          return acc;
+        }, {}),
+        popularityStats: {
+          min: Math.min(...game.sharedDeck.map(s => s.popularity || 0)),
+          max: Math.max(...game.sharedDeck.map(s => s.popularity || 0)),
+          avg: Math.round(game.sharedDeck.reduce((sum, s) => sum + (s.popularity || 0), 0) / game.sharedDeck.length)
+        }
+      }
+    };
+  });
+  
+  res.json({
+    games: gameDebugInfo,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Debug endpoint for specific game songs
+app.get('/api/debug/games/:code/songs', (req, res) => {
+  const code = req.params.code;
+  const game = games[code];
+  
+  if (!game) {
+    return res.status(404).json({ error: 'Game not found' });
+  }
+  
+  res.json({
+    gameCode: code,
+    totalSongs: game.sharedDeck.length,
+    currentIndex: game.currentCardIndex,
+    songs: game.sharedDeck.map((song, index) => ({
+      index,
+      title: song.title,
+      artist: song.artist,
+      year: song.year,
+      popularity: song.popularity,
+      genre: song.genre,
+      market: song.market,
+      isCurrent: index === game.currentCardIndex,
+      hasBeenPlayed: index < game.currentCardIndex
+    })),
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/debug', (req, res) => {
   const rooms = {};
   io.sockets.adapter.rooms.forEach((sockets, room) => {
@@ -1294,7 +1468,12 @@ app.get('/debug', (req, res) => {
   res.json({
     lobbies: Object.keys(lobbies),
     games: Object.keys(games),
-    rooms: rooms
+    rooms: rooms,
+    debugEndpoints: [
+      '/api/debug/songs - View last fetched songs',
+      '/api/debug/games - View all games and their song stats',
+      '/api/debug/games/:code/songs - View specific game songs'
+    ]
   });
 });
 

@@ -234,22 +234,24 @@ function GameFooter({
   const handleTokenExpiration = () => {
     console.log('[GameFooter] Spotify token expired, requesting re-authentication');
     
-    // Save current game state
+    // Save current game state with actual room code and player info
+    const myPlayer = players?.find(p => p.id === myPlayerId);
     const gameState = {
       view: 'game',
-      playerName: 'Current Player', // This should be passed as prop in real implementation
-      roomCode: 'CURRENT_ROOM', // This should be passed as prop in real implementation
-      isCreator: true,
+      playerName: myPlayer?.name || 'Current Player',
+      roomCode: roomCode || 'UNKNOWN_ROOM',
+      isCreator: isCreator,
       timestamp: Date.now()
     };
     
     localStorage.setItem('game_state_backup', JSON.stringify(gameState));
     localStorage.setItem('pending_reauth', 'true');
     
-    // Show user-friendly message
-    if (window.confirm('Your Spotify session has expired. Click OK to re-authenticate and continue the game.')) {
-      window.location.href = "http://localhost:3001/login";
-    }
+    // Show non-blocking notification instead of popup
+    setTokenExpiredNotification({
+      gameState,
+      timestamp: Date.now()
+    });
   };
 
   // Handle play/pause button click with proper Safari user gesture handling
@@ -406,6 +408,7 @@ function GameFooter({
   const [songTitle, setSongTitle] = useState('');
   const [songArtist, setSongArtist] = useState('');
   const [newSongRequest, setNewSongRequest] = useState(null); // For creator notifications
+  const [tokenExpiredNotification, setTokenExpiredNotification] = useState(null); // For token expiration notifications
 
   // Format time mm:ss
   const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
@@ -592,7 +595,7 @@ function GameFooter({
                   onFocus={(e) => e.target.blur()}
                 >
                   <div className="text-white text-lg md:text-xl font-bold">
-                      <svg class="w-3 h-3 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 12 16">
+                      <svg className="w-3 h-3 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 12 16">
                           <path d="M10.819.4a1.974 1.974 0 0 0-2.147.33l-6.5 5.773A2.014 2.014 0 0 0 2 6.7V1a1 1 0 0 0-2 0v14a1 1 0 1 0 2 0V9.3c.055.068.114.133.177.194l6.5 5.773a1.982 1.982 0 0 0 2.147.33A1.977 1.977 0 0 0 12 13.773V2.227A1.977 1.977 0 0 0 10.819.4Z"/>
                       </svg>
 
@@ -609,13 +612,13 @@ function GameFooter({
                 >
                   {actualIsPlaying ? (
                     <div className="text-white text-2xl md:text-4xl font-bold">
-                      <svg class="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-                         <path fill-rule="evenodd" d="M8 5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H8Zm7 0a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1Z" clip-rule="evenodd"/>
+                      <svg className="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                         <path fillRule="evenodd" d="M8 5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H8Zm7 0a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1Z" clipRule="evenodd"/>
                       </svg>
                     </div>
                   ) : (
                     <div className="text-white text-xl md:text-3xl font-bold ml-1">
-                      <svg class="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 10 16">
+                      <svg className="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 10 16">
                         <path d="M3.414 1A2 2 0 0 0 0 2.414v11.172A2 2 0 0 0 3.414 15L9 9.414a2 2 0 0 0 0-2.828L3.414 1Z"/>
                      </svg>
                     </div>
@@ -828,6 +831,38 @@ function GameFooter({
           >
             Continue to Next Turn
           </button>
+        </div>
+      )}
+
+      {/* Token Expired Notification */}
+      {tokenExpiredNotification && (
+        <div className="w-full max-w-md p-3 mb-2 text-center bg-red-900/50 border border-red-500 rounded">
+          <div className="text-red-400 font-bold mb-2">
+            🔒 Spotify Session Expired
+          </div>
+          <div className="text-red-300 text-sm mb-3">
+            Your Spotify authentication has expired. Re-authenticate to continue with Spotify playback.
+          </div>
+          <div className="flex gap-2 justify-center">
+            <button 
+              onClick={() => {
+                // Use the auth utility for consistent re-auth handling
+                spotifyAuth.initiateReauth(tokenExpiredNotification.gameState);
+              }}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-sm text-white rounded"
+            >
+              Re-authenticate with Spotify
+            </button>
+            <button 
+              onClick={() => {
+                // Dismiss notification and continue with local playback
+                setTokenExpiredNotification(null);
+              }}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-sm text-white rounded"
+            >
+              Continue without Spotify
+            </button>
+          </div>
         </div>
       )}
 

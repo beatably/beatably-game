@@ -6,6 +6,7 @@ import GameFooter from "./GameFooter";
 import Landing from "./Landing";
 import WaitingRoom from "./WaitingRoom";
 import SpotifyPlayer from "./SpotifyPlayer";
+import SongDebugPanel from "./SongDebugPanel";
 import spotifyAuth from "./utils/spotifyAuth";
 import './App.css';
 import { DndProvider } from 'react-dnd';
@@ -175,6 +176,22 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [spotifyDeviceId, setSpotifyDeviceId] = useState(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [realSongs, setRealSongs] = useState(null); // Will replace fake songs when loaded
+
+  // Debug panel state
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+
+  // Add keyboard shortcut to toggle debug panel (Ctrl+D or Cmd+D)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'd') {
+        event.preventDefault();
+        setShowDebugPanel(prev => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Connect to backend on mount
   useEffect(() => {
@@ -635,12 +652,34 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   };
 
   // Start game handler
-  const handleStart = () => {
-    console.log("[App] Starting game with real songs:", realSongs ? realSongs.length : 0);
-    socketRef.current.emit("start_game", { 
-      code: roomCode, 
-      realSongs: realSongs || null 
-    });
+  const handleStart = async () => {
+    console.log("[App] Starting game - fetching fresh songs with current settings...");
+    
+    // Always fetch fresh songs when starting the game to ensure settings are applied
+    try {
+      const freshSongs = await fetchSpotifySongs(gameSettings.musicPreferences);
+      if (freshSongs && freshSongs.length > 0) {
+        console.log("[App] Fresh songs fetched:", freshSongs.length);
+        setRealSongs(freshSongs);
+        socketRef.current.emit("start_game", { 
+          code: roomCode, 
+          realSongs: freshSongs 
+        });
+      } else {
+        console.warn("[App] No fresh songs fetched, using existing songs or fallback");
+        socketRef.current.emit("start_game", { 
+          code: roomCode, 
+          realSongs: realSongs || null 
+        });
+      }
+    } catch (error) {
+      console.error("[App] Error fetching fresh songs for game start:", error);
+      // Fallback to existing songs if fetch fails
+      socketRef.current.emit("start_game", { 
+        code: roomCode, 
+        realSongs: realSongs || null 
+      });
+    }
   };
 
   // Helper: move to next player
@@ -872,18 +911,26 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [spotifyDeviceId]);
 
-  // Fetch Spotify songs when creator enters waiting room or music preferences change
+  // Fetch Spotify songs when creator enters waiting room (for preview/testing)
   useEffect(() => {
     if (isCreator && view === 'waiting') {
-      console.log("[Spotify] Fetching real songs for game...");
+      console.log("[Spotify] Pre-fetching songs for preview (fresh songs will be fetched on game start)...");
       fetchSpotifySongs().then((songs) => {
         if (songs && songs.length > 0) {
           setRealSongs(songs);
-          console.log("[Spotify] Real songs loaded, ready for game start");
+          console.log("[Spotify] Preview songs loaded");
         }
       });
     }
-  }, [isCreator, view, gameSettings.musicPreferences]);
+  }, [isCreator, view]);
+
+  // Clear songs when settings change to force fresh fetch on game start
+  useEffect(() => {
+    if (isCreator) {
+      console.log("[Spotify] Settings changed, will fetch fresh songs on game start");
+      setRealSongs(null); // Clear existing songs to force fresh fetch
+    }
+  }, [gameSettings.musicPreferences, isCreator]);
 
     // Show Spotify login ONLY when the user is (or will be) the host
   if (isCreator && !spotifyToken) {
@@ -997,6 +1044,22 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             socketRef={socketRef}
             roomCode={roomCode}
           />
+          
+          {/* Debug Panel */}
+          <SongDebugPanel
+            roomCode={roomCode}
+            isVisible={showDebugPanel}
+            onClose={() => setShowDebugPanel(false)}
+          />
+          
+          {/* Debug Panel Toggle Button */}
+          <button
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            className="fixed bottom-4 right-4 bg-yellow-600 hover:bg-yellow-500 text-white p-2 rounded-full shadow-lg z-40 text-xs font-medium"
+            title="Toggle Song Debug Panel (Ctrl+D / Cmd+D)"
+          >
+            🐛
+          </button>
         </div>
       </DndProvider>
     );
