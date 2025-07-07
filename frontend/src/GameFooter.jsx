@@ -661,7 +661,12 @@ function GameFooter({
                   }}
                   onFocus={(e) => e.target.blur()}
                 >
-                  <div className="text-white text-lg md:text-xl font-bold">⇤</div>
+                  <div className="text-white text-lg md:text-xl font-bold">
+                      <svg class="w-3 h-3 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 12 16">
+                          <path d="M10.819.4a1.974 1.974 0 0 0-2.147.33l-6.5 5.773A2.014 2.014 0 0 0 2 6.7V1a1 1 0 0 0-2 0v14a1 1 0 1 0 2 0V9.3c.055.068.114.133.177.194l6.5 5.773a1.982 1.982 0 0 0 2.147.33A1.977 1.977 0 0 0 12 13.773V2.227A1.977 1.977 0 0 0 10.819.4Z"/>
+                      </svg>
+
+                  </div>
                 </button>
                 
                 <button
@@ -673,9 +678,17 @@ function GameFooter({
                   }}
                 >
                   {actualIsPlaying ? (
-                    <div className="text-white text-2xl md:text-4xl font-bold">⏸</div>
+                    <div className="text-white text-2xl md:text-4xl font-bold">
+                      <svg class="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                         <path fill-rule="evenodd" d="M8 5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H8Zm7 0a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1Z" clip-rule="evenodd"/>
+                      </svg>
+                    </div>
                   ) : (
-                    <div className="text-white text-xl md:text-3xl font-bold ml-1">▶</div>
+                    <div className="text-white text-xl md:text-3xl font-bold ml-1">
+                      <svg class="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 10 16">
+                        <path d="M3.414 1A2 2 0 0 0 0 2.414v11.172A2 2 0 0 0 3.414 15L9 9.414a2 2 0 0 0 0-2.828L3.414 1Z"/>
+                     </svg>
+                    </div>
                   )}
                 </button>
               </>
