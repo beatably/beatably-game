@@ -667,7 +667,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             `Warning: ${freshSongsData.metadata.warning}\n\nDo you want to continue with ${freshSongsData.tracks.length} songs, or go back to adjust your music preferences?`
           );
           if (!shouldContinue) {
-            return; // Don't start the game, let user adjust settings
+            throw new Error("User cancelled game start due to song warning");
           }
         }
         
@@ -685,11 +685,22 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       }
     } catch (error) {
       console.error("[App] Error fetching fresh songs for game start:", error);
-      // Fallback to existing songs if fetch fails
-      socketRef.current.emit("start_game", { 
-        code: roomCode, 
-        realSongs: realSongs || null 
-      });
+      
+      // If it's a user cancellation, re-throw to let WaitingRoom handle it
+      if (error.message.includes("User cancelled")) {
+        throw error;
+      }
+      
+      // For other errors, try fallback
+      try {
+        socketRef.current.emit("start_game", { 
+          code: roomCode, 
+          realSongs: realSongs || null 
+        });
+      } catch (fallbackError) {
+        console.error("[App] Fallback game start also failed:", fallbackError);
+        throw new Error("Failed to start game. Please try again.");
+      }
     }
   };
 

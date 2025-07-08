@@ -12,10 +12,21 @@ function WaitingRoom({
   onUpdateSettings,
 }) {
   const [showSettings, setShowSettings] = useState(false);
+  const [isStartingGame, setIsStartingGame] = useState(false);
   const isCreator = currentPlayer?.isCreator;
   const enoughPlayers = players.length >= 2; // Minimum 2 players, max 4 players
   const tooManyPlayers = players.length > 4;
   const canStart = isCreator && enoughPlayers && !tooManyPlayers;
+
+  const handleStartGame = async () => {
+    setIsStartingGame(true);
+    try {
+      await onStart();
+    } catch (error) {
+      console.error('Error starting game:', error);
+      setIsStartingGame(false);
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
@@ -79,11 +90,29 @@ function WaitingRoom({
           </button>
           {isCreator && (
             <button
-              className="w-full md:w-auto px-4 py-2 bg-green-700 hover:bg-green-600 rounded font-semibold text-white transition disabled:bg-gray-700 disabled:text-gray-400"
-              disabled={!canStart}
-              onClick={onStart}
+              className="w-full md:w-auto px-4 py-2 bg-green-700 hover:bg-green-600 rounded font-semibold text-white transition disabled:bg-gray-700 disabled:text-gray-400 flex items-center justify-center"
+              disabled={!canStart || isStartingGame}
+              onClick={handleStartGame}
             >
-              Start Game
+              {isStartingGame && (
+                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              )}
+              {isStartingGame ? "Preparing songs..." : "Start Game"}
             </button>
           )}
         </div>
