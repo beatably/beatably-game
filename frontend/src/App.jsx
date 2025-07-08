@@ -7,6 +7,7 @@ import Landing from "./Landing";
 import WaitingRoom from "./WaitingRoom";
 import SpotifyPlayer from "./SpotifyPlayer";
 import SongDebugPanel from "./SongDebugPanel";
+import SongGuessNotification from "./SongGuessNotification";
 import spotifyAuth from "./utils/spotifyAuth";
 import './App.css';
 import { DndProvider } from 'react-dnd';
@@ -172,6 +173,10 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Debug panel state
   const [showDebugPanel, setShowDebugPanel] = useState(false);
 
+  // Song guess notification state
+  const [songGuessNotification, setSongGuessNotification] = useState(null);
+  const [tokenAnimations, setTokenAnimations] = useState({});
+
   // Add keyboard shortcut to toggle debug panel (Ctrl+D or Cmd+D)
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -251,14 +256,46 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       // Listen for song guess results
       socketRef.current.on("song_guess_result", (result) => {
         console.log("[App] Song guess result:", result);
-        // Show a notification about the guess result
-        const message = result.correct 
-          ? `${result.playerName} correctly guessed "${result.title}" by ${result.artist}! +${result.correct ? 1 : 0} token(s)`
-          : `${result.playerName} guessed incorrectly: "${result.title}" by ${result.artist}`;
         
-        // You could show this in a toast notification or temporary message
-        // For now, we'll just log it
-        console.log("[Song Guess]", message);
+        // Play audio feedback
+        const audioFile = result.correct ? '/sounds/correct_guess.mp3' : '/sounds/incorrect_guess.mp3';
+        try {
+          const audio = new Audio(audioFile);
+          audio.volume = 0.5;
+          audio.play().catch(err => console.log('[Audio] Could not play sound:', err));
+        } catch (error) {
+          console.log('[Audio] Error creating audio:', error);
+        }
+        
+        // Calculate tokens earned (check for double points)
+        const player = players.find(p => p.id === result.playerId);
+        const tokensEarned = result.correct ? (player?.doublePoints ? 2 : 1) : 0;
+        
+        // Show notification
+        setSongGuessNotification({
+          playerName: result.playerName,
+          correct: result.correct,
+          title: result.title,
+          artist: result.artist,
+          tokensEarned: tokensEarned
+        });
+        
+        // Trigger token animation if correct
+        if (result.correct && result.playerId) {
+          setTokenAnimations(prev => ({
+            ...prev,
+            [result.playerId]: tokensEarned
+          }));
+          
+          // Clear animation after 3 seconds
+          setTimeout(() => {
+            setTokenAnimations(prev => {
+              const newState = { ...prev };
+              delete newState[result.playerId];
+              return newState;
+            });
+          }, 3000);
+        }
       });
 
       // Listen for challenge results
@@ -1003,7 +1040,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     return (
       <DndProvider backend={HTML5Backend}>
         <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-          <PlayerHeader players={players} currentPlayerId={currentPlayerId} />
+          <PlayerHeader 
+            players={players} 
+            currentPlayerId={currentPlayerId} 
+            tokenAnimations={tokenAnimations}
+          />
           <div className="sticky hidden top-0 z-20 bg-gray-900 bg-opacity-95  py-3 md:py-4 px-1">
             <h1 className="text-lg md:text-xl font-semibold text-center">
               {isMyTurn
@@ -1072,6 +1113,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             roomCode={roomCode}
             isVisible={showDebugPanel}
             onClose={() => setShowDebugPanel(false)}
+          />
+          
+          {/* Song Guess Notification */}
+          <SongGuessNotification
+            notification={songGuessNotification}
+            onClose={() => setSongGuessNotification(null)}
           />
           
           {/* Debug Panel Toggle Button */}

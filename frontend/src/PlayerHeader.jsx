@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import beatablyLogo from "./assets/beatably_logo.png";
 
 const CoinIcon = ({ className = "" }) => (
@@ -18,18 +18,37 @@ function TokenStack({ count }) {
         <span
           key={i}
           className="absolute"
-          style={{ left: `${i * 12}px`, zIndex: count - i }}
+          style={{ left: `${i * 10}px`, zIndex: count - i }}
         >
           <CoinIcon className="w-5 h-5" />
         </span>
       ))}
-      <span style={{ width: `${count > 0 ? 12 * (count - 1) + 20 : 0}px`, display: "inline-block" }}></span>
+      <span style={{ width: `${count > 0 ? 10 * (count - 1) + 20 : 0}px`, display: "inline-block" }}></span>
     </span>
   );
 }
 
-function PlayerHeader({ players, currentPlayerId }) {
+function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [animatingTokens, setAnimatingTokens] = useState({});
+
+  // Handle token animations
+  useEffect(() => {
+    Object.keys(tokenAnimations).forEach(playerId => {
+      if (tokenAnimations[playerId] && !animatingTokens[playerId]) {
+        setAnimatingTokens(prev => ({ ...prev, [playerId]: true }));
+        
+        // Remove animation after 2 seconds
+        setTimeout(() => {
+          setAnimatingTokens(prev => {
+            const newState = { ...prev };
+            delete newState[playerId];
+            return newState;
+          });
+        }, 2000);
+      }
+    });
+  }, [tokenAnimations, animatingTokens]);
 
   const handleRestart = () => {
     alert("Game restarted.");
@@ -56,28 +75,16 @@ function PlayerHeader({ players, currentPlayerId }) {
             }`}
           >
             <span className="font-bold truncate max-w-[70px] md:max-w-[60px] mb-0.5 md:mb-1">{p.name}</span>
-            <div className="flex items-center gap-0.5">
+            <div className={`flex items-center gap-0.5 transition-all duration-500 ${
+              animatingTokens[p.id] ? 'animate-pulse bg-green-500/20 rounded-md px-1' : ''
+            }`}>
               <span className="font-semibold text-base md:text-lg">{p.score}</span>
               <span className="text-gray-400 xs:inline">pts</span>
-              <TokenStack count={p.tokens} />
-            </div>
-            {/* Special abilities indicators */}
-            <div className="flex gap-1 mt-0.5">
-              {p.doublePoints && (
-                <span className="text-xs bg-yellow-600 px-1 rounded" title="Double Points">
-                  2x
-                </span>
-              )}
-              {p.skipChallenge && (
-                <span className="text-xs bg-green-600 px-1 rounded" title="Skip Challenge">
-                  🛡️
-                </span>
-              )}
-              {p.bonusTokens > 0 && (
-                <span className="text-xs bg-purple-600 px-1 rounded" title="Bonus Tokens">
-                  +{p.bonusTokens}
-                </span>
-              )}
+              <div className={`transition-transform duration-300 ${
+                animatingTokens[p.id] ? 'scale-110' : 'scale-100'
+              }`}>
+                <TokenStack count={p.tokens} />
+              </div>
             </div>
           </div>
         ))}

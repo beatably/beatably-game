@@ -1251,6 +1251,34 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Helper function to normalize song titles for comparison
+  const normalizeSongTitle = (title) => {
+    return title
+      .toLowerCase()
+      .trim()
+      // Remove content in parentheses
+      .replace(/\([^)]*\)/g, '')
+      // Remove content after dash, hyphen, or other common separators
+      .replace(/\s*[-–—]\s*.*$/, '')
+      // Remove "feat.", "ft.", "featuring" and similar
+      .replace(/\s*(feat\.?|ft\.?|featuring)\s+.*$/i, '')
+      // Remove extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  // Helper function to normalize artist names for comparison
+  const normalizeArtistName = (artist) => {
+    return artist
+      .toLowerCase()
+      .trim()
+      // Remove "feat.", "ft.", "featuring" parts
+      .replace(/\s*(feat\.?|ft\.?|featuring)\s+.*$/i, '')
+      // Remove extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
   // Song guess - only current player during song-guess phase
   socket.on('guess_song', ({ code, title, artist }) => {
     const game = games[code];
@@ -1263,10 +1291,29 @@ io.on('connection', (socket) => {
     const currentCard = game.sharedDeck[game.currentCardIndex];
     if (!currentCard) return;
     
-    // Check if guess is correct
-    const titleCorrect = title.toLowerCase().trim() === currentCard.title.toLowerCase().trim();
-    const artistCorrect = artist.toLowerCase().trim() === currentCard.artist.toLowerCase().trim();
+    // Check if guess is correct using normalized comparison
+    const normalizedGuessTitle = normalizeSongTitle(title);
+    const normalizedActualTitle = normalizeSongTitle(currentCard.title);
+    const normalizedGuessArtist = normalizeArtistName(artist);
+    const normalizedActualArtist = normalizeArtistName(currentCard.artist);
+    
+    const titleCorrect = normalizedGuessTitle === normalizedActualTitle;
+    const artistCorrect = normalizedGuessArtist === normalizedActualArtist;
     const bothCorrect = titleCorrect && artistCorrect;
+    
+    console.log('[Song Guess] Comparison debug:', {
+      originalTitle: currentCard.title,
+      normalizedActualTitle,
+      guessTitle: title,
+      normalizedGuessTitle,
+      titleCorrect,
+      originalArtist: currentCard.artist,
+      normalizedActualArtist,
+      guessArtist: artist,
+      normalizedGuessArtist,
+      artistCorrect,
+      bothCorrect
+    });
     
     if (bothCorrect) {
       // Award bonus tokens
