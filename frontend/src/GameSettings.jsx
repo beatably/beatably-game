@@ -5,8 +5,8 @@ function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
     difficulty: "normal",
     musicPreferences: {
-      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
-      yearRange: { min: 1980, max: 2024 },
+      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+      yearRange: { min: 1960, max: 2025 },
       markets: ['US']
     }
   });
@@ -20,8 +20,8 @@ function GameSettings({ settings, onUpdate }) {
     setLocalSettings(settings || {
       difficulty: "normal",
       musicPreferences: {
-        genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
-        yearRange: { min: 1980, max: 2024 },
+        genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+        yearRange: { min: 1960, max: 2025 },
         markets: ['US']
       }
     });
@@ -70,8 +70,8 @@ function GameSettings({ settings, onUpdate }) {
   };
 
   const availableGenres = [
-    'pop', 'rock', 'hip-hop', 'electronic', 'indie', 'country', 
-    'r&b', 'jazz', 'classical', 'folk', 'reggae', 'blues', 'funk', 'alternative'
+    'pop', 'rock', 'hip-hop', 'electronic', 'indie', 'Country', 
+    'R&B', 'Jazz', 'classical', 'folk', 'Reggae', 'blues', 'Funk', 'Alternative'
   ];
 
   const availableMarkets = [
@@ -143,12 +143,6 @@ function GameSettings({ settings, onUpdate }) {
         </div>
       </div>
       
-      {/* Player Info */}
-      <div className="bg-gray-600 p-2 rounded mb-4 text-sm">
-        <div className="text-gray-300 mb-1">Players: Determined by who joins (max 4 players)</div>
-        <div className="text-gray-300">Songs: Automatically maximized based on your music preferences</div>
-      </div>
-
       {/* Music Settings - Always Visible */}
       <div className="border-t border-gray-600 pt-3">
         <div className="mb-3">
@@ -184,7 +178,7 @@ function GameSettings({ settings, onUpdate }) {
                   <input
                     type="number"
                     min="1950"
-                    max="2024"
+                    max="2025"
                     value={localSettings.musicPreferences.yearRange.min}
                     onChange={e => handleMusicPreferenceChange('yearRange', {
                       ...localSettings.musicPreferences.yearRange,
@@ -198,7 +192,7 @@ function GameSettings({ settings, onUpdate }) {
                   <input
                     type="number"
                     min="1950"
-                    max="2024"
+                    max="2025"
                     value={localSettings.musicPreferences.yearRange.max}
                     onChange={e => handleMusicPreferenceChange('yearRange', {
                       ...localSettings.musicPreferences.yearRange,
@@ -232,8 +226,8 @@ function GameSettings({ settings, onUpdate }) {
             {/* Reset to Defaults */}
             <button
               onClick={() => handleMusicPreferenceChange('', {
-                genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
-                yearRange: { min: 1980, max: 2024 },
+                genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+                yearRange: { min: 1960, max: 2025 },
                 markets: ['US']
               })}
               className="w-full py-1 px-2 bg-gray-600 hover:bg-gray-500 rounded text-xs transition"

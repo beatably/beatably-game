@@ -14,30 +14,6 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { API_BASE_URL, SOCKET_URL } from './config';
 
-// Fake song data for prototyping
-const fakeSongs = [
-  { id: 1, title: "Billie Jean", artist: "Michael Jackson", year: 1983 },
-  { id: 2, title: "Rolling in the Deep", artist: "Adele", year: 2010 },
-  { id: 3, title: "Shape of You", artist: "Ed Sheeran", year: 2017 },
-  { id: 4, title: "Smells Like Teen Spirit", artist: "Nirvana", year: 1991 },
-  { id: 5, title: "Like a Prayer", artist: "Madonna", year: 1989 },
-  { id: 6, title: "Hey Ya!", artist: "Outkast", year: 2003 },
-  { id: 7, title: "Uptown Funk", artist: "Mark Ronson ft. Bruno Mars", year: 2014 },
-  { id: 8, title: "Bohemian Rhapsody", artist: "Queen", year: 1975 },
-  { id: 9, title: "Poker Face", artist: "Lady Gaga", year: 2008 },
-  { id: 10, title: "Wonderwall", artist: "Oasis", year: 1995 },
-  { id: 11, title: "Hips Don't Lie", artist: "Shakira", year: 2006 },
-  { id: 12, title: "Viva La Vida", artist: "Coldplay", year: 2008 },
-  { id: 13, title: "I Gotta Feeling", artist: "Black Eyed Peas", year: 2009 },
-  { id: 14, title: "Old Town Road", artist: "Lil Nas X", year: 2019 },
-  { id: 15, title: "Take On Me", artist: "a-ha", year: 1985 },
-];
-
-// Dummy player data for prototyping
-const dummyPlayers = [
-  { id: 1, name: "Alice", score: 3, tokens: 2 },
-  { id: 2, name: "Bob", score: 2, tokens: 1 },
-];
 
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
 
@@ -90,8 +66,8 @@ function App() {
       const settings = {
         difficulty: "normal",
         musicPreferences: {
-          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
-          yearRange: { min: 1980, max: 2024 },
+          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+          yearRange: { min: 1960, max: 2025 },
           markets: ['US']
         }
       };
@@ -134,9 +110,9 @@ function App() {
   // Centralized game state
   const [players, setPlayers] = useState([]); // [{id, name, isCreator, isReady}]
   const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
-  const [timeline, setTimeline] = useState([fakeSongs[0]]);
-  const [deck, setDeck] = useState(fakeSongs.slice(1));
-  const [currentCard, setCurrentCard] = useState(fakeSongs[1]);
+  const [timeline, setTimeline] = useState([]);
+  const [deck, setDeck] = useState([]);
+  const [currentCard, setCurrentCard] = useState(null);
   const [phase, setPhase] = useState('player-turn');
   const [feedback, setFeedback] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -156,8 +132,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [gameSettings, setGameSettings] = useState({
     difficulty: "normal",
     musicPreferences: {
-      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
-      yearRange: { min: 1980, max: 2024 },
+      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+      yearRange: { min: 1960, max: 2025 },
       markets: ['US']
     }
   });
@@ -885,9 +861,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const resetGame = () => {
     setPlayers([]);
     setCurrentPlayerIdx(0);
-    setTimeline([fakeSongs[0]]);
-    setDeck(fakeSongs.slice(1));
-    setCurrentCard(fakeSongs[1]);
+    setTimeline([]);
+    setDeck([]);
+    setCurrentCard(null);
     setFeedback(null);
     setShowFeedback(false);
     setPhase('player-turn');
