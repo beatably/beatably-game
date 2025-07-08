@@ -113,15 +113,17 @@ let fetchHistory = [];
 
 // Enhanced fetch songs from Spotify with filtering support
 app.post('/api/fetch-songs', async (req, res) => {
-  const { musicPreferences = {}, difficulty = 'normal' } = req.body;
+  const { musicPreferences = {}, difficulty = 'normal', playerCount = 2 } = req.body;
   
   // Default preferences if none provided
   const {
     genres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
     yearRange = { min: 1980, max: 2024 },
-    markets = ['US'],
-    limit = 50
+    markets = ['US']
   } = musicPreferences;
+  
+  // Calculate minimum songs needed: playerCount * 20
+  const minSongsNeeded = playerCount * 20;
 
   try {
     // Get client credentials token for unbiased market results
@@ -131,7 +133,8 @@ app.post('/api/fetch-songs', async (req, res) => {
       genres: genres.length,
       yearRange,
       markets,
-      limit,
+      playerCount,
+      minSongsNeeded,
       difficulty
     });
 
@@ -249,7 +252,7 @@ app.post('/api/fetch-songs', async (req, res) => {
     console.log(`[Spotify] Found ${uniqueTracks.length} unique tracks before filtering`);
 
     // If we don't have enough tracks, try more aggressive fallback searches
-    if (uniqueTracks.length < Math.max(60, limit * 0.8)) {
+    if (uniqueTracks.length < Math.max(60, minSongsNeeded)) {
       console.log(`[Spotify] Not enough tracks (${uniqueTracks.length}), trying fallback searches...`);
       
       const fallbackSearches = [
@@ -262,7 +265,7 @@ app.post('/api/fetch-songs', async (req, res) => {
       
       for (const market of markets) {
         for (const search of shuffledFallbacks) {
-          if (uniqueTracks.length >= Math.max(60, limit)) break; // Stop when we have enough
+          if (uniqueTracks.length >= Math.max(60, minSongsNeeded)) break; // Stop when we have enough
           
           try {
             // Use random offset for fallback searches too
@@ -333,19 +336,24 @@ app.post('/api/fetch-songs', async (req, res) => {
       console.log(`[Spotify] Hard mode: using all ${filteredTracks.length} tracks including niche songs`);
     }
 
-    // Ensure we have at least 60 songs for a good game experience
-    const minSongs = Math.max(60, limit);
+    // Automatically maximize songs - use all available filtered tracks
+    // But ensure we have at least the minimum needed for the game
+    const minSongs = Math.max(60, minSongsNeeded);
     
-    // If we still don't have enough songs, log a warning but continue
-    if (filteredTracks.length < minSongs) {
-      console.warn(`[Spotify] Warning: Only found ${filteredTracks.length} songs, but need at least ${minSongs}. Consider broadening your search criteria.`);
+    // Check if we have enough songs for the game
+    const hasEnoughSongs = filteredTracks.length >= minSongsNeeded;
+    const warning = !hasEnoughSongs ? 
+      `Only found ${filteredTracks.length} songs, but need at least ${minSongsNeeded} for ${playerCount} players. Consider broadening your music preferences (more genres, wider year range, or additional markets).` : 
+      null;
+    
+    if (warning) {
+      console.warn(`[Spotify] ${warning}`);
     }
     
-    // Shuffle and limit to requested number, but ensure at least 60 if possible
-    const targetCount = Math.min(filteredTracks.length, Math.max(minSongs, limit));
+    // Use all available songs (maximized) but ensure minimum for good experience
+    const targetCount = Math.max(filteredTracks.length, minSongs);
     const shuffled = filteredTracks
-      .sort(() => 0.5 - Math.random())
-      .slice(0, targetCount);
+      .sort(() => 0.5 - Math.random());
     
     // Store for debugging purposes
     const fetchResult = {
@@ -353,10 +361,15 @@ app.post('/api/fetch-songs', async (req, res) => {
       metadata: {
         totalFound: uniqueTracks.length,
         filteredByDifficulty: filteredTracks.length,
+        finalCount: shuffled.length,
         difficulty: difficulty,
         preferences: musicPreferences,
         marketsSearched: markets,
         genresSearched: genres,
+        playerCount: playerCount,
+        minSongsNeeded: minSongsNeeded,
+        hasEnoughSongs: hasEnoughSongs,
+        warning: warning,
         timestamp: new Date().toISOString(),
         fetchId: Date.now().toString()
       }
@@ -412,7 +425,7 @@ io.on('connection', (socket) => {
     const player = { id: socket.id, name, isCreator: true, isReady: true };
     lobbies[code] = {
       players: [player],
-      settings: settings || { minPlayers: 2, maxPlayers: 8, difficulty: "normal", timeLimit: 30 },
+      settings: settings || { difficulty: "normal" },
       status: "waiting"
     };
     socket.join(code);
@@ -437,9 +450,9 @@ io.on('connection', (socket) => {
       callback({ error: "No lobby found or game already started" });
       return;
     }
-    if (lobby.players.length >= (lobby.settings?.maxPlayers || 8)) {
+    if (lobby.players.length >= 4) {
       console.log('[Backend] Lobby is full:', lobby.players.length);
-      callback({ error: "Lobby is full" });
+      callback({ error: "Lobby is full (maximum 4 players)" });
       return;
     }
     const player = { id: socket.id, name, isCreator: false, isReady: true };

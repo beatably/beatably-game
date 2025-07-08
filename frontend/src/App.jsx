@@ -87,15 +87,11 @@ function App() {
       setRoomCode(code);
       setIsCreator(true);
       const settings = {
-        minPlayers: 2,
-        maxPlayers: 8,
         difficulty: "normal",
-        timeLimit: 30,
         musicPreferences: {
           genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
           yearRange: { min: 1980, max: 2024 },
-          markets: ['US'],
-          limit: 50
+          markets: ['US']
         }
       };
       console.log("[Socket] Emitting create_lobby", { name, code, settings });
@@ -157,15 +153,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [isCreator, setIsCreator] = useState(false);
   const [gameSettings, setGameSettings] = useState({
-    minPlayers: 2,
-    maxPlayers: 8,
     difficulty: "normal",
-    timeLimit: 30,
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
       yearRange: { min: 1980, max: 2024 },
-      markets: ['US'],
-      limit: 50
+      markets: ['US']
     }
   });
 
@@ -504,7 +496,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         },
         body: JSON.stringify({
           musicPreferences: musicPreferences || gameSettings.musicPreferences,
-          difficulty: gameSettings.difficulty
+          difficulty: gameSettings.difficulty,
+          playerCount: players.length || 2
         })
       });
 
@@ -515,7 +508,14 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       const data = await response.json();
       console.log("[Spotify] Successfully fetched", data.tracks.length, "songs");
       console.log("[Spotify] Metadata:", data.metadata);
-      return data.tracks;
+      
+      // Check for warnings and display them
+      if (data.metadata.warning) {
+        console.warn("[Spotify] Warning:", data.metadata.warning);
+        // You could show this warning in the UI if needed
+      }
+      
+      return data;
     } catch (error) {
       console.error("[Spotify] Error fetching songs:", error);
       return null;
@@ -657,13 +657,24 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     
     // Always fetch fresh songs when starting the game to ensure settings are applied
     try {
-      const freshSongs = await fetchSpotifySongs(gameSettings.musicPreferences);
-      if (freshSongs && freshSongs.length > 0) {
-        console.log("[App] Fresh songs fetched:", freshSongs.length);
-        setRealSongs(freshSongs);
+      const freshSongsData = await fetchSpotifySongs(gameSettings.musicPreferences);
+      if (freshSongsData && freshSongsData.tracks && freshSongsData.tracks.length > 0) {
+        console.log("[App] Fresh songs fetched:", freshSongsData.tracks.length);
+        
+        // Check for warnings and potentially show them to the user
+        if (freshSongsData.metadata.warning) {
+          const shouldContinue = window.confirm(
+            `Warning: ${freshSongsData.metadata.warning}\n\nDo you want to continue with ${freshSongsData.tracks.length} songs, or go back to adjust your music preferences?`
+          );
+          if (!shouldContinue) {
+            return; // Don't start the game, let user adjust settings
+          }
+        }
+        
+        setRealSongs(freshSongsData.tracks);
         socketRef.current.emit("start_game", { 
           code: roomCode, 
-          realSongs: freshSongs 
+          realSongs: freshSongsData.tracks 
         });
       } else {
         console.warn("[App] No fresh songs fetched, using existing songs or fallback");
@@ -915,9 +926,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   useEffect(() => {
     if (isCreator && view === 'waiting') {
       console.log("[Spotify] Pre-fetching songs for preview (fresh songs will be fetched on game start)...");
-      fetchSpotifySongs().then((songs) => {
-        if (songs && songs.length > 0) {
-          setRealSongs(songs);
+      fetchSpotifySongs().then((songsData) => {
+        if (songsData && songsData.tracks && songsData.tracks.length > 0) {
+          setRealSongs(songsData.tracks);
           console.log("[Spotify] Preview songs loaded");
         }
       });

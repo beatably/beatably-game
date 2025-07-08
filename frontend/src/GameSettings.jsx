@@ -3,15 +3,11 @@ import { API_BASE_URL } from './config';
 
 function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
-    minPlayers: 2,
-    maxPlayers: 8,
     difficulty: "normal",
-    timeLimit: 30,
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
       yearRange: { min: 1980, max: 2024 },
-      markets: ['US'],
-      limit: 50
+      markets: ['US']
     }
   });
 
@@ -22,15 +18,11 @@ function GameSettings({ settings, onUpdate }) {
 
   useEffect(() => {
     setLocalSettings(settings || {
-      minPlayers: 2,
-      maxPlayers: 8,
       difficulty: "normal",
-      timeLimit: 30,
       musicPreferences: {
         genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
         yearRange: { min: 1980, max: 2024 },
-        markets: ['US'],
-        limit: 50
+        markets: ['US']
       }
     });
   }, [settings]);
@@ -136,31 +128,7 @@ function GameSettings({ settings, onUpdate }) {
       <h3 className="font-medium mb-2">Game Settings</h3>
       
       {/* Basic Game Settings */}
-      <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-        <div>
-          <label className="block text-gray-300 mb-1">Min Players</label>
-          <select
-            className="w-full p-1 rounded text-black"
-            value={localSettings.minPlayers}
-            onChange={e => handleChange('minPlayers', parseInt(e.target.value))}
-          >
-            {[2, 3, 4].map(num => (
-              <option key={num} value={num}>{num}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-gray-300 mb-1">Max Players</label>
-          <select
-            className="w-full p-1 rounded text-black"
-            value={localSettings.maxPlayers}
-            onChange={e => handleChange('maxPlayers', parseInt(e.target.value))}
-          >
-            {[4, 6, 8, 10].map(num => (
-              <option key={num} value={num}>{num}</option>
-            ))}
-          </select>
-        </div>
+      <div className="grid grid-cols-1 gap-2 text-sm mb-4">
         <div>
           <label className="block text-gray-300 mb-1">Difficulty</label>
           <select
@@ -173,18 +141,12 @@ function GameSettings({ settings, onUpdate }) {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-gray-300 mb-1">Time Limit (sec)</label>
-          <select
-            className="w-full p-1 rounded text-black"
-            value={localSettings.timeLimit}
-            onChange={e => handleChange('timeLimit', parseInt(e.target.value))}
-          >
-            {[15, 30, 45, 60, 90].map(time => (
-              <option key={time} value={time}>{time}</option>
-            ))}
-          </select>
-        </div>
+      </div>
+      
+      {/* Player Info */}
+      <div className="bg-gray-600 p-2 rounded mb-4 text-sm">
+        <div className="text-gray-300 mb-1">Players: Determined by who joins (max 4 players)</div>
+        <div className="text-gray-300">Songs: Automatically maximized based on your music preferences</div>
       </div>
 
       {/* Music Settings - Always Visible */}
@@ -266,27 +228,13 @@ function GameSettings({ settings, onUpdate }) {
               </div>
             </div>
 
-            {/* Song Limit */}
-            <div>
-              <label className="block text-gray-300 mb-1 text-sm font-medium">Number of Songs</label>
-              <select
-                className="w-full p-1 rounded text-black text-xs"
-                value={localSettings.musicPreferences.limit}
-                onChange={e => handleMusicPreferenceChange('limit', parseInt(e.target.value))}
-              >
-                {[30, 40, 50, 60, 75, 100].map(num => (
-                  <option key={num} value={num}>{num} songs</option>
-                ))}
-              </select>
-            </div>
 
             {/* Reset to Defaults */}
             <button
               onClick={() => handleMusicPreferenceChange('', {
                 genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
                 yearRange: { min: 1980, max: 2024 },
-                markets: ['US'],
-                limit: 50
+                markets: ['US']
               })}
               className="w-full py-1 px-2 bg-gray-600 hover:bg-gray-500 rounded text-xs transition"
             >
@@ -348,6 +296,20 @@ function GameSettings({ settings, onUpdate }) {
                                 <div>Difficulty: <span className="text-white">{meta.difficulty}</span></div>
                                 <div>Total Found: <span className="text-white">{meta.totalFound}</span></div>
                                 <div>After Filtering: <span className="text-white">{meta.filteredByDifficulty}</span></div>
+                                <div>Final Count: <span className="text-white">{meta.finalCount}</span></div>
+                                {meta.playerCount && (
+                                  <>
+                                    <div>Player Count: <span className="text-white">{meta.playerCount}</span></div>
+                                    <div>Min Songs Needed: <span className="text-white">{meta.minSongsNeeded}</span></div>
+                                    <div>Has Enough Songs: <span className={meta.hasEnoughSongs ? "text-green-400" : "text-red-400"}>{meta.hasEnoughSongs ? "Yes" : "No"}</span></div>
+                                  </>
+                                )}
+                                {meta.warning && (
+                                  <div className="bg-yellow-900 bg-opacity-50 p-2 rounded mt-2">
+                                    <div className="text-yellow-300 font-medium">Warning:</div>
+                                    <div className="text-yellow-200 text-xs">{meta.warning}</div>
+                                  </div>
+                                )}
                                 <div>Genres: <span className="text-white">{meta.genresSearched?.join(', ')}</span></div>
                                 <div>Markets: <span className="text-white">{meta.marketsSearched?.join(', ')}</span></div>
                                 <div>Year Range: <span className="text-white">{meta.preferences?.yearRange?.min}-{meta.preferences?.yearRange?.max}</span></div>

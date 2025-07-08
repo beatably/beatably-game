@@ -13,8 +13,9 @@ function WaitingRoom({
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const isCreator = currentPlayer?.isCreator;
-  const enoughPlayers = players.length >= (settings?.minPlayers || 2);
-  const canStart = isCreator && enoughPlayers;
+  const enoughPlayers = players.length >= 2; // Minimum 2 players, max 4 players
+  const tooManyPlayers = players.length > 4;
+  const canStart = isCreator && enoughPlayers && !tooManyPlayers;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
@@ -29,7 +30,7 @@ function WaitingRoom({
             <div className="text-sm mt-4 text-gray-400">Share this code with friends to join</div>
           </div>
           <div className="mb-12">
-            <div className="font-semibold text-gray-300 mb-3">Players ({players.length})</div>
+            <div className="font-semibold text-gray-300 mb-3">Players ({players.length}/4)</div>
             <div className="bg-gray-800 rounded-lg border border-gray-700 divide-y divide-gray-700 overflow-hidden">
               {players.map((player) => (
                 <div
@@ -86,9 +87,10 @@ function WaitingRoom({
             </button>
           )}
         </div>
-        {isCreator && !enoughPlayers && (
+        {isCreator && !canStart && (
           <div className="text-center text-sm text-yellow-400 pb-4">
-            Need at least {settings?.minPlayers || 2} players to start
+            {!enoughPlayers && "Need at least 2 players to start"}
+            {tooManyPlayers && "Maximum 4 players allowed"}
           </div>
         )}
       </div>
