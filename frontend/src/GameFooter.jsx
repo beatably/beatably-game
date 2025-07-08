@@ -822,7 +822,11 @@ function GameFooter({
           <div className="text-white text-sm mb-4">
             {challenge.result?.challengeWon ? 
               `${players?.find(p => p.id === challenge.challengerId)?.name} won the challenge!` :
-              `${players?.find(p => p.id === challenge.originalPlayerId)?.name} placed it correctly!`
+              challenge.result?.originalCorrect ?
+                `${players?.find(p => p.id === challenge.originalPlayerId)?.name} placed it correctly!` :
+                challenge.result?.challengerCorrect ?
+                  `${players?.find(p => p.id === challenge.challengerId)?.name} placed it correctly, but ${players?.find(p => p.id === challenge.originalPlayerId)?.name} went first!` :
+                  `Both players placed it incorrectly! No one gets the card.`
             }
           </div>
           <button 

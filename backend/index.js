@@ -648,10 +648,36 @@ io.on('connection', (socket) => {
     let newTimeline = [...timeline];
     newTimeline.splice(index, 0, currentCard);
 
-    // Check correctness
-    const prevYear = index > 0 ? timeline[index - 1].year : -Infinity;
-    const nextYear = index < timeline.length ? timeline[index].year : Infinity;
+    // Check correctness - CRITICAL FIX: Properly handle all placement scenarios
+    let prevYear, nextYear;
+    
+    if (index === 0) {
+      // Placing at the beginning
+      prevYear = -Infinity;
+      nextYear = timeline.length > 0 ? timeline[0].year : Infinity;
+    } else if (index >= timeline.length) {
+      // Placing at the end (beyond current timeline)
+      prevYear = timeline.length > 0 ? timeline[timeline.length - 1].year : -Infinity;
+      nextYear = Infinity;
+    } else {
+      // Placing in the middle
+      prevYear = timeline[index - 1].year;
+      nextYear = timeline[index].year;
+    }
+    
     const correct = prevYear <= currentCard.year && currentCard.year <= nextYear;
+    
+    // Add debug logging for original placement
+    console.log('[Backend] Original placement debug:', {
+      cardYear: currentCard.year,
+      placementIndex: index,
+      timeline: timeline.map(c => c.year),
+      timelineLength: timeline.length,
+      prevYear,
+      nextYear,
+      correct,
+      calculation: `${prevYear} <= ${currentCard.year} <= ${nextYear}`
+    });
 
     // Update game state
     game.timelines[playerId] = newTimeline;
@@ -750,7 +776,8 @@ io.on('connection', (socket) => {
           return;
         }
         
-        gameInTimeout.timelines[playerId] = (gameInTimeout.timelines[playerId] || []).filter((c) => c.id !== gameInTimeout.lastPlaced?.id);
+        // CRITICAL FIX: Remove incorrect card from the CURRENT player's timeline, not the next player
+        gameInTimeout.timelines[currentPlayerId] = (gameInTimeout.timelines[currentPlayerId] || []).filter((c) => c.id !== gameInTimeout.lastPlaced?.id);
         gameInTimeout.removingId = null;
         gameInTimeout.lastPlaced = null;
         gameInTimeout.feedback = null;
@@ -971,14 +998,48 @@ io.on('connection', (socket) => {
     // Remove the original placement first
     const timelineWithoutOriginal = originalTimeline.filter(c => c.id !== currentCard.id);
     
+    // CRITICAL FIX: Adjust challenger's index to account for the original card's position
+    // The challenger sees a timeline WITH the original card, but we process against timeline WITHOUT it
+    let adjustedIndex = index;
+    if (index > game.challenge.originalIndex) {
+      // If challenger placed after the original card's position, subtract 1 from index
+      adjustedIndex = index - 1;
+    }
+    
     // Place challenger's card in the original player's timeline
     let newTimeline = [...timelineWithoutOriginal];
-    newTimeline.splice(index, 0, currentCard);
+    newTimeline.splice(adjustedIndex, 0, currentCard);
 
-    // Check challenger's correctness
-    const prevYear = index > 0 ? timelineWithoutOriginal[index - 1]?.year || -Infinity : -Infinity;
-    const nextYear = index < timelineWithoutOriginal.length ? timelineWithoutOriginal[index]?.year || Infinity : Infinity;
+    // Check challenger's correctness using the adjusted index
+    let prevYear, nextYear;
+    
+    if (adjustedIndex === 0) {
+      // Placing at the beginning
+      prevYear = -Infinity;
+      nextYear = timelineWithoutOriginal.length > 0 ? timelineWithoutOriginal[0].year : Infinity;
+    } else if (adjustedIndex >= timelineWithoutOriginal.length) {
+      // Placing at the end (beyond current timeline)
+      prevYear = timelineWithoutOriginal.length > 0 ? timelineWithoutOriginal[timelineWithoutOriginal.length - 1].year : -Infinity;
+      nextYear = Infinity;
+    } else {
+      // Placing in the middle
+      prevYear = timelineWithoutOriginal[adjustedIndex - 1].year;
+      nextYear = timelineWithoutOriginal[adjustedIndex].year;
+    }
+    
     const challengerCorrect = prevYear <= currentCard.year && currentCard.year <= nextYear;
+    
+    // Add debug logging to understand what's happening
+    console.log('[Backend] Challenge placement debug:', {
+      cardYear: currentCard.year,
+      challengerIndex: index,
+      timelineWithoutOriginal: timelineWithoutOriginal.map(c => c.year),
+      timelineLength: timelineWithoutOriginal.length,
+      prevYear,
+      nextYear,
+      challengerCorrect,
+      calculation: `${prevYear} <= ${currentCard.year} <= ${nextYear}`
+    });
     
     // Get original player's placement result
     const originalCorrect = game.lastPlaced?.correct || false;
@@ -993,28 +1054,58 @@ io.on('connection', (socket) => {
     // CRITICAL: Update the main game phase to challenge-resolved
     game.phase = 'challenge-resolved';
     
-    // For challenge resolution, we need to show both cards temporarily
-    // Create a display timeline that shows both the original and challenger placements
+    // SIMPLIFIED FIX: Show the actual final timeline state instead of complex display logic
+    // The final timeline will be determined by the challenge outcome logic below
     let displayTimeline = [...timelineWithoutOriginal];
     
-    // Add the original player's card at their original position
-    const originalCard = { ...currentCard, originalCard: true };
-    displayTimeline.splice(game.challenge.originalIndex, 0, originalCard);
+    // Add both cards in their actual positions for visual comparison
+    // Original card at its position
+    const originalDisplayCard = { ...currentCard, originalCard: true };
+    const challengerDisplayCard = { ...currentCard, challengerCard: true };
     
-    // Add the challenger's card at their chosen position
-    // Adjust index if challenger placed after original position
-    let challengerDisplayIndex = index;
-    if (index > game.challenge.originalIndex) {
-      challengerDisplayIndex = index + 1; // Account for original card already inserted
+    // Insert original card at its position
+    const originalDisplayTimeline = [...timelineWithoutOriginal];
+    originalDisplayTimeline.splice(game.challenge.originalIndex, 0, originalDisplayCard);
+    
+    // Insert challenger card at its position  
+    const challengerDisplayTimeline = [...timelineWithoutOriginal];
+    challengerDisplayTimeline.splice(index, 0, challengerDisplayCard);
+    
+    // For display, show both cards in a simple way - just add them both to show comparison
+    displayTimeline = [...timelineWithoutOriginal];
+    
+    // CRITICAL FIX: Use the adjusted index for display to match the actual placement logic
+    // Both indices are relative to the timelineWithoutOriginal, so we need to be careful about insertion order
+    
+    if (game.challenge.originalIndex <= adjustedIndex) {
+      // Original comes first or at same position, insert original first
+      displayTimeline.splice(game.challenge.originalIndex, 0, originalDisplayCard);
+      // Now challenger index needs to be adjusted since we inserted original card before it
+      displayTimeline.splice(adjustedIndex + 1, 0, challengerDisplayCard);
+    } else {
+      // Challenger comes first, insert challenger first
+      displayTimeline.splice(adjustedIndex, 0, challengerDisplayCard);
+      // Now original index needs to be adjusted since we inserted challenger card before it
+      displayTimeline.splice(game.challenge.originalIndex + 1, 0, originalDisplayCard);
     }
-    const challengerCard = { ...currentCard, challengerCard: true };
-    displayTimeline.splice(challengerDisplayIndex, 0, challengerCard);
     
     // Determine challenge outcome and update actual timelines
     let challengeWon = false;
+    
+    // Add comprehensive debug logging for challenge outcome
+    console.log('[Backend] Challenge outcome debug:', {
+      challengerCorrect,
+      originalCorrect,
+      challengerId: playerId,
+      originalPlayerId,
+      cardYear: currentCard.year,
+      cardId: currentCard.id
+    });
+    
     if (challengerCorrect && !originalCorrect) {
       // Challenger wins - card goes to challenger's timeline in correct chronological position
       challengeWon = true;
+      console.log('[Backend] Challenge outcome: Challenger wins (challenger correct, original wrong)');
       const challengerTimeline = game.timelines[playerId] || [];
       
       // Find correct position in challenger's timeline
@@ -1035,17 +1126,22 @@ io.on('connection', (socket) => {
     } else if (!challengerCorrect && originalCorrect) {
       // Original player wins - keep original placement
       challengeWon = false;
+      console.log('[Backend] Challenge outcome: Original player wins (challenger wrong, original correct)');
       // Put the card back in original position
       game.timelines[originalPlayerId].splice(game.challenge.originalIndex, 0, currentCard);
     } else if (challengerCorrect && originalCorrect) {
       // Both correct - original player keeps it (went first)
       challengeWon = false;
+      console.log('[Backend] Challenge outcome: Both correct, original player keeps card');
       // Put the card back in original position
       game.timelines[originalPlayerId].splice(game.challenge.originalIndex, 0, currentCard);
     } else {
-      // Both wrong - nobody gets the card
+      // CRITICAL FIX: Both wrong - nobody gets the card, remove from all timelines
       challengeWon = false;
+      console.log('[Backend] Challenge outcome: Both wrong, nobody gets the card');
       game.timelines[originalPlayerId] = timelineWithoutOriginal; // Remove from original
+      // Ensure card is not in challenger's timeline either
+      game.timelines[playerId] = (game.timelines[playerId] || []).filter(c => c.id !== currentCard.id);
     }
     
     // Set challenge result

@@ -43,14 +43,14 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
   const getCardOutline = (card) => {
     // Check if this is a challenger card (marked by backend)
     if (card.challengerCard && phase === 'challenge-resolved') {
-      // Challenger card should be green only if challenger won
-      return challenge?.result?.challengeWon ? 'green' : 'red';
+      // Challenger card should be green only if challenger was correct
+      return challenge?.result?.challengerCorrect ? 'green' : 'red';
     }
     
     // Check if this is an original card (marked by backend)
     if (card.originalCard && phase === 'challenge-resolved') {
-      // Original card should be green only if original player won
-      return challenge?.result?.challengeWon ? 'red' : 'green';
+      // Original card should be green only if original player was correct
+      return challenge?.result?.originalCorrect ? 'green' : 'red';
     }
     
     if (!lastPlaced || card.id !== lastPlaced.id) {
