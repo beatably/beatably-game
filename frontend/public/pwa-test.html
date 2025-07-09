@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PWA Test</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="/img/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+    <h1>PWA Test Page</h1>
+    <p>This is a simple test page to verify PWA functionality.</p>
+    <script>
+        // Test if manifest is loading
+        if ('serviceWorker' in navigator) {
+            console.log('Service Worker supported');
+        }
+        
+        // Check if manifest is accessible
+        fetch('/manifest.json')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Manifest loaded:', data);
+                document.body.innerHTML += '<p>✅ Manifest loaded successfully</p>';
+            })
+            .catch(error => {
+                console.error('Manifest error:', error);
+                document.body.innerHTML += '<p>❌ Manifest failed to load</p>';
+            });
+            
+        // Check if icon is accessible
+        fetch('/img/icon-192.png')
+            .then(response => {
+                if (response.ok) {
+                    console.log('Icon loaded successfully');
+                    document.body.innerHTML += '<p>✅ Icon accessible</p>';
+                } else {
+                    console.log('Icon failed to load');
+                    document.body.innerHTML += '<p>❌ Icon not accessible</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Icon error:', error);
+                document.body.innerHTML += '<p>❌ Icon failed to load</p>';
+            });
+    </script>
+</body>
+</html>
