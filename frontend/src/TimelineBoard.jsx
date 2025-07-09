@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { useDrop } from "react-dnd";
 import DraggableCard from "./DraggableCard";
+import DragArrow from "./DragArrow";
+import CardPlaceholder from "./CardPlaceholder";
 import { playClickSound } from "./utils/soundUtils";
 
 const CARD_TYPE = "SONG_CARD";
 
-function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic }) {
+function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
+
+  // Notify parent component when drag state changes
+  useEffect(() => {
+    if (onDragStateChange) {
+      onDragStateChange(isDragging);
+    }
+  }, [isDragging, onDragStateChange]);
 
   // Listen for custom touch drop events
   useEffect(() => {
@@ -137,17 +146,42 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     );
   }
 
+  // Determine layout based on screen size - always use side-by-side on mobile
+  const isMobile = window.innerWidth < 768; // md breakpoint
+  const containerClasses = isMobile 
+    ? "flex flex-row w-full max-w-3xl items-start justify-center gap-2"
+    : "flex flex-col md:flex-row w-full max-w-3xl items-center md:items-start justify-center gap-2 md:gap-4";
+  
+  const timelineClasses = isMobile
+    ? "flex flex-col items-center p-2 rounded-lg min-h-[700px] w-48 relative order-1"
+    : "flex flex-col items-center p-2 rounded-lg min-h-[700px] w-full md:w-56 relative order-2 md:order-1";
+    
+  const cardContainerClasses = isMobile
+    ? "flex flex-col items-center justify-start w-24 order-2 mt-8"
+    : "flex flex-col items-center justify-center w-full md:flex-1 order-1 md:order-2 m-6 md:mb-0";
+
+  // Determine if we should show the draggable card
+  const showDraggableCard = isMyTurn && currentCard && !showFeedback && (phase === 'player-turn' || phase === 'challenge');
+  
   return (
-    <div className="flex flex-col md:flex-row w-full max-w-3xl items-center md:items-start justify-center gap-2 md:gap-4">
+    <div className={containerClasses}>
       {/* Timeline - Always visible regardless of whose turn it is */}
-      <div className="flex flex-col items-center p-2 rounded-lg min-h-[300px] w-full md:w-56 relative order-2 md:order-1">
+      <div className={timelineClasses}>
         <div className="text-xs text-gray-600 mb-1">↑ Older songs</div>
         {dropZones}
         <div className="text-xs text-gray-600 mt-1">↓ Newer songs</div>
       </div>
-      {/* Draggable card only for active player during appropriate phases */}
-      <div className="flex flex-col items-center justify-center w-full md:flex-1 order-1 md:order-2 m-6 md:mb-0">
-        {isMyTurn && currentCard && !showFeedback && (phase === 'player-turn' || phase === 'challenge') && (
+      
+      
+      {/* Card container - shows either draggable card or placeholder */}
+      <div className={cardContainerClasses}>
+
+      {/* Arrow - Always visible on mobile, positioned so tip points just right of timeline */}
+      {isMobile && (
+        <DragArrow className="-ml-16 z-10" />
+      )}
+
+        {showDraggableCard ? (
           <DraggableCard 
             card={currentCard} 
             type={CARD_TYPE} 
@@ -155,6 +189,9 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
             setIsDragging={setIsDragging}
             isNewCard={isLoadingNewSong}
           />
+        ) : (
+          // Show placeholder when card is not present
+          <CardPlaceholder />
         )}
       </div>
     </div>
@@ -219,9 +256,9 @@ function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback,
     opacity = "opacity-60";
   }
 
-  const baseHeight = 8;
-  const expandedHeight = 48;
-  const mobileHeight = isDragging && canDrop ? 32 : baseHeight; // Larger on mobile when dragging
+  const baseHeight = 4;
+  const expandedHeight = 40;
+  const mobileHeight = isDragging && canDrop ? 22 : baseHeight; // Larger on mobile when dragging
 
   return (
     <div

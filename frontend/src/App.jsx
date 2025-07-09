@@ -152,6 +152,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Song guess notification state
   const [songGuessNotification, setSongGuessNotification] = useState(null);
   const [tokenAnimations, setTokenAnimations] = useState({});
+  
+  // Drag state for UI adjustments
+  const [isDragging, setIsDragging] = useState(false);
 
   // Add keyboard shortcut to toggle debug panel (Ctrl+D or Cmd+D)
   useEffect(() => {
@@ -1028,7 +1031,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                 : `${currentPlayerName}'s turn`}
             </h1>
           </div>
-          <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 pb-20 md:pb-24">
+          <div className="fixed top-16 left-0 right-0 bottom-0 flex flex-col items-center justify-center p-1 md:p-2 z-10">
             {/* Hidden Spotify Player for initialization only */}
             {isCreator && spotifyToken && (
               <div style={{ display: 'none' }}>
@@ -1056,6 +1059,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               challenge={challenge}
               onChallengePlaceCard={handleChallengePlaceCard}
               isPlayingMusic={isPlayingMusic}
+              onDragStateChange={setIsDragging}
             />
           </div>
           <GameFooter
@@ -1082,6 +1086,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             isCreator={isCreator}
             socketRef={socketRef}
             roomCode={roomCode}
+            isDragging={isDragging}
           />
           
           {/* Debug Panel */}

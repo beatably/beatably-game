@@ -24,7 +24,8 @@ function GameFooter({
   isPlayingMusic,
   isCreator,
   socketRef,
-  roomCode
+  roomCode,
+  isDragging
 }) {
   // Track local playing state for UI
   const [localIsPlaying, setLocalIsPlaying] = React.useState(false);
@@ -545,8 +546,47 @@ function GameFooter({
     onContinue();
   };
 
+  // Render compact footer during drag operations
+  if (isDragging) {
+    return (
+      <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-gray-800 shadow flex flex-col items-center px-1 py-1 border-t border-gray-700">
+        {/* Compact player during drag */}
+        <div className="w-full max-w-md flex items-center justify-center py-1">
+          {/* Essential controls only */}
+          {isCreator && (
+            <button
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 mr-2"
+              onClick={handlePlayPauseClick}
+              aria-label={actualIsPlaying ? "Pause" : "Play"}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              {actualIsPlaying ? (
+                <svg className="w-3 h-3" fill="white" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" d="M8 5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H8Zm7 0a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1Z" clipRule="evenodd"/>
+                </svg>
+              ) : (
+                <svg className="w-3 h-3 ml-0.5" fill="white" viewBox="0 0 10 16">
+                  <path d="M3.414 1A2 2 0 0 0 0 2.414v11.172A2 2 0 0 0 3.414 15L9 9.414a2 2 0 0 0 0-2.828L3.414 1Z"/>
+                </svg>
+              )}
+            </button>
+          )}
+          
+          {/* Minimal progress bar */}
+          <div className="flex-1 flex items-center gap-1 text-xs text-gray-400">
+            <span className="text-xs">{formatTime(progress)}</span>
+            <div className="relative flex-1 h-1 bg-[#404040] rounded-full overflow-hidden">
+              <div className="absolute left-0 top-0 h-1 bg-[#1db954] rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
+            </div>
+            <span className="text-xs">{formatTime(duration)}</span>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
   return (
-    <footer className="sticky bottom-0 z-30 w-full bg-gray-800 shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-gray-700">
+    <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-gray-800 shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-gray-700">
       {/* Spotify-style player */}
       <div className="w-full max-w-md flex flex-col items-center">
         <div className="w-full bg-none rounded-2xl shadow-2xl shadow-gray-900 p-3 md:p-2 flex flex-col items-center mb-3">
@@ -603,7 +643,7 @@ function GameFooter({
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-lg border-4 border-white/20 flex-shrink-0"
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-[0_10px_15px_-3px_theme(colors.green.300)/50] border-4 border-green-500/20 flex-shrink-0"
                   onClick={handlePlayPauseClick}
                   aria-label={actualIsPlaying ? "Pause" : "Play"}
                   style={{ 
