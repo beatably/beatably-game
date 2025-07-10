@@ -606,8 +606,13 @@ function GameFooter({
                   />
                 </div>
               )}
-              <div className="text-sm md:text-base text-gray-400 text-center truncate">
-                {currentCard.title} – {currentCard.artist} ({feedback?.year || currentCard.year})
+              <div className="text-sm md:text-base text-gray-400 text-center flex-1 min-w-0">
+                <div className="font-medium leading-tight">
+                  {currentCard.title}
+                </div>
+                <div className="leading-tight">
+                  {currentCard.artist} ({feedback?.year || currentCard.year})
+                </div>
               </div>
             </div>
           )}
