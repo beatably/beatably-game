@@ -111,6 +111,107 @@ let lastFetchedSongs = null;
 let lastFetchMetadata = null;
 let fetchHistory = [];
 
+// Function to create systematic year-based searches for better distribution
+function createYearBasedSearches(yearRange, genres, markets) {
+  const { min: minYear, max: maxYear } = yearRange;
+  if (!minYear || !maxYear) return [];
+  
+  const searches = [];
+  const yearSpan = maxYear - minYear + 1;
+  
+  // Create decade-based searches for better distribution
+  const decades = [];
+  for (let year = Math.floor(minYear / 10) * 10; year <= maxYear; year += 10) {
+    const decadeStart = Math.max(year, minYear);
+    const decadeEnd = Math.min(year + 9, maxYear);
+    if (decadeStart <= decadeEnd) {
+      decades.push({ start: decadeStart, end: decadeEnd });
+    }
+  }
+  
+  console.log(`[Spotify] Creating searches for decades:`, decades);
+  
+  // For each decade, create searches with different genres
+  decades.forEach(decade => {
+    const yearQuery = `year:${decade.start}-${decade.end}`;
+    
+    // Add general decade searches
+    searches.push(yearQuery);
+    searches.push(`${yearQuery} hits`);
+    searches.push(`${yearQuery} popular`);
+    
+    // Add genre-specific decade searches
+    genres.forEach(genre => {
+      searches.push(`${yearQuery} genre:${genre}`);
+    });
+  });
+  
+  // Add some 5-year period searches for finer granularity
+  for (let year = minYear; year <= maxYear; year += 5) {
+    const periodEnd = Math.min(year + 4, maxYear);
+    if (year <= periodEnd) {
+      const yearQuery = `year:${year}-${periodEnd}`;
+      searches.push(yearQuery);
+      
+      // Add a few genre searches for this period
+      const randomGenres = genres.sort(() => 0.5 - Math.random()).slice(0, 2);
+      randomGenres.forEach(genre => {
+        searches.push(`${yearQuery} genre:${genre}`);
+      });
+    }
+  }
+  
+  console.log(`[Spotify] Created ${searches.length} year-based searches`);
+  return searches;
+}
+
+// Function to ensure diverse artist representation
+function diversifyByArtist(tracks, maxPerArtist = 2) {
+  const tracksByArtist = {};
+  const diversifiedTracks = [];
+  
+  // Group tracks by artist
+  tracks.forEach(track => {
+    const artist = track.artist.toLowerCase();
+    if (!tracksByArtist[artist]) {
+      tracksByArtist[artist] = [];
+    }
+    tracksByArtist[artist].push(track);
+  });
+  
+  // Log artist distribution before diversification
+  const artistCounts = Object.fromEntries(
+    Object.entries(tracksByArtist)
+      .filter(([artist, tracks]) => tracks.length > 1)
+      .map(([artist, tracks]) => [artist, tracks.length])
+  );
+  console.log(`[Spotify] Artists with multiple tracks before diversification:`, artistCounts);
+  
+  // Take up to maxPerArtist tracks from each artist, prioritizing by popularity
+  Object.values(tracksByArtist).forEach(artistTracks => {
+    const selectedTracks = artistTracks
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, maxPerArtist);
+    diversifiedTracks.push(...selectedTracks);
+  });
+  
+  // Log final artist distribution
+  const finalArtistCounts = {};
+  diversifiedTracks.forEach(track => {
+    const artist = track.artist.toLowerCase();
+    finalArtistCounts[artist] = (finalArtistCounts[artist] || 0) + 1;
+  });
+  
+  const multipleArtists = Object.fromEntries(
+    Object.entries(finalArtistCounts)
+      .filter(([artist, count]) => count > 1)
+  );
+  console.log(`[Spotify] Artists with multiple tracks after diversification:`, multipleArtists);
+  console.log(`[Spotify] Diversification: ${tracks.length} -> ${diversifiedTracks.length} tracks`);
+  
+  return diversifiedTracks;
+}
+
 // Enhanced fetch songs from Spotify with filtering support
 app.post('/api/fetch-songs', async (req, res) => {
   const { musicPreferences = {}, difficulty = 'normal', playerCount = 2 } = req.body;
@@ -140,67 +241,34 @@ app.post('/api/fetch-songs', async (req, res) => {
 
     const allTracks = [];
     
-    // Build search queries based on selected genres with randomization
-    const searches = [];
+    // NEW APPROACH: Use systematic year-based searches for better distribution
+    const yearBasedSearches = createYearBasedSearches(yearRange, genres, markets);
     
-    // Add genre-specific searches with random terms for variety
-    const randomTerms = ['hits', 'popular', 'best', 'top', 'classic', 'greatest', 'chart'];
-    const randomYears = [];
-    
-    // Generate some random year searches within the range for more variety
-    if (yearRange.min && yearRange.max) {
-      const yearSpan = yearRange.max - yearRange.min;
-      const numYearSearches = Math.min(3, Math.floor(yearSpan / 10)); // Max 3 year-specific searches
-      for (let i = 0; i < numYearSearches; i++) {
-        const randomYear = yearRange.min + Math.floor(Math.random() * yearSpan);
-        randomYears.push(randomYear);
-      }
-    }
-    
-    // Add genre-specific searches with random terms
-    genres.forEach(genre => {
-      searches.push(`genre:${genre}`);
-      // Add some randomized genre searches
-      const randomTerm = randomTerms[Math.floor(Math.random() * randomTerms.length)];
-      searches.push(`genre:${genre} ${randomTerm}`);
-    });
-    
-    // Add year-specific searches for more variety
-    randomYears.forEach(year => {
-      searches.push(`year:${year}`);
-      const randomGenre = genres[Math.floor(Math.random() * genres.length)];
-      searches.push(`year:${year} genre:${randomGenre}`);
-    });
-    
-    // Add some general searches with randomization
+    // Add some general searches for additional variety
     const generalSearches = [
-      'hits', 'popular', 'chart', 'top', 'best', 'classic', 'greatest',
-      'rock hits', 'pop hits', 'dance hits', 'indie hits', 'alternative hits'
+      'hits', 'popular', 'chart', 'top', 'best', 'classic', 'greatest'
     ];
     
-    // Randomly select some general searches
-    const shuffledGeneral = generalSearches.sort(() => 0.5 - Math.random());
-    searches.push(...shuffledGeneral.slice(0, 5));
+    // Combine year-based and general searches
+    const allSearches = [...yearBasedSearches, ...generalSearches];
     
     // Shuffle all searches to randomize order
-    const shuffledSearches = searches.sort(() => 0.5 - Math.random());
+    const shuffledSearches = allSearches.sort(() => 0.5 - Math.random());
     
-    // Search in each market with randomized offset for more variety
+    // Search in each market with systematic approach
     for (const market of markets) {
       for (const search of shuffledSearches) {
         try {
-          // Build query with year filter if specified
+          // Year-based searches already include year filters, don't add more
           let query = search;
-          if (yearRange.min && yearRange.max && !search.includes('year:')) {
+          
+          // Only add year filter for general searches that don't already have year constraints
+          if (!search.includes('year:') && yearRange.min && yearRange.max) {
             query += ` year:${yearRange.min}-${yearRange.max}`;
-          } else if (yearRange.min && !search.includes('year:')) {
-            query += ` year:${yearRange.min}-2024`;
-          } else if (yearRange.max && !search.includes('year:')) {
-            query += ` year:1950-${yearRange.max}`;
           }
 
-          // Add random offset to get different results each time
-          const randomOffset = Math.floor(Math.random() * 100); // Random offset 0-99
+          // Use smaller random offset to get more consistent results per search
+          const randomOffset = Math.floor(Math.random() * 50); // Smaller offset for more predictable results
 
           const response = await axios.get('https://api.spotify.com/v1/search', {
             headers: {
@@ -209,7 +277,7 @@ app.post('/api/fetch-songs', async (req, res) => {
             params: {
               q: query,
               type: 'track',
-              limit: 15, // Slightly larger limit per search
+              limit: 20, // Larger limit per search to get more songs
               market: market,
               offset: randomOffset
             }
@@ -320,40 +388,40 @@ app.post('/api/fetch-songs', async (req, res) => {
     if (difficulty === 'easy') {
       // Easy: Only very popular songs (popularity >= 70) and singles
       filteredTracks = uniqueTracks
-        .filter(track => track.popularity >= 70)
-        .sort((a, b) => b.popularity - a.popularity); // Sort by popularity descending
+        .filter(track => track.popularity >= 70);
       console.log(`[Spotify] Easy mode: filtered to ${filteredTracks.length} popular tracks (popularity >= 70)`);
     } else if (difficulty === 'normal') {
       // Normal: Moderately popular songs (popularity >= 50) and singles
       filteredTracks = uniqueTracks
-        .filter(track => track.popularity >= 50)
-        .sort((a, b) => b.popularity - a.popularity);
+        .filter(track => track.popularity >= 50);
       console.log(`[Spotify] Normal mode: filtered to ${filteredTracks.length} moderately popular tracks (popularity >= 50)`);
     } else if (difficulty === 'hard') {
-      // Hard: All songs including niche ones, but still prefer singles
-      filteredTracks = uniqueTracks
-        .sort((a, b) => b.popularity - a.popularity);
+      // Hard: All songs including niche ones
+      filteredTracks = uniqueTracks;
       console.log(`[Spotify] Hard mode: using all ${filteredTracks.length} tracks including niche songs`);
     }
 
-    // Automatically maximize songs - use all available filtered tracks
-    // But ensure we have at least the minimum needed for the game
+    // Apply artist diversification to prevent too many songs from same artist
+    const artistDiversifiedTracks = diversifyByArtist(filteredTracks, 2); // Max 2 songs per artist
+    
+    // Ensure we have enough songs for the game
     const minSongs = Math.max(60, minSongsNeeded);
     
     // Check if we have enough songs for the game
-    const hasEnoughSongs = filteredTracks.length >= minSongsNeeded;
+    const hasEnoughSongs = artistDiversifiedTracks.length >= minSongsNeeded;
     const warning = !hasEnoughSongs ? 
-      `Only found ${filteredTracks.length} songs, but need at least ${minSongsNeeded} for ${playerCount} players. Consider broadening your music preferences (more genres, wider year range, or additional markets).` : 
+      `Only found ${artistDiversifiedTracks.length} songs, but need at least ${minSongsNeeded} for ${playerCount} players. Consider broadening your music preferences (more genres, wider year range, or additional markets).` : 
       null;
     
     if (warning) {
       console.warn(`[Spotify] ${warning}`);
     }
     
-    // Use all available songs (maximized) but ensure minimum for good experience
-    const targetCount = Math.max(filteredTracks.length, minSongs);
-    const shuffled = filteredTracks
-      .sort(() => 0.5 - Math.random());
+    // Use all available songs but cap at maximum of 120 for faster loading
+    const maxSongs = 120;
+    const shuffled = artistDiversifiedTracks
+      .sort(() => 0.5 - Math.random())
+      .slice(0, maxSongs); // Cap at maximum 120 songs
     
     // Store for debugging purposes
     const fetchResult = {
@@ -361,6 +429,7 @@ app.post('/api/fetch-songs', async (req, res) => {
       metadata: {
         totalFound: uniqueTracks.length,
         filteredByDifficulty: filteredTracks.length,
+        afterArtistDiversification: artistDiversifiedTracks.length,
         finalCount: shuffled.length,
         difficulty: difficulty,
         preferences: musicPreferences,
