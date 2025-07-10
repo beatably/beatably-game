@@ -53,12 +53,6 @@ function SongGuessNotification({ notification, onClose }) {
               </div>
             )}
           </div>
-          <button 
-            onClick={handleClose}
-            className="text-white hover:text-gray-300 text-xl font-bold ml-2"
-          >
-            ×
-          </button>
         </div>
       </div>
     </div>
