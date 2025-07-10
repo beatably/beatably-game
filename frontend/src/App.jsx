@@ -8,7 +8,9 @@ import WaitingRoom from "./WaitingRoom";
 import SpotifyPlayer from "./SpotifyPlayer";
 import SongDebugPanel from "./SongDebugPanel";
 import SongGuessNotification from "./SongGuessNotification";
+import SessionRestore from "./SessionRestore";
 import spotifyAuth from "./utils/spotifyAuth";
+import sessionManager from "./utils/sessionManager";
 import './App.css';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -156,6 +158,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Drag state for UI adjustments
   const [isDragging, setIsDragging] = useState(false);
 
+  // Session management state
+  const [sessionId, setSessionId] = useState(null);
+  const [showSessionRestore, setShowSessionRestore] = useState(false);
+  const [sessionRestoreData, setSessionRestoreData] = useState(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
   // Add keyboard shortcut to toggle debug panel (Ctrl+D or Cmd+D)
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -168,6 +176,115 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Check for existing session on app load
+  useEffect(() => {
+    const checkForExistingSession = () => {
+      if (sessionManager.hasValidSession()) {
+        const sessionData = sessionManager.getSession();
+        console.log('[SessionManager] Found existing session:', sessionData);
+        setSessionRestoreData(sessionData);
+        setShowSessionRestore(true);
+      }
+    };
+
+    // Only check for session if we're on the landing page and not already restoring
+    if (view === 'landing' && !isRestoring && !showSessionRestore) {
+      checkForExistingSession();
+    }
+  }, [view, isRestoring, showSessionRestore]);
+
+  // Save session data whenever important state changes
+  useEffect(() => {
+    if (sessionId && (view === 'waiting' || view === 'game') && roomCode && playerName) {
+      const currentState = {
+        sessionId,
+        roomCode,
+        playerName,
+        playerId: socketRef.current?.id,
+        isCreator,
+        view,
+        players,
+        gameSettings,
+        currentPlayerId,
+        currentPlayerIdx,
+        phase,
+        timeline,
+        deck,
+        gameRound,
+        feedback,
+        lastPlaced,
+        challenge
+      };
+      
+      sessionManager.saveSession(sessionManager.createSessionData(currentState));
+    }
+  }, [sessionId, view, roomCode, playerName, isCreator, players, gameSettings, 
+      currentPlayerId, currentPlayerIdx, phase, timeline, deck, gameRound, 
+      feedback, lastPlaced, challenge]);
+
+  // Handle page visibility change and beforeunload for session backup
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (view === 'game' || view === 'waiting') {
+        const currentState = {
+          sessionId,
+          roomCode,
+          playerName,
+          playerId: socketRef.current?.id,
+          isCreator,
+          view,
+          players,
+          gameSettings,
+          currentPlayerId,
+          currentPlayerIdx,
+          phase,
+          timeline,
+          deck,
+          gameRound,
+          feedback,
+          lastPlaced,
+          challenge
+        };
+        sessionManager.handleVisibilityChange(currentState);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      if (view === 'game' || view === 'waiting') {
+        const currentState = {
+          sessionId,
+          roomCode,
+          playerName,
+          playerId: socketRef.current?.id,
+          isCreator,
+          view,
+          players,
+          gameSettings,
+          currentPlayerId,
+          currentPlayerIdx,
+          phase,
+          timeline,
+          deck,
+          gameRound,
+          feedback,
+          lastPlaced,
+          challenge
+        };
+        sessionManager.handleBeforeUnload(currentState);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sessionId, view, roomCode, playerName, isCreator, players, gameSettings,
+      currentPlayerId, currentPlayerIdx, phase, timeline, deck, gameRound,
+      feedback, lastPlaced, challenge]);
 
   // Connect to backend on mount
   useEffect(() => {
@@ -581,6 +698,104 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   };
 
+  // Session restoration handlers
+  const handleRestoreSession = async () => {
+    if (!sessionRestoreData) return;
+    
+    setIsRestoring(true);
+    console.log('[SessionManager] Attempting to restore session:', sessionRestoreData);
+    
+    try {
+      // Attempt to reconnect to the backend
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit('reconnect_session', {
+          sessionId: sessionRestoreData.sessionId,
+          roomCode: sessionRestoreData.roomCode,
+          playerName: sessionRestoreData.playerName
+        }, (response) => {
+          console.log('[SessionManager] Reconnection response:', response);
+          
+          if (response.error) {
+            console.error('[SessionManager] Reconnection failed:', response.error);
+            alert(`Failed to rejoin game: ${response.error}`);
+            sessionManager.clearSession();
+            setShowSessionRestore(false);
+            setIsRestoring(false);
+            return;
+          }
+          
+          if (response.success) {
+            console.log('[SessionManager] Successfully reconnected to:', response.view);
+            
+            // Restore app state
+            setSessionId(sessionRestoreData.sessionId);
+            setPlayerName(sessionRestoreData.playerName);
+            setRoomCode(sessionRestoreData.roomCode);
+            setIsCreator(sessionRestoreData.isCreator);
+            setPlayerId(socketRef.current.id);
+            
+            if (response.view === 'waiting') {
+              setPlayers(response.lobby.players);
+              setGameSettings(response.lobby.settings || gameSettings);
+              setView('waiting');
+            } else if (response.view === 'game') {
+              const gameState = response.gameState;
+              setPlayers(gameState.players);
+              setCurrentPlayerIdx(gameState.currentPlayerIdx || 0);
+              
+              // CRITICAL FIX: The backend sends the reconnecting player's timeline,
+              // but the frontend needs to show the current player's timeline.
+              // We'll let the game_update event handle the timeline display.
+              setTimeline(gameState.timeline || []);
+              
+              setDeck(gameState.deck || []);
+              setPhase(gameState.phase);
+              setFeedback(gameState.feedback);
+              setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
+              setLastPlaced(gameState.lastPlaced);
+              setRemovingId(gameState.removingId);
+              setChallenge(gameState.challenge);
+              setCurrentPlayerId(gameState.currentPlayerId);
+              
+              // CRITICAL FIX: Restore game round from session data
+              if (sessionRestoreData.gameRound) {
+                setGameRound(sessionRestoreData.gameRound);
+              } else {
+                // Fallback: calculate game round based on current player index
+                setGameRound((gameState.currentPlayerIdx || 0) + 1);
+              }
+              
+              setView('game');
+              
+              // CRITICAL FIX: The backend will send a game_update event shortly after
+              // reconnection that will set the correct timeline for the current player.
+              // This ensures the UI shows the right perspective.
+            }
+            
+            setShowSessionRestore(false);
+            setIsRestoring(false);
+            console.log('[SessionManager] Session restoration complete');
+          }
+        });
+      } else {
+        throw new Error('Socket not connected');
+      }
+    } catch (error) {
+      console.error('[SessionManager] Error during session restoration:', error);
+      alert('Failed to restore session. Please try again.');
+      sessionManager.clearSession();
+      setShowSessionRestore(false);
+      setIsRestoring(false);
+    }
+  };
+
+  const handleDeclineRestore = () => {
+    console.log('[SessionManager] User declined session restoration');
+    sessionManager.clearSession();
+    setShowSessionRestore(false);
+    setSessionRestoreData(null);
+  };
+
   // Create game handler (calls backend)
   // Game creator must have a Spotify token; if not, trigger OAuth first
   const handleCreate = (name) => {
@@ -594,6 +809,21 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     setPlayerName(name);
     setRoomCode(code);
     setIsCreator(true);
+    
+    // Create session for tracking
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('create_session', {
+        roomCode: code,
+        playerName: name,
+        isCreator: true
+      }, (response) => {
+        if (response.sessionId) {
+          setSessionId(response.sessionId);
+          console.log('[SessionManager] Created session:', response.sessionId);
+        }
+      });
+    }
+    
     console.log("[Socket] Emitting create_lobby", { name, code, settings: gameSettings });
     socketRef.current.emit(
       "create_lobby",
@@ -601,14 +831,20 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         name,
         code,
         settings: gameSettings,
+        sessionId: sessionId
       },
-      ({ error, lobby, player }) => {
-        console.log("[Socket] create_lobby callback", { error, lobby, player });
+      ({ error, lobby, player, sessionId: returnedSessionId }) => {
+        console.log("[Socket] create_lobby callback", { error, lobby, player, sessionId: returnedSessionId });
         if (error) {
           alert(error);
           setView("landing");
           return;
         }
+        
+        if (returnedSessionId) {
+          setSessionId(returnedSessionId);
+        }
+        
         setPlayers(lobby.players);
         setGameSettings(lobby.settings);
         setView("waiting");
@@ -621,6 +857,21 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     setPlayerName(name);
     setRoomCode(code);
     setIsCreator(false);
+    
+    // Create session for tracking (for guest players too)
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('create_session', {
+        roomCode: code,
+        playerName: name,
+        isCreator: false
+      }, (response) => {
+        if (response.sessionId) {
+          setSessionId(response.sessionId);
+          console.log('[SessionManager] Created session for guest player:', response.sessionId);
+        }
+      });
+    }
+    
     console.log("[Socket] Emitting join_lobby", { name, code });
     socketRef.current.emit(
       "join_lobby",
@@ -970,19 +1221,32 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [gameSettings.musicPreferences, isCreator]);
 
-    // Show Spotify login ONLY when the user is (or will be) the host
-  if (isCreator && !spotifyToken) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-900">
-        <a href={`${API_BASE_URL}/login`} className="px-6 py-3 bg-green-500 text-white rounded">
-          Login with Spotify
-        </a>
-      </div>
-    );
-  }
-
   if (view === "landing") {
-    return <Landing onCreate={handleCreate} onJoin={handleJoin} />;
+    return (
+      <>
+        <Landing onCreate={handleCreate} onJoin={handleJoin} />
+        {showSessionRestore && (
+          <SessionRestore
+            sessionData={sessionRestoreData}
+            onRestore={handleRestoreSession}
+            onDecline={handleDeclineRestore}
+            isRestoring={isRestoring}
+          />
+        )}
+        {/* Show Spotify login ONLY when the user is (or will be) the host AND no session restore is available */}
+        {isCreator && !spotifyToken && !showSessionRestore && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-gray-800 rounded-lg p-6 text-center">
+              <h2 className="text-xl font-bold text-white mb-4">Spotify Login Required</h2>
+              <p className="text-gray-300 mb-6">As a game creator, you need to connect with Spotify to play music.</p>
+              <a href={`${API_BASE_URL}/login`} className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
+                Login with Spotify
+              </a>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
   if (view === "waiting") {
     const currentPlayer = players.find((p) => p.name === playerName) || {};

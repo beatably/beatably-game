@@ -482,11 +482,219 @@ const lobbies = {}; // { code: { players: [], settings: {}, status: "waiting"|"p
 // Store game state per room: { [code]: { timeline, deck, currentPlayerIdx, phase, ... } }
 const games = {};
 
+// Store player sessions for reconnection: { sessionId: { playerId, roomCode, playerName, isCreator, timestamp } }
+const playerSessions = {};
+
+// Session timeout (30 minutes)
+const SESSION_TIMEOUT = 30 * 60 * 1000;
+
+// Clean up expired sessions periodically
+setInterval(() => {
+  const now = Date.now();
+  Object.keys(playerSessions).forEach(sessionId => {
+    if (now - playerSessions[sessionId].timestamp > SESSION_TIMEOUT) {
+      console.log('[Sessions] Cleaning up expired session:', sessionId);
+      delete playerSessions[sessionId];
+    }
+  });
+}, 5 * 60 * 1000); // Clean up every 5 minutes
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
+  // Session reconnection
+  socket.on('reconnect_session', ({ sessionId, roomCode, playerName }, callback) => {
+    console.log('[Sessions] Reconnection attempt:', { sessionId, roomCode, playerName, socketId: socket.id });
+    
+    // Check if session exists and is valid
+    const session = playerSessions[sessionId];
+    if (!session) {
+      console.log('[Sessions] Session not found:', sessionId);
+      callback({ error: "Session not found or expired" });
+      return;
+    }
+    
+    // Check if session matches the request
+    if (session.roomCode !== roomCode || session.playerName !== playerName) {
+      console.log('[Sessions] Session mismatch:', { 
+        sessionRoomCode: session.roomCode, 
+        requestRoomCode: roomCode,
+        sessionPlayerName: session.playerName,
+        requestPlayerName: playerName
+      });
+      callback({ error: "Session data mismatch" });
+      return;
+    }
+    
+    // Update session with new socket ID
+    session.playerId = socket.id;
+    session.timestamp = Date.now();
+    
+    // Check if lobby/game still exists
+    const lobby = lobbies[roomCode];
+    const game = games[roomCode];
+    
+    // CRITICAL FIX: Prioritize game over lobby - if game exists, reconnect to game
+    if (game) {
+      // Reconnect to game
+      const existingPlayerIndex = game.players.findIndex(p => p.name === playerName);
+      if (existingPlayerIndex !== -1) {
+        // CRITICAL FIX: Get the old socket ID BEFORE updating it
+        const oldPlayerId = game.players[existingPlayerIndex].id;
+        
+        socket.join(roomCode);
+        console.log('[Sessions] Reconnected to game:', roomCode);
+        
+        // Send current game state
+        const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+        const currentCard = game.sharedDeck[game.currentCardIndex];
+        
+        // CRITICAL DEBUG: Log all timeline data before processing
+        console.log('[Sessions] FULL DEBUG - Before reconnection processing:', {
+          playerName,
+          currentPlayerId,
+          allPlayers: game.players.map(p => ({ id: p.id, name: p.name })),
+          allTimelineKeys: Object.keys(game.timelines),
+          timelineLengths: Object.fromEntries(Object.entries(game.timelines).map(([id, timeline]) => [id, timeline.length])),
+          phase: game.phase,
+          currentPlayerIdx: game.currentPlayerIdx,
+          oldPlayerId: oldPlayerId,
+          newSocketId: socket.id
+        });
+        
+        // Get the player's timeline using their old player ID (before socket ID update)
+        const playerTimeline = game.timelines[oldPlayerId] || [];
+        
+        console.log('[Sessions] Timeline lookup result:', {
+          oldPlayerId,
+          timelineFound: !!game.timelines[oldPlayerId],
+          timelineLength: playerTimeline.length,
+          timelineCards: playerTimeline.map(c => ({ id: c.id, title: c.title, year: c.year }))
+        });
+        
+        // Now update the player's socket ID
+        game.players[existingPlayerIndex].id = socket.id;
+        
+        // CRITICAL FIX: Update currentPlayerId if the reconnecting player is the current player
+        if (game.playerOrder[game.currentPlayerIdx] === oldPlayerId) {
+          game.playerOrder[game.currentPlayerIdx] = socket.id;
+          console.log('[Sessions] Updated current player ID in player order:', {
+            from: oldPlayerId,
+            to: socket.id,
+            currentPlayerIdx: game.currentPlayerIdx
+          });
+        }
+        
+        // Update the timeline mapping to use the new socket ID
+        if (game.timelines[oldPlayerId]) {
+          game.timelines[socket.id] = game.timelines[oldPlayerId];
+          console.log('[Sessions] Timeline mapping updated:', {
+            from: oldPlayerId,
+            to: socket.id,
+            timelineLength: game.timelines[socket.id].length
+          });
+        }
+        
+        // CRITICAL FIX: Get the updated current player ID after potential player order update
+        const updatedCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
+        
+        callback({
+          success: true,
+          view: 'game',
+          gameState: {
+            timeline: playerTimeline, // Send the reconnecting player's timeline
+            deck: [currentCard],
+            players: game.players,
+            phase: game.phase,
+            feedback: game.feedback,
+            lastPlaced: game.lastPlaced,
+            removingId: game.removingId,
+            currentPlayerIdx: game.currentPlayerIdx,
+            currentPlayerId: updatedCurrentPlayerId, // Use updated ID
+            challenge: game.challenge
+          }
+        });
+        
+        // CRITICAL FIX: Broadcast updated game state to all players to sync the reconnected player
+        setTimeout(() => {
+          game.players.forEach((p) => {
+            io.to(p.id).emit('game_update', {
+              timeline: game.timelines[updatedCurrentPlayerId],
+              deck: [currentCard],
+              players: game.players,
+              phase: game.phase,
+              feedback: game.feedback,
+              lastPlaced: game.lastPlaced,
+              removingId: game.removingId,
+              currentPlayerIdx: game.currentPlayerIdx,
+              currentPlayerId: updatedCurrentPlayerId, // Use updated ID
+              challenge: game.challenge
+            });
+          });
+        }, 100);
+        
+        // Notify other players of reconnection
+        socket.to(roomCode).emit('player_reconnected', {
+          playerName: playerName,
+          playerId: socket.id
+        });
+        
+      } else {
+        console.log('[Sessions] Player not found in game:', playerName);
+        callback({ error: "Player not found in game" });
+      }
+      
+    } else if (lobby) {
+      // Reconnect to lobby (fallback if no game exists)
+      const existingPlayerIndex = lobby.players.findIndex(p => p.name === playerName);
+      if (existingPlayerIndex !== -1) {
+        // Update existing player's socket ID
+        lobby.players[existingPlayerIndex].id = socket.id;
+      } else {
+        // Add player back to lobby
+        lobby.players.push({
+          id: socket.id,
+          name: playerName,
+          isCreator: session.isCreator,
+          isReady: true
+        });
+      }
+      
+      socket.join(roomCode);
+      console.log('[Sessions] Reconnected to lobby:', roomCode);
+      callback({ 
+        success: true, 
+        view: 'waiting',
+        lobby: lobby,
+        player: lobby.players.find(p => p.id === socket.id)
+      });
+      io.to(roomCode).emit('lobby_update', lobby);
+      
+    } else {
+      console.log('[Sessions] Room no longer exists:', roomCode);
+      callback({ error: "Game no longer exists" });
+    }
+  });
+
+  // Create session for new players
+  socket.on('create_session', ({ roomCode, playerName, isCreator }, callback) => {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    
+    playerSessions[sessionId] = {
+      sessionId,
+      playerId: socket.id,
+      roomCode,
+      playerName,
+      isCreator,
+      timestamp: Date.now()
+    };
+    
+    console.log('[Sessions] Created session:', sessionId, 'for player:', playerName);
+    callback({ sessionId });
+  });
+
   // Create lobby
-  socket.on('create_lobby', ({ name, code, settings }, callback) => {
+  socket.on('create_lobby', ({ name, code, settings, sessionId }, callback) => {
     if (lobbies[code]) {
       callback({ error: "Lobby already exists" });
       return;
@@ -498,7 +706,20 @@ io.on('connection', (socket) => {
       status: "waiting"
     };
     socket.join(code);
-    callback({ lobby: lobbies[code], player });
+    
+    // Create or update session
+    if (sessionId) {
+      playerSessions[sessionId] = {
+        sessionId,
+        playerId: socket.id,
+        roomCode: code,
+        playerName: name,
+        isCreator: true,
+        timestamp: Date.now()
+      };
+    }
+    
+    callback({ lobby: lobbies[code], player, sessionId });
     io.to(code).emit('lobby_update', lobbies[code]);
   });
 
