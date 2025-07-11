@@ -166,7 +166,7 @@ function createYearBasedSearches(yearRange, genres, markets) {
 }
 
 // Function to ensure diverse artist representation
-function diversifyByArtist(tracks, maxPerArtist = 2) {
+function diversifyByArtist(tracks, maxPerArtist = 1) {
   const tracksByArtist = {};
   const diversifiedTracks = [];
   
@@ -283,7 +283,7 @@ app.post('/api/fetch-songs', async (req, res) => {
             }
           });
 
-          const tracks = response.data.tracks.items
+          let tracks = response.data.tracks.items
             .filter(track => {
               // Additional year filtering for precision
               const trackYear = new Date(track.album.release_date).getFullYear();
@@ -303,6 +303,10 @@ app.post('/api/fetch-songs', async (req, res) => {
               genre: search.includes('genre:') ? search.split('genre:')[1].split(' ')[0] : 'general',
               popularity: track.popularity
             }));
+
+          // CRITICAL FIX: Shuffle tracks to counteract alphabetical bias from Spotify
+          // This prevents artists starting with numbers/early letters from being favored
+          tracks = tracks.sort(() => 0.5 - Math.random());
 
           allTracks.push(...tracks);
           console.log(`[Spotify] Found ${tracks.length} tracks for "${query}" in ${market} (offset: ${randomOffset})`);
@@ -352,7 +356,7 @@ app.post('/api/fetch-songs', async (req, res) => {
               }
             });
 
-            const tracks = response.data.tracks.items
+            let tracks = response.data.tracks.items
               .filter(track => {
                 const trackYear = new Date(track.album.release_date).getFullYear();
                 return (!yearRange.min || trackYear >= yearRange.min) && 
@@ -372,6 +376,9 @@ app.post('/api/fetch-songs', async (req, res) => {
                 genre: 'fallback',
                 popularity: track.popularity
               }));
+
+            // CRITICAL FIX: Shuffle fallback tracks to counteract alphabetical bias
+            tracks = tracks.sort(() => 0.5 - Math.random());
 
             uniqueTracks.push(...tracks);
             console.log(`[Spotify] Added ${tracks.length} fallback tracks from "${search}" in ${market} (offset: ${randomOffset})`);
@@ -402,7 +409,7 @@ app.post('/api/fetch-songs', async (req, res) => {
     }
 
     // Apply artist diversification to prevent too many songs from same artist
-    const artistDiversifiedTracks = diversifyByArtist(filteredTracks, 2); // Max 2 songs per artist
+    const artistDiversifiedTracks = diversifyByArtist(filteredTracks, 1); // Max 1 song per artist
     
     // Ensure we have enough songs for the game
     const minSongs = Math.max(60, minSongsNeeded);
