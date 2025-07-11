@@ -595,7 +595,7 @@ function GameFooter({
             <div className="mb-2 flex items-center gap-4 justify-center w-full">
               {/* Album Art - only during reveal */}
               {(currentCard?.album_art || currentCard?.image || currentCard?.album?.images?.[0]?.url) && (
-                <div className="w-12 h-12 md:w-16 md:h-16 rounded overflow-hidden bg-gray-700 flex-shrink-0">
+                <div className="w-20 h-20 md:w-32 md:h-32 rounded overflow-hidden bg-gray-700 flex-shrink-0">
                   <img 
                     src={currentCard?.album_art || currentCard?.image || currentCard?.album?.images?.[0]?.url} 
                     alt="Album cover"
@@ -606,8 +606,8 @@ function GameFooter({
                   />
                 </div>
               )}
-              <div className="text-sm md:text-base text-gray-400 text-center flex-1 min-w-0">
-                <div className="font-medium leading-tight">
+              <div className="text-sm md:text-base text-gray-400 text-left flex-1 min-w-0">
+                <div className="font-medium leading-tight mb-2">
                   {currentCard.title}
                 </div>
                 <div className="leading-tight">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import beatablyLogo from "./assets/beatably_logo.png";
 
 const CoinIcon = ({ className = "" }) => (
-  <span className={`inline-block w-5 h-5 align-middle ${className}`}>
+  <span className={`inline-block w-3 h-3 align-middle ${className}`}>
     <svg viewBox="0 0 20 20" fill="gold" xmlns="http://www.w3.org/2000/svg">
       <circle cx="10" cy="10" r="9" stroke="#BBB" strokeWidth="1" fill="#FFEB3B" />
       <circle cx="10" cy="10" r="5" fill="#FFD700" />
@@ -18,12 +18,12 @@ function TokenStack({ count }) {
         <span
           key={i}
           className="absolute"
-          style={{ left: `${i * 10}px`, zIndex: count - i }}
+          style={{ left: `${i * 7}px`, zIndex: count - i }}
         >
-          <CoinIcon className="w-5 h-5" />
+          <CoinIcon className="w-3 h-3" />
         </span>
       ))}
-      <span style={{ width: `${count > 0 ? 10 * (count - 1) + 20 : 0}px`, display: "inline-block" }}></span>
+      <span style={{ width: `${count > 0 ? 5 * (count - 1) + 20 : 0}px`, display: "inline-block" }}></span>
     </span>
   );
 }
@@ -61,7 +61,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
   };
 
   return (
-    <header className="relative sticky top-0 z-30 w-full bg-none shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
+    <header className="relative sticky top-0 z-30 w-full bg-gray-900 shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
       <div className="absolute left-16 top-5">
         <img className="w-24" src={beatablyLogo} alt="Beatably Logo"></img>
       </div>
