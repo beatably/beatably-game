@@ -15,6 +15,7 @@ function GameSettings({ settings, onUpdate }) {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [debugData, setDebugData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showSongsButton, setShowSongsButton] = useState(false);
 
   useEffect(() => {
     setLocalSettings(settings || {
@@ -26,6 +27,14 @@ function GameSettings({ settings, onUpdate }) {
       }
     });
   }, [settings]);
+
+  // Load showSongsButton state from localStorage
+  useEffect(() => {
+    const savedShowSongsButton = localStorage.getItem('showSongsButton');
+    if (savedShowSongsButton !== null) {
+      setShowSongsButton(savedShowSongsButton === 'true');
+    }
+  }, []);
 
   const handleChange = (key, value) => {
     const updated = { ...localSettings, [key]: value };
@@ -262,6 +271,23 @@ function GameSettings({ settings, onUpdate }) {
                 <div className="mt-3 space-y-3">
                   <div className="text-xs text-yellow-300 bg-yellow-900 bg-opacity-30 p-2 rounded">
                     <strong>Debug Panel:</strong> Use this to check what songs are being fetched from Spotify and verify that your settings are working correctly.
+                  </div>
+
+                  {/* Show Songs Button Toggle */}
+                  <div className="flex items-center space-x-2 p-2 bg-gray-700 rounded">
+                    <input
+                      type="checkbox"
+                      id="showSongsButton"
+                      checked={showSongsButton}
+                      onChange={(e) => {
+                        setShowSongsButton(e.target.checked);
+                        localStorage.setItem('showSongsButton', e.target.checked.toString());
+                      }}
+                      className="rounded"
+                    />
+                    <label htmlFor="showSongsButton" className="text-xs text-gray-300 cursor-pointer">
+                      Show "All Songs" button in game footer during play
+                    </label>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">

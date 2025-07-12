@@ -150,6 +150,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Debug panel state
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showDebugButton, setShowDebugButton] = useState(false);
 
   // Song guess notification state
   const [songGuessNotification, setSongGuessNotification] = useState(null);
@@ -163,6 +164,14 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [showSessionRestore, setShowSessionRestore] = useState(false);
   const [sessionRestoreData, setSessionRestoreData] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  // Load showDebugButton state from localStorage
+  useEffect(() => {
+    const savedShowDebugButton = localStorage.getItem('showSongsButton');
+    if (savedShowDebugButton !== null) {
+      setShowDebugButton(savedShowDebugButton === 'true');
+    }
+  }, []);
 
   // Add keyboard shortcut to toggle debug panel (Ctrl+D or Cmd+D)
   useEffect(() => {
@@ -1366,14 +1375,16 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             onClose={() => setSongGuessNotification(null)}
           />
           
-          {/* Debug Panel Toggle Button */}
-          <button
-            onClick={() => setShowDebugPanel(!showDebugPanel)}
-            className="fixed bottom-4 right-4 bg-yellow-600 hover:bg-yellow-500 text-white p-2 rounded-full shadow-lg z-40 text-xs font-medium"
-            title="Toggle Song Debug Panel (Ctrl+D / Cmd+D)"
-          >
-            🐛
-          </button>
+          {/* Debug Panel Toggle Button - only show if enabled in settings */}
+          {showDebugButton && (
+            <button
+              onClick={() => setShowDebugPanel(!showDebugPanel)}
+              className="fixed bottom-4 right-4 bg-yellow-600 hover:bg-yellow-500 text-white p-2 rounded-full shadow-lg z-40 text-xs font-medium"
+              title="Toggle Song Debug Panel (Ctrl+D / Cmd+D)"
+            >
+              🐛
+            </button>
+          )}
         </div>
       </DndProvider>
     );

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import spotifyAuth from "./utils/spotifyAuth";
+import { API_BASE_URL } from './config';
 
 function GameFooter({ 
   currentCard, 
@@ -526,6 +527,7 @@ function GameFooter({
     });
   }, [isCreator, spotifyDeviceId]);
 
+
   const handleContinueClick = () => {
     console.log('[GameFooter] Continue button clicked:', { 
       myPlayerId, 
@@ -979,11 +981,13 @@ function GameFooter({
                 </button>
               </div>
             )}
+
           </div>
         ) : phase === 'game-over' ? (
           <div className="w-full p-2 md:p-4 rounded text-center bg-gray-800 mb-1 text-gray-300 text-lg md:text-2xl">Game over! 🎉</div>
         ) : null}
       </div>
+
     </footer>
   );
 }
