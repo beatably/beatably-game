@@ -26,7 +26,10 @@ function GameFooter({
   isCreator,
   socketRef,
   roomCode,
-  isDragging
+  isDragging,
+  pendingDropIndex,
+  onConfirmDrop,
+  onCancelDrop
 }) {
   // Track local playing state for UI
   const [localIsPlaying, setLocalIsPlaying] = React.useState(false);
@@ -548,8 +551,8 @@ function GameFooter({
     onContinue();
   };
 
-  // Render compact footer during drag operations
-  if (isDragging) {
+  // Render compact footer during drag operations, but show full interface when pending drop
+  if (isDragging && pendingDropIndex === null) {
     return (
       <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-gray-800 shadow flex flex-col items-center px-1 py-1 border-t border-gray-700">
         {/* Compact player during drag */}
@@ -941,6 +944,29 @@ function GameFooter({
         </div>
       )}
       
+      {/* Pending drop confirmation section */}
+      {pendingDropIndex !== null && isMyTurn && (
+        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+          <div className="text-white font-bold mb-4">
+            Confirm placement at position {pendingDropIndex + 1}
+          </div>
+          <div className="flex gap-2 justify-center">
+            <button 
+              onClick={onConfirmDrop}
+              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+            >
+              Confirm Placement
+            </button>
+            <button 
+              onClick={onCancelDrop}
+              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Feedback section */}
       <div className="w-full max-w-md flex flex-col items-center">
         {showFeedback && feedback ? (
@@ -963,7 +989,7 @@ function GameFooter({
               </div>
             )}
           </div>
-        ) : currentCard && phase === 'player-turn' ? (
+        ) : currentCard && phase === 'player-turn' && pendingDropIndex === null ? (
           <div className="w-full p-2 md:p-4 rounded text-center bg-none mb-1">
             <div className="text-gray-200 text-md md:text-2xl font-bold">
               {isMyTurn ? "Place this card in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}

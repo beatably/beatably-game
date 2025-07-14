@@ -7,10 +7,11 @@ import { playClickSound } from "./utils/soundUtils";
 
 const CARD_TYPE = "SONG_CARD";
 
-function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange }) {
+function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
+  const [challengePendingIndex, setChallengePendingIndex] = useState(null);
 
   // Notify parent component when drag state changes
   useEffect(() => {
@@ -25,7 +26,8 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
       const { cardId, dropIndex } = event.detail;
       if (currentCard && currentCard.id === cardId) {
         playClickSound();
-        onPlaceCard(dropIndex);
+        // Always use pending drop for confirmation/cancel mechanism
+        onPendingDrop(dropIndex);
       }
     };
 
@@ -33,7 +35,7 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     return () => {
       document.removeEventListener('cardDrop', handleCardDrop);
     };
-  }, [currentCard, onPlaceCard]);
+  }, [currentCard, onPendingDrop]);
 
   // Track when a new song is being loaded
   useEffect(() => {
@@ -114,32 +116,52 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     return index === originalIndex || index === originalIndex + 1;
   };
 
+  // Create preview timeline when there's a pending drop
+  const getPreviewTimeline = () => {
+    if (pendingDropIndex === null || !currentCard) {
+      return timeline;
+    }
+    
+    const newTimeline = [...timeline];
+    const previewCard = {
+      ...currentCard,
+      id: `preview-${currentCard.id}`,
+      year: '?' // Hide year during preview
+    };
+    
+    newTimeline.splice(pendingDropIndex, 0, previewCard);
+    return newTimeline;
+  };
+
+  const displayTimeline = pendingDropIndex !== null ? getPreviewTimeline() : timeline;
+
   // Always render all drop zones, but only show the hovered one when dragging
   const dropZones = [];
-  for (let i = 0; i <= Math.max(1, timeline.length); i++) {
+  for (let i = 0; i <= Math.max(1, displayTimeline.length); i++) {
     const isDropActive = isDragging && hoverIndex === i;
     const isDisabled = isDropZoneDisabled(i);
+    const isPreviewCard = pendingDropIndex !== null && i === pendingDropIndex;
     
     dropZones.push(
       <React.Fragment key={"drop-" + i}>
         <DropTarget
           index={i}
           isActive={isDropActive}
-          onDrop={onPlaceCard}
+          onDrop={onPendingDrop}
           setHoverIndex={setHoverIndex}
-          canDrop={isMyTurn && !showFeedback && !!currentCard && !isDisabled}
+          canDrop={isMyTurn && !showFeedback && !!currentCard && !isDisabled && pendingDropIndex === null}
           feedback={feedback}
           visible={isDragging}
           disabled={isDisabled}
           isDragging={isDragging}
         />
-        {i < timeline.length && (
+        {i < displayTimeline.length && (
           <TimelineCard
-            key={timeline[i].id}
-            card={timeline[i]}
-            outline={getCardOutline(timeline[i])}
-            animateRemove={removingId === timeline[i].id}
-            hideYear={shouldHideYear(timeline[i])}
+            key={displayTimeline[i].id}
+            card={displayTimeline[i]}
+            outline={getCardOutline(displayTimeline[i])}
+            animateRemove={removingId === displayTimeline[i].id}
+            hideYear={shouldHideYear(displayTimeline[i]) || isPreviewCard}
           />
         )}
       </React.Fragment>
@@ -161,7 +183,7 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     : "flex flex-col items-center justify-center w-full md:flex-1 order-1 md:order-2 m-6 md:mb-0";
 
   // Determine if we should show the draggable card
-  const showDraggableCard = isMyTurn && currentCard && !showFeedback && (phase === 'player-turn' || phase === 'challenge');
+  const showDraggableCard = isMyTurn && currentCard && !showFeedback && (phase === 'player-turn' || phase === 'challenge') && pendingDropIndex === null;
   
   return (
     <div className={containerClasses}>

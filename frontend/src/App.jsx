@@ -159,6 +159,10 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Drag state for UI adjustments
   const [isDragging, setIsDragging] = useState(false);
 
+  // Pending drop confirmation state
+  const [pendingDropIndex, setPendingDropIndex] = useState(null);
+  const [previewTimeline, setPreviewTimeline] = useState(null);
+
   // Session management state
   const [sessionId, setSessionId] = useState(null);
   const [showSessionRestore, setShowSessionRestore] = useState(false);
@@ -985,6 +989,60 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     setCurrentPlayerIdx((idx) => (idx + 1) % players.length);
   };
 
+  // Handler for pending drop - sets the pending drop index
+  const handlePendingDrop = (index) => {
+    console.log("[App] handlePendingDrop called:", {
+      index,
+      phase,
+      playerId: socketRef.current?.id,
+      currentPlayerId,
+      isMyTurn: socketRef.current?.id === currentPlayerId,
+      roomCode
+    });
+    
+    // Allow pending drop for both player-turn and challenge phases
+    if (phase !== 'player-turn' && phase !== 'challenge') return;
+    if (socketRef.current?.id !== currentPlayerId) return;
+    
+    setPendingDropIndex(index);
+  };
+
+  // Handler for confirming a pending drop
+  const handleConfirmDrop = () => {
+    if (pendingDropIndex === null) return;
+    
+    console.log("[App] handleConfirmDrop called:", {
+      pendingDropIndex,
+      phase,
+      roomCode,
+      socketConnected: !!socketRef.current?.connected
+    });
+    
+    if (!roomCode || !socketRef.current?.connected) {
+      console.error("[App] FAILED: No room code or socket not connected!");
+      return;
+    }
+    
+    try {
+      if (phase === 'challenge') {
+        socketRef.current.emit("challenge_place_card", { code: roomCode, index: pendingDropIndex });
+        console.log("[App] challenge_place_card emitted successfully to room:", roomCode);
+      } else {
+        socketRef.current.emit("place_card", { code: roomCode, index: pendingDropIndex });
+        console.log("[App] place_card emitted successfully to room:", roomCode);
+      }
+      setPendingDropIndex(null); // Clear pending drop after confirmation
+    } catch (error) {
+      console.error("[App] Error emitting place_card:", error);
+    }
+  };
+
+  // Handler for canceling a pending drop
+  const handleCancelDrop = () => {
+    console.log("[App] handleCancelDrop called");
+    setPendingDropIndex(null);
+  };
+
   // Handler for placing a card in the timeline (only if it's your turn)
   const handlePlaceCard = (index) => {
     console.log("[App] handlePlaceCard called:", {
@@ -1321,7 +1379,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             <TimelineBoard
               timeline={timeline || []}
               currentCard={currentCard}
-              onPlaceCard={phase === 'challenge' ? handleChallengePlaceCard : handlePlaceCard}
+              onPlaceCard={handlePlaceCard}
               feedback={feedback}
               showFeedback={showFeedback}
               lastPlaced={lastPlaced}
@@ -1333,6 +1391,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               onChallengePlaceCard={handleChallengePlaceCard}
               isPlayingMusic={isPlayingMusic}
               onDragStateChange={setIsDragging}
+              pendingDropIndex={pendingDropIndex}
+              onPendingDrop={handlePendingDrop}
             />
           </div>
           <GameFooter
@@ -1360,6 +1420,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             socketRef={socketRef}
             roomCode={roomCode}
             isDragging={isDragging}
+            pendingDropIndex={pendingDropIndex}
+            onConfirmDrop={handleConfirmDrop}
+            onCancelDrop={handleCancelDrop}
           />
           
           {/* Debug Panel */}
