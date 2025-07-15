@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import spotifyAuth from "./utils/spotifyAuth";
 import { API_BASE_URL } from './config';
+import DeviceSwitchModal from './DeviceSwitchModal';
 
 function GameFooter({ 
   currentCard, 
@@ -118,7 +119,7 @@ function GameFooter({
 
     try {
       console.log('[GameFooter] Triggering Spotify playback for:', currentCard.title);
-      
+
       // Validate token before making request
       const tokenValidation = await spotifyAuth.ensureValidToken();
       if (!tokenValidation.valid) {
@@ -129,9 +130,15 @@ function GameFooter({
         return false;
       }
 
+      // Always transfer playback to the stored device before starting playback
+      const storedDeviceId = spotifyAuth.getStoredDeviceId();
+      if (storedDeviceId && storedDeviceId !== spotifyDeviceId) {
+        await spotifyAuth.transferPlayback(storedDeviceId, false);
+      }
+
       // Use the auth utility for the API call
-      const success = await spotifyAuth.startPlayback(spotifyDeviceId, currentCard.uri, 0);
-      
+      const success = await spotifyAuth.startPlayback(storedDeviceId || spotifyDeviceId, currentCard.uri, 0);
+
       if (success) {
         console.log('[GameFooter] Successfully started Spotify playback');
         return true;
@@ -141,12 +148,12 @@ function GameFooter({
       }
     } catch (error) {
       console.error('[GameFooter] Error triggering Spotify playback:', error);
-      
+
       if (error.message.includes('Token expired')) {
         handleTokenExpiration();
         return false;
       }
-      
+
       // Try preview fallback on any error
       return await tryPreviewFallback();
     }
@@ -408,12 +415,13 @@ function GameFooter({
     }
   };
 
-  // Song guessing state
+// Song guessing state
   const [showSongGuess, setShowSongGuess] = useState(false);
   const [songTitle, setSongTitle] = useState('');
   const [songArtist, setSongArtist] = useState('');
   const [newSongRequest, setNewSongRequest] = useState(null); // For creator notifications
   const [tokenExpiredNotification, setTokenExpiredNotification] = useState(null); // For token expiration notifications
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
 
   // Format time mm:ss
   const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
@@ -677,21 +685,35 @@ function GameFooter({
               </>
             ) : (
               /* Spacer for non-creators to maintain layout */
-              <div className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0"></div>
-            )}
-            
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center gap-1 text-xs md:text-base text-gray-400">
+                <div className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0"></div>
+              )}
+              
+              <div className="flex-1 flex flex-col">
+                <div className="flex items-center gap-1 text-xs md:text-base text-gray-400">
                 <span>{formatTime(progress)}</span>
                 <div className="relative flex-1 h-2 bg-[#404040] rounded-full overflow-hidden">
                   <div className="absolute left-0 top-0 h-2 bg-[#1db954] rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
                 </div>
                 <span>{formatTime(duration)}</span>
+                {isCreator && (
+                  <button
+                  onClick={() => setShowDeviceModal(true)}
+                  className="ml-2 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-gray-600 hover:bg-gray-500 text-white text-xs"
+                  title="Switch device"
+                  aria-label="Switch Spotify device"
+                  >
+                  <img
+                    src="/img/speaker-icon.svg"
+                    alt="Switch device"
+                    className="w-5 h-5"
+                  />
+                  </button>
+                )}
+                </div>
               </div>
-            </div>
-          </div>
-          
-          {/* Spotify Debug Info - only for creator */}
+              </div>
+              
+              {/* Spotify Debug Info - only for creator */}
           {isCreator && (
             <div className="hidden text-xs text-gray-500 text-center space-y-1">
               {spotifyDeviceId ? (
@@ -774,6 +796,28 @@ function GameFooter({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Device switch modal */}
+      {showDeviceModal && (
+        <DeviceSwitchModal
+          isOpen={showDeviceModal}
+          onClose={() => setShowDeviceModal(false)}
+          onDeviceSwitch={(newDeviceId) => {
+            console.log('[GameFooter] Device switched to:', newDeviceId);
+            // Notify parent component about device change
+            if (window.parent && window.parent.handleDeviceSwitch) {
+              window.parent.handleDeviceSwitch(newDeviceId);
+            }
+            // Also emit to socket for real-time updates
+            if (socketRef?.current && roomCode) {
+              socketRef.current.emit('device_switched', {
+                code: roomCode,
+                deviceId: newDeviceId
+              });
+            }
+          }}
+        />
       )}
 
 

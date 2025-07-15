@@ -51,6 +51,13 @@ function App() {
         localStorage.removeItem("pending_create");
         setPendingCreate(pending);
       }
+
+      // Transfer to stored device if available
+      spotifyAuth.transferToStoredDevice().then(success => {
+        if (success) {
+          console.log("[Spotify] Automatically transferred to stored device");
+        }
+      });
     }
   }, []);
 
@@ -69,7 +76,7 @@ function App() {
         difficulty: "normal",
         musicPreferences: {
           genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
-          yearRange: { min: 1960, max: 2025 },
+          yearRange: { min: 2015, max: 2025 },
           markets: ['US']
         }
       };
@@ -135,7 +142,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     difficulty: "normal",
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
-      yearRange: { min: 1960, max: 2025 },
+      yearRange: { min: 2015, max: 2025 },
       markets: ['US']
     }
   });
@@ -467,10 +474,21 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         // Auto-start music for creators when new song loads
         if (hasSpotifyToken && spotifyDeviceId) {
           console.log("[App] Creator detected, triggering autoplay for new song");
-          setTimeout(() => {
-            console.log("[App] Setting isPlayingMusic to true for autoplay");
-            setIsPlayingMusic(true);
-          }, 1500); // Delay to ensure song loads
+          // Always transfer playback to the stored device before starting playback
+          const storedDeviceId = spotifyAuth.getStoredDeviceId();
+          if (storedDeviceId && storedDeviceId !== spotifyDeviceId) {
+            spotifyAuth.transferPlayback(storedDeviceId, false).then(() => {
+              setTimeout(() => {
+                console.log("[App] Setting isPlayingMusic to true for autoplay (after transfer)");
+                setIsPlayingMusic(true);
+              }, 1500); // Delay to ensure song loads
+            });
+          } else {
+            setTimeout(() => {
+              console.log("[App] Setting isPlayingMusic to true for autoplay");
+              setIsPlayingMusic(true);
+            }, 1500); // Delay to ensure song loads
+          }
         } else {
           console.log("[App] Not creator, waiting for progress sync from creator");
         }
@@ -708,6 +726,45 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         console.log('[App] Token expired during pause operation');
       }
       return false;
+    }
+  };
+
+  // Handler for device switching
+  const handleDeviceSwitch = async (newDeviceId) => {
+    console.log('[App] Switching Spotify device from', spotifyDeviceId, 'to', newDeviceId);
+    
+    try {
+      // Update the device ID in state
+      setSpotifyDeviceId(newDeviceId);
+      
+      // If currently playing music, transfer playback to new device
+      if (isPlayingMusic && currentCard?.uri) {
+        console.log('[App] Transferring active playback to new device:', newDeviceId);
+        
+        // First, pause current playback on old device
+        await pauseSpotifyPlayback();
+        
+        // Then start playback on new device
+        setTimeout(async () => {
+          try {
+            const success = await spotifyAuth.playTrack(
+              newDeviceId, 
+              currentCard.uri, 
+              0 // Start from beginning
+            );
+            if (success) {
+              console.log('[App] Successfully started playback on new device:', newDeviceId);
+              setIsPlayingMusic(true);
+            }
+          } catch (error) {
+            console.error('[App] Error starting playback on new device:', error);
+          }
+        }, 500); // Small delay to ensure device transfer is complete
+      }
+      
+      console.log('[App] Device switch completed successfully');
+    } catch (error) {
+      console.error('[App] Error during device switch:', error);
     }
   };
 

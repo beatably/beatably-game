@@ -177,67 +177,6 @@ class SpotifyAuthManager {
     }
   }
 
-  // Start playback with error handling
-  async startPlayback(deviceId, trackUri, positionMs = 0) {
-    try {
-      const url = `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`;
-      const body = {
-        uris: [trackUri],
-        position_ms: positionMs
-      };
-
-      await this.makeSpotifyRequest(url, {
-        method: 'PUT',
-        body: JSON.stringify(body)
-      });
-
-      console.log('[SpotifyAuth] Playback started successfully');
-      return true;
-    } catch (error) {
-      console.error('[SpotifyAuth] Error starting playback:', error.message);
-      return false;
-    }
-  }
-
-  // Pause playback with error handling
-  async pausePlayback(deviceId) {
-    try {
-      const url = `https://api.spotify.com/v1/me/player/pause?device_id=${deviceId}`;
-      await this.makeSpotifyRequest(url, { method: 'PUT' });
-      console.log('[SpotifyAuth] Playback paused successfully');
-      return true;
-    } catch (error) {
-      console.error('[SpotifyAuth] Error pausing playback:', error.message);
-      return false;
-    }
-  }
-
-  // Resume playback with error handling
-  async resumePlayback(deviceId) {
-    try {
-      const url = `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`;
-      await this.makeSpotifyRequest(url, { method: 'PUT' });
-      console.log('[SpotifyAuth] Playback resumed successfully');
-      return true;
-    } catch (error) {
-      console.error('[SpotifyAuth] Error resuming playback:', error.message);
-      return false;
-    }
-  }
-
-  // Seek to position with error handling
-  async seekToPosition(deviceId, positionMs) {
-    try {
-      const url = `https://api.spotify.com/v1/me/player/seek?position_ms=${positionMs}&device_id=${deviceId}`;
-      await this.makeSpotifyRequest(url, { method: 'PUT' });
-      console.log('[SpotifyAuth] Seek successful');
-      return true;
-    } catch (error) {
-      console.error('[SpotifyAuth] Error seeking:', error.message);
-      return false;
-    }
-  }
-
   // Check if we have necessary scopes
   async checkScopes() {
     try {
@@ -263,25 +202,179 @@ class SpotifyAuthManager {
       return false;
     }
   }
+
+  // Get stored device ID
+  getStoredDeviceId() {
+    return localStorage.getItem('spotify_device_id');
+  }
+
+  // Store device ID
+  storeDeviceId(deviceId) {
+    localStorage.setItem('spotify_device_id', deviceId);
+  }
+
+  // Clear stored device ID
+  clearStoredDeviceId() {
+    localStorage.removeItem('spotify_device_id');
+  }
+
+  // Transfer playback to a specific device
+  async transferPlayback(deviceId, play = true) {
+    try {
+      const url = 'https://api.spotify.com/v1/me/player';
+      const body = {
+        device_ids: [deviceId],
+        play: play
+      };
+
+      await this.makeSpotifyRequest(url, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      });
+
+      // Store the device ID for persistence
+      this.storeDeviceId(deviceId);
+      console.log('[SpotifyAuth] Playback transferred to device:', deviceId);
+      return true;
+    } catch (error) {
+      console.error('[SpotifyAuth] Error transferring playback:', error.message);
+      return false;
+    }
+  }
+
+  // Get available devices
+  async getDevices() {
+    try {
+      const data = await this.makeSpotifyRequest('https://api.spotify.com/v1/me/player/devices');
+      return data?.devices || [];
+    } catch (error) {
+      console.error('[SpotifyAuth] Error getting devices:', error.message);
+      return [];
+    }
+  }
+
+  // Validate if stored device is still available
+  async validateStoredDevice() {
+    const storedDeviceId = this.getStoredDeviceId();
+    if (!storedDeviceId) {
+      console.log('[SpotifyAuth] No stored device ID found');
+      return null;
+    }
+
+    try {
+      const devices = await this.getDevices();
+      const storedDevice = devices.find(device => device.id === storedDeviceId);
+      
+      if (storedDevice) {
+        console.log('[SpotifyAuth] Stored device is still available:', storedDevice.name);
+        return storedDevice;
+      } else {
+        console.log('[SpotifyAuth] Stored device is no longer available, clearing');
+        this.clearStoredDeviceId();
+        return null;
+      }
+    } catch (error) {
+      console.error('[SpotifyAuth] Error validating stored device:', error);
+      return null;
+    }
+  }
+
+  // Automatically transfer to stored device on app load
+  async transferToStoredDevice() {
+    const storedDeviceId = this.getStoredDeviceId();
+    if (!storedDeviceId) {
+      console.log('[SpotifyAuth] No stored device to transfer to');
+      return false;
+    }
+
+    const isValid = await this.validateToken();
+    if (!isValid) {
+      console.log('[SpotifyAuth] Cannot transfer - invalid token');
+      return false;
+    }
+
+    const storedDevice = await this.validateStoredDevice();
+    if (!storedDevice) {
+      console.log('[SpotifyAuth] Cannot transfer - stored device not available');
+      return false;
+    }
+
+    console.log('[SpotifyAuth] Transferring to stored device:', storedDevice.name);
+    return await this.transferPlayback(storedDeviceId, false); // Don't auto-play
+  }
+
+  // Start playback with device persistence
+  async startPlayback(deviceId, trackUri, positionMs = 0) {
+    try {
+      // Use stored device ID if available and no specific device provided
+      const targetDeviceId = deviceId || this.getStoredDeviceId();
+      
+      const url = `https://api.spotify.com/v1/me/player/play${targetDeviceId ? `?device_id=${targetDeviceId}` : ''}`;
+      const body = {
+        uris: [trackUri],
+        position_ms: positionMs
+      };
+
+      await this.makeSpotifyRequest(url, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      });
+
+      console.log('[SpotifyAuth] Playback started successfully on device:', targetDeviceId || 'default');
+      return true;
+    } catch (error) {
+      console.error('[SpotifyAuth] Error starting playback:', error.message);
+      return false;
+    }
+  }
+
+  // Resume playback with device persistence
+  async resumePlayback(deviceId) {
+    try {
+      const targetDeviceId = deviceId || this.getStoredDeviceId();
+      const url = `https://api.spotify.com/v1/me/player/play${targetDeviceId ? `?device_id=${targetDeviceId}` : ''}`;
+      
+      await this.makeSpotifyRequest(url, { method: 'PUT' });
+      console.log('[SpotifyAuth] Playback resumed successfully on device:', targetDeviceId || 'default');
+      return true;
+    } catch (error) {
+      console.error('[SpotifyAuth] Error resuming playback:', error.message);
+      return false;
+    }
+  }
+
+  // Pause playback with device persistence
+  async pausePlayback(deviceId) {
+    try {
+      const targetDeviceId = deviceId || this.getStoredDeviceId();
+      const url = `https://api.spotify.com/v1/me/player/pause${targetDeviceId ? `?device_id=${targetDeviceId}` : ''}`;
+      
+      await this.makeSpotifyRequest(url, { method: 'PUT' });
+      console.log('[SpotifyAuth] Playback paused successfully on device:', targetDeviceId || 'default');
+      return true;
+    } catch (error) {
+      console.error('[SpotifyAuth] Error pausing playback:', error.message);
+      return false;
+    }
+  }
+
+  // Seek to position with device persistence
+  async seekToPosition(deviceId, positionMs) {
+    try {
+      const targetDeviceId = deviceId || this.getStoredDeviceId();
+      const url = `https://api.spotify.com/v1/me/player/seek?position_ms=${positionMs}${targetDeviceId ? `&device_id=${targetDeviceId}` : ''}`;
+      
+      await this.makeSpotifyRequest(url, { method: 'PUT' });
+      console.log('[SpotifyAuth] Seek successful on device:', targetDeviceId || 'default');
+      return true;
+    } catch (error) {
+      console.error('[SpotifyAuth] Error seeking:', error.message);
+      return false;
+    }
+  }
 }
 
 // Create singleton instance
 const spotifyAuth = new SpotifyAuthManager();
 
 export default spotifyAuth;
-
-// Export individual functions for convenience
-export const {
-  getToken,
-  clearToken,
-  validateToken,
-  ensureValidToken,
-  initiateReauth,
-  makeSpotifyRequest,
-  getPlaybackState,
-  startPlayback,
-  pausePlayback,
-  resumePlayback,
-  seekToPosition,
-  checkScopes
-} = spotifyAuth;
