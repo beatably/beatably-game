@@ -854,43 +854,59 @@ function GameFooter({
       )}
 
       {/* Challenge window section */}
-      {phase === 'challenge-window' && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
-          <div className="text-white font-bold mb-2">
-            Other players can now challenge.
+      {phase === 'challenge-window' && (() => {
+        // Determine if this player has already responded (skipped or challenged)
+        let hasResponded = false;
+        let waitingForOthers = false;
+        let waitingText = "";
+        if (challenge && challenge.challengeWindow) {
+          const { respondedCount, totalEligible, waitingFor } = challenge.challengeWindow;
+          hasResponded = waitingFor && !waitingFor.includes(myPlayerId);
+          waitingForOthers = hasResponded && waitingFor.length > 0;
+          if (waitingForOthers) {
+            waitingText = "Other players can now challenge - Waiting for other players...";
+          }
+        }
+        return (
+          <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+            <div className="text-white font-bold mb-2">
+              Other players can now challenge.
+            </div>
+            {!isMyTurn && myPlayer && myPlayer.tokens > 0 && !hasResponded ? (
+              <div className="flex gap-2 justify-center">
+                <button 
+                  onClick={() => onInitiateChallenge()}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+                >
+                  Challenge (1 token)
+                </button>
+                <button 
+                  onClick={() => onSkipChallenge()}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded"
+                >
+                  Skip
+                </button>
+              </div>
+            ) : !isMyTurn && myPlayer && myPlayer.tokens === 0 && !hasResponded ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-white text-sm">No tokens to challenge</div>
+                <button 
+                  onClick={() => onSkipChallenge()}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+                >
+                  OK
+                </button>
+              </div>
+            ) : waitingForOthers ? (
+              <div className="text-white text-sm">{waitingText}</div>
+            ) : (
+              <div className="text-white text-sm">
+                {isMyTurn ? "Waiting for other players..." : "Waiting..."}
+              </div>
+            )}
           </div>
-          {!isMyTurn && myPlayer && myPlayer.tokens > 0 ? (
-            <div className="flex gap-2 justify-center">
-              <button 
-                onClick={() => onInitiateChallenge()}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
-              >
-                Challenge (1 token)
-              </button>
-              <button 
-                onClick={() => onSkipChallenge()}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded"
-              >
-                Skip
-              </button>
-            </div>
-          ) : !isMyTurn && myPlayer && myPlayer.tokens === 0 ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="text-white text-sm">No tokens to challenge</div>
-              <button 
-                onClick={() => onSkipChallenge()}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
-              >
-                OK
-              </button>
-            </div>
-          ) : (
-            <div className="text-white text-sm">
-              {isMyTurn ? "Waiting for other players..." : "Waiting..."}
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* Challenge in progress section */}
       {phase === 'challenge' && challenge && (

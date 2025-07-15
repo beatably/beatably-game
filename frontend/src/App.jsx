@@ -350,6 +350,16 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           myPlayerId: socketRef.current?.id,
           phase: game.phase
         });
+
+        // Store challengeWindow info globally for use in GameFooter
+        if (game.phase === "challenge-window" && game.challenge && game.challenge.challengeWindow) {
+          window.latestChallengeWindow = game.challenge.challengeWindow;
+        } else if (game.phase === "challenge-window" && game.challengeWindow) {
+          window.latestChallengeWindow = game.challengeWindow;
+        } else {
+          window.latestChallengeWindow = null;
+        }
+
         setPlayers(game.players);
         setCurrentPlayerIdx(game.currentPlayerIdx || 0);
         setTimeline(game.timeline || []);
@@ -1465,7 +1475,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             phase={phase}
             onUseToken={handleUseToken}
             onGuessSong={handleGuessSong}
-            challenge={challenge}
+            challenge={
+              // Inject challengeWindow info into challenge prop if in challenge-window phase
+              phase === "challenge-window" && window.latestChallengeWindow
+                ? { ...challenge, challengeWindow: window.latestChallengeWindow }
+                : challenge
+            }
             onChallengeResponse={handleChallengeResponse}
             onInitiateChallenge={handleInitiateChallenge}
             onContinueAfterChallenge={handleContinueAfterChallenge}

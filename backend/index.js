@@ -1216,29 +1216,71 @@ io.on('connection', (socket) => {
     if (!game || game.phase !== 'challenge-window') return;
     
     const playerId = socket.id;
-    // Any player can skip, no token cost for skipping
     
-    // Move directly to reveal phase
-    game.phase = "reveal";
-    game.lastPlaced.phase = 'resolved';
+    // Initialize challenge responses tracking if not exists
+    if (!game.challengeResponses) {
+      game.challengeResponses = new Set();
+    }
     
+    // Track that this player has responded
+    game.challengeResponses.add(playerId);
+    
+    // Get all players who can challenge (not the current player and have tokens)
     const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-    const currentCard = game.sharedDeck[game.currentCardIndex];
+    const eligibleChallengers = game.players.filter(p => 
+      p.id !== currentPlayerId && p.tokens > 0
+    ).map(p => p.id);
     
-    // Broadcast reveal state
-    game.players.forEach((p, idx) => {
-      io.to(p.id).emit('game_update', {
-        timeline: game.timelines[currentPlayerId],
-        deck: [currentCard],
-        players: game.players,
-        phase: "reveal",
-        feedback: game.feedback,
-        lastPlaced: game.lastPlaced,
-        removingId: null,
-        currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: currentPlayerId,
+    // Check if all eligible challengers have responded
+    const allResponded = eligibleChallengers.every(id => game.challengeResponses.has(id));
+    
+    if (allResponded || eligibleChallengers.length === 0) {
+      // All eligible players have responded, move to reveal phase
+      game.phase = "reveal";
+      game.lastPlaced.phase = 'resolved';
+      game.challengeResponses = null; // Clear responses
+      
+      const currentCard = game.sharedDeck[game.currentCardIndex];
+      
+      // Broadcast reveal state
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: game.timelines[currentPlayerId],
+          deck: [currentCard],
+          players: game.players,
+          phase: "reveal",
+          feedback: game.feedback,
+          lastPlaced: game.lastPlaced,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: currentPlayerId,
+        });
       });
-    });
+    } else {
+      // Still waiting for other players to respond
+      // Broadcast updated challenge window state with progress indicator
+      const respondedCount = game.challengeResponses.size;
+      const totalEligible = eligibleChallengers.length;
+      
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: game.timelines[currentPlayerId],
+          deck: [game.sharedDeck[game.currentCardIndex]],
+          players: game.players,
+          phase: "challenge-window",
+          feedback: null,
+          lastPlaced: game.lastPlaced,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: currentPlayerId,
+          challengeWindow: {
+            respondedCount,
+            totalEligible,
+            waitingFor: eligibleChallengers.filter(id => !game.challengeResponses.has(id))
+          }
+        });
+      });
+    }
   });
 
   // Challenge initiation - any player can challenge during challenge-window phase
@@ -1269,6 +1311,9 @@ io.on('connection', (socket) => {
     };
     game.phase = 'challenge';
     game.lastPlaced.phase = 'challenged';
+    
+    // Clear challenge responses since we're moving to challenge phase
+    game.challengeResponses = null;
     
     // Broadcast challenge state - challenger places on original player's timeline
     game.players.forEach((p) => {
