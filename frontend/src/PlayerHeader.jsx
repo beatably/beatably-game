@@ -63,7 +63,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
   return (
     <header className="relative sticky top-0 z-30 w-full bg-gray-900 shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
       <div className="absolute left-16 top-5">
-        <img className="w-24" src={beatablyLogo} alt="Beatably Logo"></img>
+        <img className="w-0" src={beatablyLogo} alt="Beatably Logo"></img>
       </div>
       <div className="flex flex-wrap gap-4 md:gap-6 text-[10px] md:text-xs">
 
