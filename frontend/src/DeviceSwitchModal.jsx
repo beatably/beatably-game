@@ -76,12 +76,7 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
       <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-white">Switch Device</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
-          >
-            ×
-          </button>
+          
         </div>
 
         {loading && (
@@ -130,12 +125,18 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t border-gray-700">
+        <div className="mt-4 pt-6">
           <button
             onClick={fetchDevices}
             className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
           >
             Refresh Devices
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full py-2 mt-3 bg-green-700 hover:bg-green-600 text-white rounded"
+          >
+            Close
           </button>
         </div>
       </div>
