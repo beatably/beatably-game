@@ -70,28 +70,29 @@ app.get('/login', (req, res) => {
   res.redirect(spotifyUrl);
 });
 
-// Spotify OAuth callback endpoint
-app.get('/callback', async (req, res) => {
-  const code = req.query.code || null;
-  try {
-    const tokenResponse = await axios.post('https://accounts.spotify.com/api/token',
-      querystring.stringify({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
-        client_id: process.env.SPOTIFY_CLIENT_ID,
-        client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-      }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-    const access_token = tokenResponse.data.access_token;
-    // Redirect back to frontend with token
-    res.redirect(`${process.env.FRONTEND_URI}/?access_token=${access_token}`);
-  } catch (error) {
-    console.error('Error fetching Spotify token', error);
-    res.status(500).send('Authentication failed');
-  }
-});
+  // Spotify OAuth callback endpoint
+  app.get('/callback', async (req, res) => {
+    const code = req.query.code || null;
+    const redirectUrl = req.query.redirect || process.env.FRONTEND_URI;
+    try {
+      const tokenResponse = await axios.post('https://accounts.spotify.com/api/token',
+        querystring.stringify({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+          client_id: process.env.SPOTIFY_CLIENT_ID,
+          client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+        }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      const access_token = tokenResponse.data.access_token;
+      // Redirect back to frontend with token, using provided redirect URL
+      res.redirect(`${redirectUrl}?access_token=${access_token}`);
+    } catch (error) {
+      console.error('Error fetching Spotify token', error);
+      res.status(500).send('Authentication failed');
+    }
+  });
 
 // CORS configuration for production
 const corsOptions = {

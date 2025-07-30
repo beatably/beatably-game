@@ -74,12 +74,16 @@ class SpotifyAuthManager {
     const token = this.getToken();
     if (!token) {
       console.log('[SpotifyAuth] No token found, authentication required');
+      window.alert("Your session has expired. Please log in again.");
+      this.initiateReauth();
       return { valid: false, requiresAuth: true };
     }
 
     const isValid = await this.validateToken(token);
     if (!isValid) {
       console.log('[SpotifyAuth] Token invalid, authentication required');
+      window.alert("Your session has expired. Please log in again.");
+      this.initiateReauth();
       return { valid: false, requiresAuth: true };
     }
 
@@ -99,8 +103,9 @@ class SpotifyAuthManager {
       localStorage.setItem('pending_reauth', 'true');
     }
     
-    // Redirect to Spotify login
-    window.location.href = `${API_BASE_URL}/login`;
+    // Redirect to Spotify login with game redirect
+    const gameRedirect = window.location.origin + window.location.pathname;
+    window.location.href = `${API_BASE_URL}/login?redirect=${encodeURIComponent(gameRedirect)}`;
   }
 
   // Make authenticated Spotify API request with automatic retry
@@ -305,6 +310,8 @@ class SpotifyAuthManager {
 
   // Start playback with device persistence
   async startPlayback(deviceId, trackUri, positionMs = 0) {
+    const tokenStatus = await this.ensureValidToken();
+    if (!tokenStatus.valid) return false;
     try {
       // Use stored device ID if available and no specific device provided
       const targetDeviceId = deviceId || this.getStoredDeviceId();
@@ -330,6 +337,8 @@ class SpotifyAuthManager {
 
   // Resume playback with device persistence
   async resumePlayback(deviceId) {
+    const tokenStatus = await this.ensureValidToken();
+    if (!tokenStatus.valid) return false;
     try {
       const targetDeviceId = deviceId || this.getStoredDeviceId();
       const url = `https://api.spotify.com/v1/me/player/play${targetDeviceId ? `?device_id=${targetDeviceId}` : ''}`;
@@ -345,6 +354,8 @@ class SpotifyAuthManager {
 
   // Pause playback with device persistence
   async pausePlayback(deviceId) {
+    const tokenStatus = await this.ensureValidToken();
+    if (!tokenStatus.valid) return false;
     try {
       const targetDeviceId = deviceId || this.getStoredDeviceId();
       const url = `https://api.spotify.com/v1/me/player/pause${targetDeviceId ? `?device_id=${targetDeviceId}` : ''}`;
@@ -360,6 +371,8 @@ class SpotifyAuthManager {
 
   // Seek to position with device persistence
   async seekToPosition(deviceId, positionMs) {
+    const tokenStatus = await this.ensureValidToken();
+    if (!tokenStatus.valid) return false;
     try {
       const targetDeviceId = deviceId || this.getStoredDeviceId();
       const url = `https://api.spotify.com/v1/me/player/seek?position_ms=${positionMs}${targetDeviceId ? `&device_id=${targetDeviceId}` : ''}`;
