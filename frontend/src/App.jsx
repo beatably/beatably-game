@@ -214,6 +214,61 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [view, isRestoring, showSessionRestore]);
 
+  // Handle device lock/unlock for iOS Safari fullscreen mode
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[App] Device unlocked - checking for session restoration');
+        
+        // Check if we have a valid session and are in game/waiting view
+        if ((view === 'game' || view === 'waiting') && sessionManager.hasValidSession()) {
+          const sessionData = sessionManager.getSession();
+          console.log('[App] Found session after unlock:', sessionData);
+          
+          // Attempt to reconnect if socket is available
+          if (socketRef.current && socketRef.current.connected) {
+            console.log('[App] Attempting automatic reconnection after unlock');
+            socketRef.current.emit('reconnect_session', {
+              sessionId: sessionData.sessionId,
+              roomCode: sessionData.roomCode,
+              playerName: sessionData.playerName
+            }, (response) => {
+              if (response.success) {
+                console.log('[App] Successfully reconnected after device unlock');
+                // Update state with reconnection response
+                if (response.view === 'waiting') {
+                  setPlayers(response.lobby.players);
+                  setGameSettings(response.lobby.settings || gameSettings);
+                } else if (response.view === 'game') {
+                  const gameState = response.gameState;
+                  setPlayers(gameState.players);
+                  setCurrentPlayerIdx(gameState.currentPlayerIdx || 0);
+                  setTimeline(gameState.timeline || []);
+                  setDeck(gameState.deck || []);
+                  setPhase(gameState.phase);
+                  setFeedback(gameState.feedback);
+                  setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
+                  setLastPlaced(gameState.lastPlaced);
+                  setRemovingId(gameState.removingId);
+                  setChallenge(gameState.challenge);
+                  setCurrentPlayerId(gameState.currentPlayerId);
+                }
+              } else {
+                console.warn('[App] Reconnection failed after unlock:', response.error);
+              }
+            });
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [view, gameSettings]);
+
   // Save session data whenever important state changes
   useEffect(() => {
     if (sessionId && (view === 'waiting' || view === 'game') && roomCode && playerName) {
