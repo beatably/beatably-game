@@ -12,6 +12,8 @@ import SessionRestore from "./SessionRestore";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
 import './App.css';
+import WinnerView from "./WinnerView";
+import "./WinnerView.css";
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { API_BASE_URL, SOCKET_URL } from './config';
@@ -74,6 +76,7 @@ function App() {
       setIsCreator(true);
       const settings = {
         difficulty: "normal",
+        winCondition: 10,
         musicPreferences: {
           genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
           yearRange: { min: 2015, max: 2025 },
@@ -140,6 +143,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
   const [gameSettings, setGameSettings] = useState({
     difficulty: "normal",
+    winCondition: 10,
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
       yearRange: { min: 2015, max: 2025 },
@@ -162,6 +166,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Song guess notification state
   const [songGuessNotification, setSongGuessNotification] = useState(null);
   const [tokenAnimations, setTokenAnimations] = useState({});
+  // Winner screen state
+  const [winner, setWinner] = useState(null);
+  const [showWinnerView, setShowWinnerView] = useState(false);
   
   // Drag state for UI adjustments
   const [isDragging, setIsDragging] = useState(false);
@@ -398,13 +405,45 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setGameRound(1);
       });
 
-      // Listen for game updates (real-time sync, per player)
-      socketRef.current.on("game_update", (game) => {
-        console.log("[App] Game update received:", {
-          currentPlayerId: game.currentPlayerId,
-          myPlayerId: socketRef.current?.id,
-          phase: game.phase
-        });
+  // Listen for game updates (real-time sync, per player)
+  socketRef.current.on("game_update", (game) => {
+    console.log("[App] Game update received:", {
+      currentPlayerId: game.currentPlayerId,
+      myPlayerId: socketRef.current?.id,
+      phase: game.phase,
+      deckLength: game.deck?.length || 0,
+      winner: game.winner
+    });
+
+    // If already showing winner, ignore further updates to avoid UI flicker
+    if (showWinnerView && winner) {
+      return;
+    }
+
+    // Show winner view immediately when game over with winner info
+    if (game.phase === 'game-over' && game.winner) {
+      console.log("[App] Game over detected, showing winner view");
+      setWinner(game.winner);
+      setShowWinnerView(true);
+      // Stop any Spotify playback if creator
+      if (isCreator && spotifyDeviceId) {
+        pauseSpotifyPlayback();
+      }
+      return;
+    }
+    
+    // CRITICAL FIX: Validate deck state and handle empty deck
+    if (!game.deck || game.deck.length === 0) {
+      console.warn("[App] Empty deck received in game update");
+      if (game.phase !== 'game-over') {
+        console.error("[App] ERROR: Empty deck but game not over!");
+        // Attempt to request fresh state from backend
+        if (socketRef.current && roomCode) {
+          console.log("[App] Requesting game state refresh...");
+          socketRef.current.emit("request_game_state", { code: roomCode });
+        }
+      }
+    }
 
         // Store challengeWindow info globally for use in GameFooter
         if (game.phase === "challenge-window" && game.challenge && game.challenge.challengeWindow) {
@@ -1049,8 +1088,13 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Update game settings handler
   const handleUpdateSettings = (newSettings) => {
-    setGameSettings(newSettings);
-    socketRef.current.emit("update_settings", { code: roomCode, settings: newSettings });
+    // Ensure winCondition is a sane number before sending to backend
+    const normalized = {
+      ...newSettings,
+      winCondition: Math.max(1, Math.min(50, parseInt(newSettings.winCondition ?? gameSettings.winCondition ?? 10, 10)))
+    };
+    setGameSettings(normalized);
+    socketRef.current.emit("update_settings", { code: roomCode, settings: normalized });
   };
 
   // Start game handler
@@ -1332,8 +1376,18 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     };
   }, [phase, roomCode]);
 
+  // CRITICAL FIX: Add deck validation and error handling
+  const [deckError, setDeckError] = useState(null);
+  
   // Trigger music playback when it's a new player's turn and there's a new card
   useEffect(() => {
+    // CRITICAL FIX: Validate deck state before attempting playback
+    if (!deck || deck.length === 0) {
+      console.warn("[App] No cards available in deck");
+      setDeckError("No cards available - game may be ending");
+      return;
+    }
+    
     if (isCreator && phase === 'player-turn' && currentCard && currentCard.uri && spotifyDeviceId) {
       console.log("[Spotify] New turn detected, triggering playback for:", currentCard.title);
       setIsPlayingMusic(false); // Reset first
@@ -1341,7 +1395,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setIsPlayingMusic(true); // Then trigger playback
       }, 100);
     }
-  }, [phase, currentCard, isCreator, spotifyDeviceId]);
+  }, [phase, currentCard, isCreator, spotifyDeviceId, deck]);
 
   // Add user interaction listener for Safari audio unlock
   useEffect(() => {
@@ -1410,6 +1464,51 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [gameSettings.musicPreferences, isCreator]);
 
+  // WinnerView takes priority over all other views
+  if (showWinnerView && winner) {
+    return (
+      <WinnerView
+        winner={winner}
+        players={players}
+        onPlayAgain={() => {
+          // Keep same lobby and players, reset game state and go to waiting room
+          setShowWinnerView(false);
+          setWinner(null);
+          setTimeline([]);
+          setDeck([]);
+          setCurrentCard(null);
+          setFeedback(null);
+          setShowFeedback(false);
+          setPhase('player-turn');
+          setLastPlaced(null);
+          setRemovingId(null);
+          setGameRound(1);
+          setView('waiting');
+        }}
+        onReturnToLobby={() => {
+          // Full reset back to landing
+          setShowWinnerView(false);
+          setWinner(null);
+          setPlayers([]);
+          setCurrentPlayerIdx(0);
+          setTimeline([]);
+          setDeck([]);
+          setCurrentCard(null);
+          setFeedback(null);
+          setShowFeedback(false);
+          setPhase('player-turn');
+          setLastPlaced(null);
+          setRemovingId(null);
+          setGameRound(1);
+          setRoomCode("");
+          setPlayerName("");
+          setIsCreator(false);
+          setView('landing');
+        }}
+      />
+    );
+  }
+
   if (view === "landing") {
     return (
       <>
@@ -1439,6 +1538,28 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   }
   if (view === "waiting") {
     const currentPlayer = players.find((p) => p.name === playerName) || {};
+
+    // Derive external loading stage for all players:
+    // - If host is starting (we're the host), reflect staged progress locally
+    // - If we're a guest, show at least stage 1 while waiting for host to start
+    //   and keep it active until game_started arrives.
+    let externalLoadingStage = 0;
+    let isLoadingExternally = false;
+
+    // Heuristic: if the host has already fetched preview songs (realSongs present),
+    // bump initial stage to at least 2 to avoid getting stuck at stage 1.
+    const hasPreviewSongs = Array.isArray(realSongs) && realSongs.length > 0;
+
+    // Determine if the lobby currently has a creator (host) present
+    const hostInPlayers = players.some(p => p.isCreator);
+
+    if (!isCreator && hostInPlayers) {
+      // Guests: if the host initiates start, they will quickly fetch and transition.
+      // We can't know exact timing without a backend event, but show meaningful progress:
+      externalLoadingStage = hasPreviewSongs ? 2 : 1;
+      isLoadingExternally = true;
+    }
+
     return (
       <WaitingRoom
         code={roomCode}
@@ -1450,6 +1571,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         onLeave={handleLeave}
         settings={gameSettings}
         onUpdateSettings={handleUpdateSettings}
+        externalLoadingStage={externalLoadingStage}
+        isLoadingExternally={isLoadingExternally}
       />
     );
   }

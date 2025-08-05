@@ -4,6 +4,8 @@ import { API_BASE_URL } from './config';
 function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
     difficulty: "normal",
+    // Default win condition if not provided
+    winCondition: 10,
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
       yearRange: { min: 1960, max: 2025 },
@@ -20,6 +22,7 @@ function GameSettings({ settings, onUpdate }) {
   useEffect(() => {
     setLocalSettings(settings || {
       difficulty: "normal",
+      winCondition: 10,
       musicPreferences: {
         genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
         yearRange: { min: 1960, max: 2025 },
@@ -206,6 +209,28 @@ function GameSettings({ settings, onUpdate }) {
 
         {showAdvancedSettings && (
           <div className="mt-3 space-y-4">
+            {/* Win Condition */}
+            <div>
+              <label className="block text-gray-300 mb-2 text-sm font-medium">Cards to Win</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={localSettings.winCondition ?? 10}
+                onChange={(e) => {
+                  const raw = parseInt(e.target.value, 10);
+                  // Clamp and sanitize
+                  const value = Number.isFinite(raw) ? Math.min(50, Math.max(1, raw)) : 10;
+                  const updated = { ...localSettings, winCondition: value };
+                  setLocalSettings(updated);
+                  onUpdate(updated);
+                }}
+                className="w-full p-2 rounded text-black text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                First player to reach this many cards in the timeline wins. Default is 10.
+              </p>
+            </div>
             {/* Genre Selection */}
             <div>
               <label className="block text-gray-300 mb-3 text-sm font-medium">Music Genres</label>

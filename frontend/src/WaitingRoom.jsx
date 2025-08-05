@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import GameSettings from "./GameSettings";
 
 function WaitingRoom({
@@ -10,21 +10,57 @@ function WaitingRoom({
   onLeave,
   settings,
   onUpdateSettings,
+  // Optional: externally supplied progress state if parent wants to control it
+  externalLoadingStage,
+  isLoadingExternally
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [isStartingGame, setIsStartingGame] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0); // 0: idle, 1: fetching, 2: filtering, 3: preparing, 4: done
+  const [guestSeesLoading, setGuestSeesLoading] = useState(false); // guests should also see loading while host starts
   const isCreator = currentPlayer?.isCreator;
   const enoughPlayers = players.length >= 2; // Minimum 2 players, max 4 players
   const tooManyPlayers = players.length > 4;
   const canStart = isCreator && enoughPlayers && !tooManyPlayers;
 
+  // Sync with external progress if provided (e.g., from socket events)
+  useEffect(() => {
+    if (typeof externalLoadingStage === 'number') {
+      setLoadingStage(externalLoadingStage);
+      const active = externalLoadingStage > 0 && externalLoadingStage < 4;
+      setIsStartingGame(active);
+      // If external stage is driven (e.g., by App / sockets), ensure guests also see it
+      setGuestSeesLoading(active);
+    }
+  }, [externalLoadingStage]);
+
   const handleStartGame = async () => {
     setIsStartingGame(true);
+    setGuestSeesLoading(true); // make guests see loading immediately
+    // Stage 1: Fetching
+    setLoadingStage(1);
     try {
-      await onStart();
+      // Kick off the start
+      const startPromise = onStart();
+
+      // Drive stages visually while waiting for transition to game
+      // Stage 2 after short delay
+      const t1 = setTimeout(() => {
+        setLoadingStage((prev) => (prev < 2 ? 2 : prev));
+      }, 900);
+
+      // Stage 3 after another short delay
+      const t2 = setTimeout(() => {
+        setLoadingStage((prev) => (prev < 3 ? 3 : prev));
+      }, 1800);
+
+      await startPromise;
+      // If we are still in waiting view, keep showing progress until backend flips to game_started
     } catch (error) {
       console.error('Error starting game:', error);
       setIsStartingGame(false);
+      setGuestSeesLoading(false);
+      setLoadingStage(0);
     }
   };
 
@@ -70,6 +106,11 @@ function WaitingRoom({
         {isCreator && showSettings && (
           <div className="px-4 pb-2">
             <GameSettings settings={settings} onUpdate={onUpdateSettings} />
+            {/* Display key advanced settings summary */}
+            <div className="mt-3 text-xs text-gray-300 bg-gray-800 border border-gray-700 rounded p-2">
+              <div className="font-semibold text-gray-200 mb-1">Advanced Settings Summary</div>
+              <div>Cards to Win: <span className="text-white">{settings?.winCondition ?? 10}</span></div>
+            </div>
           </div>
         )}
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 justify-between items-center px-4 pb-6">
@@ -94,7 +135,7 @@ function WaitingRoom({
               disabled={!canStart || isStartingGame}
               onClick={handleStartGame}
             >
-              {isStartingGame && (
+              {(isStartingGame || isLoadingExternally) && (
                 <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
                   <circle
                     className="opacity-25"
@@ -108,14 +149,34 @@ function WaitingRoom({
                   <path
                     className="opacity-75"
                     fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                   />
                 </svg>
               )}
-              {isStartingGame ? "Preparing songs..." : "Start Game"}
+              {(() => {
+                const stage = externalLoadingStage || loadingStage;
+                if (isStartingGame || isLoadingExternally) {
+                  if (stage === 1) return "Fetching songs across various time periods…";
+                  if (stage === 2) return "Validating songs and filtering to match our criteria…";
+                  if (stage >= 3) return "Preparing your personalized game playlist…";
+                  return "Preparing songs…";
+                }
+                return "Start Game";
+              })()}
             </button>
           )}
         </div>
+
+        {/*
+          No separate progress panel; progress text now shown directly in Start button.
+          Show a lightweight indicator for guests (non-creator) while host is starting.
+        */}
+        {!isCreator && (guestSeesLoading || isLoadingExternally || loadingStage > 0) && (
+          <div className="px-4 pb-2 w-full max-w-md text-center text-sm text-gray-300">
+            Game is preparing…
+          </div>
+        )}
+
         {isCreator && !canStart && (
           <div className="text-center text-sm text-yellow-400 pb-4">
             {!enoughPlayers && "Need at least 2 players to start"}

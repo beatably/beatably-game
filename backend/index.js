@@ -834,6 +834,7 @@ io.on('connection', (socket) => {
     console.log('[Backend] Starting game for code:', code);
     console.log('[Backend] Real songs provided:', realSongs ? realSongs.length : 0);
     const lobby = lobbies[code];
+    console.log('[Backend] Lobby settings at start:', lobby?.settings);
     if (!lobby) {
       console.log('[Backend] No lobby found for code:', code);
       return;
@@ -875,6 +876,12 @@ io.on('connection', (socket) => {
     // Create shared deck excluding the starting cards
     const sharedDeck = shuffledSongs.filter(song => !usedStartCards.has(song.id));
 
+    // Determine win condition from lobby settings (default 10)
+    const winCondition = (lobby.settings && Number.isFinite(lobby.settings.winCondition))
+      ? Math.max(1, Math.min(50, parseInt(lobby.settings.winCondition, 10)))
+      : 10;
+    console.log('[Backend] Using winCondition:', winCondition);
+
     games[code] = {
       timelines, // { [playerId]: [cards] } - each player has their own timeline
       sharedDeck, // All players draw from the same deck
@@ -899,7 +906,9 @@ io.on('connection', (socket) => {
       currentPlayerIdx: 0,
       phase: "player-turn", // player-turn, reveal, challenge, song-guess, game-over
       playerOrder: lobby.players.map((p) => p.id),
-      winCondition: 10, // First to 10 cards in timeline wins
+      winCondition: winCondition, // First to N cards in timeline wins (configurable)
+      // CRITICAL FIX: Track played cards to prevent cycling back to already-played cards
+      playedCards: new Set(), // Track which cards have been played
     };
 
     // Send initial game state to all players
@@ -990,8 +999,16 @@ io.on('connection', (socket) => {
       calculation: `${prevYear} <= ${currentCard.year} <= ${nextYear}`
     });
 
-    // Update game state
-    game.timelines[playerId] = newTimeline;
+    // IMPORTANT: Do NOT commit the placed card to the player's timeline yet.
+    // We only commit permanently after reveal/continue logic confirms it's correct
+    // or after challenge resolution. For now, keep the committed timeline intact.
+    // We'll only send a visual timeline-with-placed-card to clients.
+
+    // Compute visual timeline for display (non-committed)
+    const displayTimeline = [...timeline];
+    displayTimeline.splice(index, 0, { ...currentCard, preview: true });
+
+    // Track lastPlaced for UI and later resolution
     game.lastPlaced = { 
       id: currentCard.id, 
       correct, 
@@ -1004,10 +1021,13 @@ io.on('connection', (socket) => {
     game.phase = "song-guess";
     game.challengeWindowStart = Date.now();
 
-    // Broadcast song guess state to all players
+    // Normalize scores to committed timeline lengths before broadcasting
+    updatePlayerScores(game);
+
+    // Broadcast song guess state to all players with a visual-only timeline
     game.players.forEach((p, idx) => {
       io.to(p.id).emit('game_update', {
-        timeline: game.timelines[currentPlayerId], // Show current player's timeline to all
+        timeline: displayTimeline, // Visual timeline includes the tentative card
         deck: [currentCard], // Everyone sees the same current card
         players: game.players,
         phase: "song-guess",
@@ -1020,6 +1040,40 @@ io.on('connection', (socket) => {
     });
 
   });
+
+  // CRITICAL FIX: Unified function to safely get the next card and advance turn
+  const advanceTurn = (game, code) => {
+    // CRITICAL: Ensure we have a valid card to play
+    if (game.currentCardIndex >= game.sharedDeck.length) {
+      console.log('[Backend] ERROR: Reached end of shared deck, game should end');
+      return false;
+    }
+    
+    // Mark current card as played
+    const currentCard = game.sharedDeck[game.currentCardIndex];
+    if (currentCard) {
+      game.playedCards.add(currentCard.id);
+    }
+    
+    // Advance to next player
+    game.currentPlayerIdx = (game.currentPlayerIdx + 1) % game.players.length;
+    
+    // Find next unplayed card
+    let nextCardIndex = game.currentCardIndex + 1;
+    while (nextCardIndex < game.sharedDeck.length && game.playedCards.has(game.sharedDeck[nextCardIndex].id)) {
+      nextCardIndex++;
+    }
+    
+    if (nextCardIndex >= game.sharedDeck.length) {
+      console.log('[Backend] ERROR: No more unplayed cards available');
+      return false;
+    }
+    
+    game.currentCardIndex = nextCardIndex;
+    game.phase = "player-turn";
+    
+    return true;
+  };
 
   // Handle continue after feedback (any player can trigger)
   socket.on('continue_game', ({ code }) => {
@@ -1053,10 +1107,143 @@ io.on('connection', (socket) => {
     // Update all player scores to match their timeline lengths
     updatePlayerScores(game);
     
-    // ALWAYS advance to next player after any placement attempt
-    game.currentPlayerIdx = (game.currentPlayerIdx + 1) % game.players.length;
-    game.currentCardIndex = (game.currentCardIndex + 1) % game.sharedDeck.length;
-    game.phase = "player-turn";
+    // CRITICAL FIX: Handle incorrect card removal BEFORE advancing turn
+    if (wasIncorrect) {
+      // For incorrect, the card was never committed; just animate removal on UI
+      game.removingId = game.lastPlaced?.id;
+      setTimeout(() => {
+        // Get fresh reference again
+        const gameInTimeout = games[code];
+        if (!gameInTimeout) {
+          console.log('[Backend] Game disappeared in timeout!');
+          return;
+        }
+        
+        // Ensure no accidental commit exists; keep committed timelines unchanged
+        gameInTimeout.timelines[currentPlayerId] = (gameInTimeout.timelines[currentPlayerId] || []).filter((c) => c.id !== gameInTimeout.lastPlaced?.id);
+        gameInTimeout.removingId = null;
+        gameInTimeout.lastPlaced = null;
+        gameInTimeout.feedback = null;
+
+        // Normalize scores after removal
+        updatePlayerScores(gameInTimeout);
+        
+        // CRITICAL FIX: Use unified advanceTurn function
+        if (!advanceTurn(gameInTimeout, code)) {
+          // Game should end
+          gameInTimeout.phase = "game-over";
+          const maxScore = Math.max(...gameInTimeout.players.map(p => p.score));
+          const winners = gameInTimeout.players.filter(p => p.score === maxScore);
+          gameInTimeout.winner = winners[0];
+          
+          gameInTimeout.players.forEach((p) => {
+            io.to(p.id).emit('game_update', {
+              timeline: gameInTimeout.timelines[gameInTimeout.winner?.id] || [],
+              deck: [],
+              players: gameInTimeout.players,
+              phase: "game-over",
+              feedback: null,
+              lastPlaced: null,
+              removingId: null,
+              currentPlayerIdx: gameInTimeout.currentPlayerIdx,
+              currentPlayerId: null,
+              winner: gameInTimeout.winner,
+            });
+          });
+          return;
+        }
+        
+        const nextPlayerId = gameInTimeout.playerOrder[gameInTimeout.currentPlayerIdx];
+        const nextCard = gameInTimeout.sharedDeck[gameInTimeout.currentCardIndex];
+
+        // Normalize scores before broadcast
+        updatePlayerScores(gameInTimeout);
+
+        // NEW: Evaluate win condition at end-of-round after incorrect placement
+        if (checkGameEnd(gameInTimeout)) {
+          gameInTimeout.players.forEach((p) => {
+            io.to(p.id).emit('game_update', {
+              timeline: gameInTimeout.timelines[gameInTimeout.winner?.id] || [],
+              deck: [],
+              players: gameInTimeout.players,
+              phase: gameInTimeout.phase,
+              feedback: null,
+              lastPlaced: null,
+              removingId: null,
+              currentPlayerIdx: gameInTimeout.currentPlayerIdx,
+              currentPlayerId: null,
+              winner: gameInTimeout.winner,
+            });
+          });
+          return;
+        }
+        
+        // Broadcast updated state to all players
+        gameInTimeout.players.forEach((p, idx) => {
+          const logInfo = {
+            player: p.name,
+            cardIndex: gameInTimeout.currentCardIndex,
+            timelineLength: gameInTimeout.timelines[nextPlayerId]?.length,
+            phase: gameInTimeout.phase,
+            currentPlayerIdx: gameInTimeout.currentPlayerIdx,
+            currentPlayerId: nextPlayerId,
+          };
+          console.log("[game_update]", logInfo);
+          io.to(p.id).emit('game_update', {
+            timeline: gameInTimeout.timelines[nextPlayerId],
+            deck: [nextCard],
+            players: gameInTimeout.players,
+            phase: "player-turn",
+            feedback: null,
+            lastPlaced: null,
+            removingId: null,
+            currentPlayerIdx: gameInTimeout.currentPlayerIdx,
+            currentPlayerId: nextPlayerId,
+          });
+        });
+      }, 400);
+      return;
+    }
+    
+    // For correct placement: now COMMIT the card to the player's timeline
+    const playerTimelineCommitted = game.timelines[currentPlayerId] || [];
+    // Insert at the recorded index
+    const commitTimeline = [...playerTimelineCommitted];
+    commitTimeline.splice(game.lastPlaced.index, 0, game.sharedDeck[game.currentCardIndex]);
+    game.timelines[currentPlayerId] = commitTimeline;
+
+    // Now advance turn
+    if (!advanceTurn(game, code)) {
+      // Game should end
+      game.phase = "game-over";
+      const maxScore = Math.max(...game.players.map(p => p.score));
+      const winners = game.players.filter(p => p.score === maxScore);
+      game.winner = winners[0];
+      
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: game.timelines[game.winner?.id] || [],
+          deck: [],
+          players: game.players,
+          phase: "game-over",
+          feedback: null,
+          lastPlaced: null,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: null,
+          winner: game.winner,
+        });
+      });
+      return;
+    }
+    
+    // Clear state after correct placement was committed
+    game.feedback = null;
+    game.lastPlaced = null;
+    game.removingId = null;
+
+    // Normalize scores after committing correct placement
+    updatePlayerScores(game);
     
     // Check if game should end with new win condition logic
     if (checkGameEnd(game)) {
@@ -1086,58 +1273,9 @@ io.on('connection', (socket) => {
       io.to(code).emit('new_song_loaded', { reason: 'next_turn' });
     }, 500);
     
-    // Handle incorrect card removal with setTimeout BEFORE clearing state
-    if (wasIncorrect) {
-      game.removingId = game.lastPlaced?.id;
-      setTimeout(() => {
-        // Get fresh reference again
-        const gameInTimeout = games[code];
-        if (!gameInTimeout) {
-          console.log('[Backend] Game disappeared in timeout!');
-          return;
-        }
-        
-        // CRITICAL FIX: Remove incorrect card from the CURRENT player's timeline, not the next player
-        gameInTimeout.timelines[currentPlayerId] = (gameInTimeout.timelines[currentPlayerId] || []).filter((c) => c.id !== gameInTimeout.lastPlaced?.id);
-        gameInTimeout.removingId = null;
-        gameInTimeout.lastPlaced = null;
-        gameInTimeout.feedback = null;
-        
-        // Broadcast updated state to all players
-        gameInTimeout.players.forEach((p, idx) => {
-          const logInfo = {
-            player: p.name,
-            cardIndex: gameInTimeout.currentCardIndex,
-            timelineLength: gameInTimeout.timelines[nextPlayerId]?.length,
-            phase: gameInTimeout.phase,
-            currentPlayerIdx: gameInTimeout.currentPlayerIdx,
-            currentPlayerId: nextPlayerId,
-          };
-          console.log("[game_update]", logInfo);
-          io.to(p.id).emit('game_update', {
-            timeline: gameInTimeout.timelines[nextPlayerId],
-            deck: [nextCard],
-            players: gameInTimeout.players,
-            phase: "player-turn",
-            feedback: null,
-            lastPlaced: null,
-            removingId: null,
-            currentPlayerIdx: gameInTimeout.currentPlayerIdx,
-            currentPlayerId: nextPlayerId,
-          });
-        });
-      }, 400);
-      return;
-    }
-    
-    // Clear state for correct placements
-    game.feedback = null;
-    game.lastPlaced = null;
-    game.removingId = null;
-    
-    // Ensure game object is still in games collection
-    games[code] = game;
-    
+    // Normalize scores before broadcasting correct placement advance
+    updatePlayerScores(game);
+
     // Broadcast updated state to all players immediately for correct placements
     game.players.forEach((p, idx) => {
       const logInfo = {
@@ -1243,20 +1381,26 @@ io.on('connection', (socket) => {
       
       const currentCard = game.sharedDeck[game.currentCardIndex];
       
-      // Broadcast reveal state
-      game.players.forEach((p) => {
-        io.to(p.id).emit('game_update', {
-          timeline: game.timelines[currentPlayerId],
-          deck: [currentCard],
-          players: game.players,
-          phase: "reveal",
-          feedback: game.feedback,
-          lastPlaced: game.lastPlaced,
-          removingId: null,
-          currentPlayerIdx: game.currentPlayerIdx,
-          currentPlayerId: currentPlayerId,
-        });
+    // Broadcast reveal state with visual-only timeline (non-committed)
+    const revealTimeline = [...game.timelines[currentPlayerId]];
+    // Insert the placed card visually for reveal only
+    revealTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true });
+    
+    updatePlayerScores(game); // scores from committed timelines only
+
+    game.players.forEach((p) => {
+      io.to(p.id).emit('game_update', {
+        timeline: revealTimeline,
+        deck: [currentCard],
+        players: game.players,
+        phase: "reveal",
+        feedback: game.feedback,
+        lastPlaced: game.lastPlaced,
+        removingId: null,
+        currentPlayerIdx: game.currentPlayerIdx,
+        currentPlayerId: currentPlayerId,
       });
+    });
     } else {
       // Still waiting for other players to respond
       // Broadcast updated challenge window state with progress indicator
@@ -1316,6 +1460,9 @@ io.on('connection', (socket) => {
     // Clear challenge responses since we're moving to challenge phase
     game.challengeResponses = null;
     
+    // Normalize scores before broadcasting challenge state
+    updatePlayerScores(game);
+
     // Broadcast challenge state - challenger places on original player's timeline
     game.players.forEach((p) => {
       io.to(p.id).emit('game_update', {
@@ -1518,6 +1665,9 @@ io.on('connection', (socket) => {
       challengerPlacement: { index, correct: challengerCorrect }
     };
     
+    // Normalize scores after challenge resolution before broadcasting
+    updatePlayerScores(game);
+
     // Broadcast challenge result with display timeline showing both cards
     game.players.forEach((p) => {
       io.to(p.id).emit('game_update', {
@@ -1545,41 +1695,49 @@ io.on('connection', (socket) => {
 
   // Helper function to check if game should end and determine winner
   const checkGameEnd = (game) => {
-    const maxScore = Math.max(...game.players.map(p => p.score));
-    
-    // Check if any player has reached 10 points
-    if (maxScore >= 10) {
-      // Check if we're at the end of a complete round (all players have had equal turns)
-      const isEndOfRound = game.currentPlayerIdx === 0;
-      
-      if (isEndOfRound) {
-        // All players have completed the same number of turns
-        const playersWithMaxScore = game.players.filter(p => p.score === maxScore);
-        
-        if (playersWithMaxScore.length === 1) {
-          // Single winner
-          game.phase = "game-over";
-          game.winner = playersWithMaxScore[0];
-          return true;
-        } else if (maxScore > 10) {
-          // Multiple players tied above 10 - highest score wins
-          game.phase = "game-over";
-          game.winner = playersWithMaxScore[0]; // First player with max score
-          return true;
-        }
-        // If tied at exactly 10, continue playing
+    const target = Number.isFinite(game.winCondition) ? game.winCondition : 10;
+
+    // Build score snapshot for robust logging and evaluation
+    const scores = game.players.map(p => ({ id: p.id, name: p.name, score: p.score }));
+    const maxScore = Math.max(...scores.map(s => s.score));
+    const playersWithMaxScore = scores.filter(s => s.score === maxScore);
+
+    // We only consider end-of-round after advanceTurn (i.e., when currentPlayerIdx wrapped to 0)
+    const isEndOfRound = game.currentPlayerIdx === 0;
+
+    console.log('[WinCheck]', {
+      target,
+      currentPlayerIdx: game.currentPlayerIdx,
+      isEndOfRound,
+      scores,
+      maxScore,
+      leaders: playersWithMaxScore.map(p => ({ name: p.name, score: p.score }))
+    });
+
+    // Declare winner ONLY at end-of-round when there is a strict leader at/above target
+    if (maxScore >= target && isEndOfRound) {
+      if (playersWithMaxScore.length === 1) {
+        const winnerId = playersWithMaxScore[0].id;
+        const winnerPlayer = game.players.find(p => p.id === winnerId) || game.players.find(p => p.score === maxScore) || null;
+        game.phase = "game-over";
+        game.winner = winnerPlayer;
+        console.log('[WinCheck] Winner decided at end-of-round:', { winner: game.winner?.name, score: maxScore });
+        return true;
       }
+      // Tie at/above target at end-of-round -> keep playing further rounds until a leader exists
+      console.log('[WinCheck] Tie at/above target at end-of-round. Continue.');
     }
-    
-    // Check if we've run out of cards
+
+    // Deck exhaustion fallback: end immediately and select highest score
     if (game.currentCardIndex >= game.sharedDeck.length) {
+      const endMax = Math.max(...game.players.map(p => p.score));
+      const winners = game.players.filter(p => p.score === endMax);
       game.phase = "game-over";
-      const maxScore = Math.max(...game.players.map(p => p.score));
-      const winners = game.players.filter(p => p.score === maxScore);
-      game.winner = winners[0]; // First player with highest score
+      game.winner = winners[0] || null;
+      console.log('[WinCheck] Deck exhausted. Winner:', game.winner?.name, 'score:', endMax);
       return true;
     }
-    
+
     return false;
   };
 
@@ -1618,13 +1776,34 @@ io.on('connection', (socket) => {
       io.to(code).emit('new_song_loaded', { reason: 'next_turn' });
     }, 500);
     
-    // Clear challenge and advance to next player
+    // CRITICAL FIX: Use unified advanceTurn function for challenge resolution
     game.challenge = null;
-    game.currentPlayerIdx = (game.currentPlayerIdx + 1) % game.players.length;
-    game.currentCardIndex = (game.currentCardIndex + 1) % game.sharedDeck.length;
-    game.phase = "player-turn";
     game.feedback = null;
     game.lastPlaced = null;
+    
+    if (!advanceTurn(game, code)) {
+      // Game should end
+      game.phase = "game-over";
+      const maxScore = Math.max(...game.players.map(p => p.score));
+      const winners = game.players.filter(p => p.score === maxScore);
+      game.winner = winners[0];
+      
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: game.timelines[game.winner?.id] || [],
+          deck: [],
+          players: game.players,
+          phase: "game-over",
+          feedback: null,
+          lastPlaced: null,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: null,
+          winner: game.winner,
+        });
+      });
+      return;
+    }
     
     // Check if game should end with new win condition logic
     if (checkGameEnd(game)) {
@@ -1649,6 +1828,9 @@ io.on('connection', (socket) => {
     const nextPlayerId = game.playerOrder[game.currentPlayerIdx];
     const nextCard = game.sharedDeck[game.currentCardIndex];
     
+    // Normalize scores before broadcasting next turn
+    updatePlayerScores(game);
+
     // Broadcast next turn
     game.players.forEach((p) => {
       io.to(p.id).emit('game_update', {
@@ -1744,6 +1926,9 @@ io.on('connection', (socket) => {
     // Move to challenge window after song guess
     game.phase = "challenge-window";
     
+    // Normalize scores before broadcasting challenge window
+    updatePlayerScores(game);
+
     // Broadcast challenge window state
     game.players.forEach((p) => {
       io.to(p.id).emit('game_update', {
@@ -1787,6 +1972,9 @@ io.on('connection', (socket) => {
     
     const currentCard = game.sharedDeck[game.currentCardIndex];
     
+    // Normalize scores before broadcasting challenge window
+    updatePlayerScores(game);
+
     // Broadcast challenge window state
     game.players.forEach((p) => {
       io.to(p.id).emit('game_update', {
