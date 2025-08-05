@@ -101,7 +101,7 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
         </h1>
 
         <p className="mt-3 text-base md:text-lg text-gray-300">
-          Amazing knowledge of music!
+          and shows amazing knowledge in music.
         </p>
 
         {players.length > 1 && (
