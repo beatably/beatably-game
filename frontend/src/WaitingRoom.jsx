@@ -106,11 +106,7 @@ function WaitingRoom({
         {isCreator && showSettings && (
           <div className="px-4 pb-2">
             <GameSettings settings={settings} onUpdate={onUpdateSettings} />
-            {/* Display key advanced settings summary */}
-            <div className="mt-3 text-xs text-gray-300 bg-gray-800 border border-gray-700 rounded p-2">
-              <div className="font-semibold text-gray-200 mb-1">Advanced Settings Summary</div>
-              <div>Cards to Win: <span className="text-white">{settings?.winCondition ?? 10}</span></div>
-            </div>
+
           </div>
         )}
         <div className="flex flex-col md:flex-row gap-2 md:gap-4 justify-between items-center px-4 pb-6">
@@ -156,9 +152,9 @@ function WaitingRoom({
               {(() => {
                 const stage = externalLoadingStage || loadingStage;
                 if (isStartingGame || isLoadingExternally) {
-                  if (stage === 1) return "Fetching songs across various time periods…";
-                  if (stage === 2) return "Validating songs and filtering to match our criteria…";
-                  if (stage >= 3) return "Preparing your personalized game playlist…";
+                  if (stage === 1) return "Fetching songs…";
+                  if (stage === 2) return "Filtering songs…";
+                  if (stage >= 3) return "Preparing playlist…";
                   return "Preparing songs…";
                 }
                 return "Start Game";
