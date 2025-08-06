@@ -7,7 +7,7 @@ function GameSettings({ settings, onUpdate }) {
     // Default win condition if not provided
     winCondition: 10,
     musicPreferences: {
-      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
       yearRange: { min: 1960, max: 2025 },
       markets: ['US']
     }
@@ -274,7 +274,7 @@ function GameSettings({ settings, onUpdate }) {
             {/* Reset to Defaults */}
             <button
               onClick={() => handleMusicPreferenceChange('', {
-                genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+                genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
                 yearRange: { min: 1960, max: 2025 },
                 markets: ['US']
               })}

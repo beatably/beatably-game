@@ -74,8 +74,8 @@ function App() {
         difficulty: "normal",
         winCondition: 10,
         musicPreferences: {
-          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
-          yearRange: { min: 2015, max: 2025 },
+          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+          yearRange: { min: 1960, max: 2025 },
           markets: ['US']
         }
       };
@@ -141,8 +141,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     difficulty: "normal",
     winCondition: 10,
     musicPreferences: {
-      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
-      yearRange: { min: 2015, max: 2025 },
+      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+      yearRange: { min: 1960, max: 2025 },
       markets: ['US']
     }
   });
