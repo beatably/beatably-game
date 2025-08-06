@@ -25,6 +25,52 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
 
+  // New: session unlock state to handle iOS Safari autoplay restrictions
+  const [playbackUnlocked, setPlaybackUnlocked] = useState(false);
+  // Expose minimal API globally so App/GameFooter can request unlock/play if needed
+  useEffect(() => {
+    window.beatablyPlayback = {
+      isUnlocked: () => playbackUnlocked,
+      ensureUnlockedViaGesture: async () => {
+        try {
+          // Resume/create an AudioContext with a short silent sound to satisfy gesture
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.05);
+          }
+          // Attempt to resume the Spotify player if available
+          if (window.spotifyPlayerInstance?.resume) {
+            try { await window.spotifyPlayerInstance.resume(); } catch (_) {}
+          }
+          setPlaybackUnlocked(true);
+          return true;
+        } catch (e) {
+          console.warn('[Playback] ensureUnlockedViaGesture failed:', e);
+          return false;
+        }
+      },
+      // Best-effort stop (pause) current playback via Web API helper in App
+      stopCurrent: async () => {
+        try {
+          // leave to App/spotifyAuth through events if needed
+          if (window.spotifyPlayerInstance?.pause) {
+            await window.spotifyPlayerInstance.pause();
+          }
+        } catch (_) {}
+      }
+    };
+    return () => {
+      // do not delete to allow persistence between mounts in game view
+    };
+  }, [playbackUnlocked]);
+
   // Validate token before initializing player
   useEffect(() => {
     const initializePlayer = async () => {
@@ -123,6 +169,20 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
           setConnectionStatus('connected');
           setErrorMessage(null);
           setRetryCount(0);
+
+          // IMPORTANT: Do NOT override a user-selected device with the SDK device.
+          // Only persist the SDK device if no explicit selection exists yet.
+          try {
+            if (window.localStorage) {
+              const existing = window.localStorage.getItem('spotify_device_id');
+              if (!existing) {
+                window.localStorage.setItem('spotify_device_id', device_id);
+              } else {
+                console.log('[SpotifyPlayer] Preserving existing selected device over SDK device:', { selected: existing, sdk: device_id });
+              }
+            }
+          } catch (_) {}
+
           if (onPlayerReady) {
             onPlayerReady(device_id);
           }
@@ -156,6 +216,10 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         spotifyPlayer.addListener('autoplay_failed', () => {
           console.log('[SpotifyPlayer] Autoplay failed - browser autoplay rules');
           setErrorMessage('Tap the play button to enable audio');
+        });
+        // Try to mark unlocked when user interacts with SDK controls
+        spotifyPlayer.addListener('ready', () => {
+          // no-op; unlock handled by gesture util
         });
 
         // Enhanced error handling
@@ -235,6 +299,46 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
 
   // REMOVED: Automatic playback trigger to prevent restarts on phase changes
   // Playback is now controlled manually through the GameFooter play button
+
+  // Helper: attempt to force play currentTrack when isPlaying toggles true
+  useEffect(() => {
+    // Only attempt when creator side sets isPlaying true and we have SDK/player
+    if (!player) return;
+    if (!isPlaying) return;
+
+    // Autoplay gating: if not unlocked yet on iOS Safari, surface a hint and do nothing
+    const tryPlay = async () => {
+      try {
+        // If the SDK exposes activateElement, call it to appease Safari
+        if (player.activateElement) {
+          try {
+            await player.activateElement();
+            setPlaybackUnlocked(true);
+          } catch (e) {
+            // ignore
+          }
+        }
+        // If resume exists, try to resume
+        if (player.resume) {
+          try { await player.resume(); } catch (_) {}
+        }
+        // If we still aren't unlocked, bail; App will flip the CTA when needed
+        if (!playbackUnlocked) {
+          console.log('[SpotifyPlayer] Playback blocked (not unlocked)');
+          setErrorMessage('Tap play to enable audio');
+          return;
+        }
+        // No direct .play(uris) on SDK; actual track start is driven by backend via Web API
+        // This hook's role is primarily to ensure the audio element is in a playable state.
+      } catch (err) {
+        console.warn('[SpotifyPlayer] Autoplay attempt encountered error:', err?.message || err);
+        // If NotAllowedError-like, keep unlocked false and rely on CTA
+      }
+    };
+
+    tryPlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, player]);
 
   // Control functions
   const togglePlay = () => {
@@ -318,7 +422,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         <div className="text-sm text-yellow-400">
           <div>Spotify Player Connected</div>
           <div className="text-xs text-gray-400 mt-1">
-            Transfer playback to "Beatably Game Player" in your Spotify app to start playing music
+            Ensure your selected Spotify device is active. The web player is available as: "{deviceId ? 'Beatably Game Player' : 'Web Player'}"
           </div>
           {errorMessage && (
             <div className="text-xs text-orange-400 mt-1">

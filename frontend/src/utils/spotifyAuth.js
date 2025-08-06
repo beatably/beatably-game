@@ -144,9 +144,16 @@ class SpotifyAuthManager {
       // Reset retry count on success
       this.retryAttempts.delete(retryKey);
       
-      // Handle empty responses
+      // Handle empty or non-JSON responses (e.g., 204 No Content)
       const text = await response.text();
-      return text ? JSON.parse(text) : null;
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch {
+        // Some Spotify endpoints may return non-JSON/empty responses on success.
+        // Return raw text to avoid crashing callers.
+        return text;
+      }
 
     } catch (error) {
       console.error(`[SpotifyAuth] API request failed:`, error);
@@ -180,6 +187,34 @@ class SpotifyAuthManager {
       console.log('[SpotifyAuth] Error getting playback state:', error.message);
       return null;
     }
+  }
+
+  // Internal: normalize a Spotify URI string (trim, lower)
+  _normalizeUri(uri) {
+    return (uri || '').trim().toLowerCase();
+  }
+
+  // Verify currently playing item/context matches requested target URI
+  async verifyPlaybackMatches(deviceId, targetUri) {
+    const target = this._normalizeUri(targetUri);
+    const state = await this.getPlaybackState(deviceId);
+    if (!state) return false;
+
+    // If target is a track URI, compare with state.item.uri
+    if (target.startsWith('spotify:track:')) {
+      const currentTrackUri = this._normalizeUri(state?.item?.uri || state?.item?.uri);
+      return currentTrackUri === target;
+    }
+
+    // If target is a context (playlist/album/artist), compare with state.context.uri
+    if (target.startsWith('spotify:playlist:') || target.startsWith('spotify:album:') || target.startsWith('spotify:artist:')) {
+      const currentContextUri = this._normalizeUri(state?.context?.uri);
+      return currentContextUri === target;
+    }
+
+    // Fallback: if we cannot classify, compare against item.uri
+    const currentFallback = this._normalizeUri(state?.item?.uri);
+    return currentFallback === target;
   }
 
   // Check if we have necessary scopes
@@ -357,12 +392,20 @@ class SpotifyAuthManager {
     const tokenStatus = await this.ensureValidToken();
     if (!tokenStatus.valid) return false;
     try {
-      const targetDeviceId = deviceId || this.getStoredDeviceId();
-      const url = `https://api.spotify.com/v1/me/player/pause${targetDeviceId ? `?device_id=${targetDeviceId}` : ''}`;
-      
-      await this.makeSpotifyRequest(url, { method: 'PUT' });
-      console.log('[SpotifyAuth] Playback paused successfully on device:', targetDeviceId || 'default');
-      return true;
+      // Prefer pausing the active device without device_id to avoid 404 when device isn't addressable via query
+      let url = `https://api.spotify.com/v1/me/player/pause`;
+      // As a fallback, if a deviceId is explicitly provided and first attempt fails, try with query param.
+      try {
+        await this.makeSpotifyRequest(url, { method: 'PUT' });
+        console.log('[SpotifyAuth] Playback paused on active device (no device_id)');
+        return true;
+      } catch (e) {
+        if (!deviceId) throw e;
+        url = `https://api.spotify.com/v1/me/player/pause?device_id=${deviceId}`;
+        await this.makeSpotifyRequest(url, { method: 'PUT' });
+        console.log('[SpotifyAuth] Playback paused successfully on device via query:', deviceId);
+        return true;
+      }
     } catch (error) {
       console.error('[SpotifyAuth] Error pausing playback:', error.message);
       return false;
@@ -382,6 +425,133 @@ class SpotifyAuthManager {
       return true;
     } catch (error) {
       console.error('[SpotifyAuth] Error seeking:', error.message);
+      return false;
+    }
+  }
+
+  // Verified start helper: transfer to device (play=false), then play without device_id, verify, retry
+  async verifiedTransferAndPlay(deviceId, trackUri, positionMs = 0, opts = {}) {
+    const {
+      attempts = 3,
+      delayMs = 350,
+      verifyDelayMs = 250
+    } = opts || {};
+
+    const tokenStatus = await this.ensureValidToken();
+    if (!tokenStatus.valid) return false;
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        // 1) Transfer to target device (do not autoplay)
+        const transferOk = await this.transferPlayback(deviceId, false);
+        if (!transferOk) {
+          console.warn('[SpotifyAuth] transferPlayback returned false; attempt', attempt);
+        }
+
+        // 2) Small delay, then issue PLAY without device_id to target active device
+        await sleep(delayMs);
+        const playUrl = `https://api.spotify.com/v1/me/player/play`;
+        const body = {
+          uris: [trackUri],
+          position_ms: positionMs
+        };
+        await this.makeSpotifyRequest(playUrl, {
+          method: 'PUT',
+          body: JSON.stringify(body)
+        });
+
+        // 3) Verify playback is on requested track (best-effort)
+        await sleep(verifyDelayMs);
+        try {
+          const state = await this.getPlaybackState(); // active device
+          const itemUri = state?.item?.uri;
+          if (itemUri === trackUri) {
+            console.log('[SpotifyAuth] Verified transfer-and-play on target device:', deviceId);
+            return true;
+          } else {
+            console.warn('[SpotifyAuth] Verification mismatch (got:', itemUri, 'expected:', trackUri, ') attempt', attempt);
+          }
+        } catch (verifyErr) {
+          console.warn('[SpotifyAuth] Verification fetch failed (continuing):', verifyErr?.message || verifyErr);
+          // If we cannot verify due to CORS or network, assume success after play call
+          return true;
+        }
+      } catch (err) {
+        console.warn('[SpotifyAuth] verifiedTransferAndPlay error on attempt', attempt, ':', err?.message || err);
+      }
+      await sleep(delayMs);
+    }
+    return false;
+  }
+
+  // Verified start that prefers active device model and falls back to device_id query
+  async verifiedStartPlayback(deviceId, trackUri, positionMs = 0, opts = {}) {
+    const {
+      pauseFirst = true,
+      transferFirst = false,
+      maxVerifyAttempts = 3,
+      verifyDelayMs = 250
+    } = opts || {};
+
+    const tokenStatus = await this.ensureValidToken();
+    if (!tokenStatus.valid) return false;
+
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    try {
+      // Optionally transfer first (not default); generally we prefer transfer+play path via verifiedTransferAndPlay
+      if (transferFirst && deviceId) {
+        await this.transferPlayback(deviceId, false);
+        await sleep(200);
+      }
+
+      if (pauseFirst) {
+        // Pause active device to ensure a clean cut; avoid device_id query to minimize 404
+        await this.pausePlayback().catch(() => {});
+      }
+
+      // First attempt: play WITHOUT device_id (active device)
+      let playUrl = `https://api.spotify.com/v1/me/player/play`;
+      let body = {
+        uris: [trackUri],
+        position_ms: positionMs
+      };
+      try {
+        await this.makeSpotifyRequest(playUrl, {
+          method: 'PUT',
+          body: JSON.stringify(body)
+        });
+      } catch (e) {
+        // Fallback: try with device_id query if provided
+        if (!deviceId) throw e;
+        playUrl = `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`;
+        await this.makeSpotifyRequest(playUrl, {
+          method: 'PUT',
+          body: JSON.stringify(body)
+        });
+      }
+
+      // Verify
+      for (let i = 0; i < maxVerifyAttempts; i++) {
+        await sleep(verifyDelayMs);
+        try {
+          const state = await this.getPlaybackState(deviceId); // may try with device_id query
+          const itemUri = state?.item?.uri;
+          if (itemUri === trackUri) {
+            console.log('[SpotifyAuth] Verified playback on correct target:', itemUri);
+            return true;
+          }
+        } catch (vErr) {
+          // If verification fails due to CORS/network, accept success (we already issued PLAY)
+          console.warn('[SpotifyAuth] Verification failed (continuing):', vErr?.message || vErr);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('[SpotifyAuth] verifiedStartPlayback error:', error.message);
       return false;
     }
   }

@@ -1075,6 +1075,30 @@ io.on('connection', (socket) => {
     return true;
   };
 
+  // Helper to emit new_song_loaded with concrete URI for the next card
+  function emitNewSongLoaded(io, code, game, reasonTag = 'next_turn') {
+    try {
+      const nextCard = game.sharedDeck[game.currentCardIndex];
+      const payload = { reason: reasonTag };
+      if (nextCard && nextCard.uri) {
+        payload.uri = nextCard.uri;
+        payload.card = {
+          id: nextCard.id,
+          title: nextCard.title,
+          artist: nextCard.artist,
+          year: nextCard.year,
+          uri: nextCard.uri,
+          preview_url: nextCard.preview_url || null,
+          album_art: nextCard.album_art || null
+        };
+      }
+      io.to(code).emit('new_song_loaded', payload);
+      console.log('[Backend] Emitted new_song_loaded:', { room: code, reason: reasonTag, hasUri: !!payload.uri });
+    } catch (e) {
+      console.log('[Backend] Failed to emit new_song_loaded:', e.message);
+    }
+  }
+
   // Handle continue after feedback (any player can trigger)
   socket.on('continue_game', ({ code }) => {
     console.log('[Backend] Continue game called for code:', code, 'from socket:', socket.id);
@@ -1268,10 +1292,10 @@ io.on('connection', (socket) => {
     const nextPlayerId = game.playerOrder[game.currentPlayerIdx];
     const nextCard = game.sharedDeck[game.currentCardIndex];
     
-    // Emit new song loaded event for automatic playback
+    // Emit new song loaded event for automatic playback, include concrete URI if available
     setTimeout(() => {
-      io.to(code).emit('new_song_loaded', { reason: 'next_turn' });
-    }, 500);
+      emitNewSongLoaded(io, code, game, 'next_turn');
+    }, 400);
     
     // Normalize scores before broadcasting correct placement advance
     updatePlayerScores(game);
@@ -1340,9 +1364,22 @@ io.on('connection', (socket) => {
           });
         });
         
-        // Emit new song loaded event for automatic playback
+        // Emit new song loaded event for automatic playback, include concrete URI if available
         setTimeout(() => {
-          io.to(code).emit('new_song_loaded', { reason: 'skip_song' });
+          const payload = { reason: 'skip_song' };
+          if (nextCard && nextCard.uri) {
+            payload.uri = nextCard.uri;
+            payload.card = {
+              id: nextCard.id,
+              title: nextCard.title,
+              artist: nextCard.artist,
+              year: nextCard.year,
+              uri: nextCard.uri,
+              preview_url: nextCard.preview_url || null,
+              album_art: nextCard.album_art || null
+            };
+          }
+          io.to(code).emit('new_song_loaded', payload);
         }, 500);
         break;
         
@@ -1771,10 +1808,10 @@ io.on('connection', (socket) => {
     // Update all player scores to match their timeline lengths
     updatePlayerScores(game);
     
-    // Emit new song loaded event for automatic playback
+    // Emit new song loaded event for automatic playback, include concrete URI if available
     setTimeout(() => {
-      io.to(code).emit('new_song_loaded', { reason: 'next_turn' });
-    }, 500);
+      emitNewSongLoaded(io, code, game, 'next_turn');
+    }, 400);
     
     // CRITICAL FIX: Use unified advanceTurn function for challenge resolution
     game.challenge = null;
