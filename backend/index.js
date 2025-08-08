@@ -9,6 +9,11 @@ if (process.env.NODE_ENV !== 'production') {
 const axios = require('axios');
 const querystring = require('querystring');
 
+// Feature flags, thresholds, and providers
+const { config } = require('./config');
+const { resolveOriginalYear, isRemasterMarker, normalizeTitle } = require('./musicbrainz');
+const { getChartEntries } = require('./chartProvider');
+
 const app = express();
 
 // Store client credentials token
@@ -213,21 +218,234 @@ function diversifyByArtist(tracks, maxPerArtist = 1) {
   return diversifiedTracks;
 }
 
-// Enhanced fetch songs from Spotify with filtering support
+/**
+ * Determine if a track is suspicious (remaster/live markers).
+ */
+function isSuspiciousTrack(track) {
+  const t = `${track.title || ''}`.toLowerCase();
+  const a = `${track.album || ''}`.toLowerCase();
+  return isRemasterMarker(t) || isRemasterMarker(a) || /\blive\b/.test(t);
+}
+
+/**
+ * Apply popularity thresholds for non-chart mode.
+ */
+function applyNonChartDifficulty(tracks, difficulty) {
+  const thr = config.thresholds.nonChart;
+  let floor = thr.normal;
+  if (difficulty === 'easy') floor = thr.easy;
+  else if (difficulty === 'hard') floor = thr.hard;
+  return tracks.filter((t) => (t.popularity || 0) >= floor);
+}
+
+// Enhanced fetch songs from Spotify with filtering support and MB enrichment (Phase 1-2)
 app.post('/api/fetch-songs', async (req, res) => {
-  const { musicPreferences = {}, difficulty = 'normal', playerCount = 2 } = req.body;
-  
+  const { musicPreferences = {}, difficulty = (config.difficulty || 'normal'), playerCount = 2, useChartMode } = req.body || {};
+  const chartMode = typeof useChartMode === 'boolean' ? useChartMode : config.featureFlags.enableChartMode;
+  console.log('[FetchSongs] Incoming request:', {
+    requestedChartMode: useChartMode,
+    effectiveChartMode: chartMode,
+    difficulty,
+    yearRange: musicPreferences?.yearRange
+  });
+
   // Default preferences if none provided
-  const {
+  let {
     genres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
     yearRange = { min: 1980, max: 2024 },
     markets = ['US']
-  } = musicPreferences;
+  } = musicPreferences || {};
+
+  // Defensive normalization: lowercase + dedupe genres; uppercase + dedupe markets
+  genres = Array.from(new Set((genres || []).map(g => String(g || '').toLowerCase()).filter(Boolean)));
+  markets = Array.from(new Set((markets || []).map(m => String(m || '').toUpperCase()).filter(Boolean)));
   
   // Calculate minimum songs needed: playerCount * 20
   const minSongsNeeded = playerCount * 20;
 
   try {
+    // If chart mode: build from chart provider and then resolve to Spotify
+    if (chartMode) {
+      console.log('[ChartMode] Enabled. Fetching chart entries...');
+
+      // Honor yearRange in chart mode with a minimum span of 10 years
+      let minY = Number(yearRange?.min) || null;
+      let maxY = Number(yearRange?.max) || null;
+      let effectiveRange = null;
+
+      if (Number.isFinite(minY) && Number.isFinite(maxY) && minY <= maxY) {
+        const span = maxY - minY + 1;
+        const MIN_SPAN = 10;
+        if (span < MIN_SPAN) {
+          const deficit = MIN_SPAN - span;
+          const expandLeft = Math.floor(deficit / 2);
+          const expandRight = deficit - expandLeft;
+          minY = minY - expandLeft;
+          maxY = maxY + expandRight;
+          console.log('[ChartMode] Expanded narrow year range to meet 10-year minimum:', { minY, maxY });
+          effectiveRange = { min: minY, max: maxY, expanded: true, minSpan: MIN_SPAN };
+        } else {
+          effectiveRange = { min: minY, max: maxY, expanded: false, minSpan: MIN_SPAN };
+        }
+      }
+
+      // Ask chartProvider to filter by yearMin/yearMax, with our enforced 10-year minimum
+      let chartEntries = await getChartEntries({
+        mode: 'recent',
+        difficulty,
+        yearMin: effectiveRange ? effectiveRange.min : undefined,
+        yearMax: effectiveRange ? effectiveRange.max : undefined
+      });
+
+      console.log('[ChartMode] Entries after difficulty (pre-resolve):', chartEntries.length);
+
+      // Extra fallback: if still zero, try 'all' mode unfiltered to ensure we get items
+      if (!chartEntries || chartEntries.length === 0) {
+        console.log('[ChartMode] No entries from recent. Trying ALL archive without year filter as fallback.');
+        chartEntries = await getChartEntries({ mode: 'all', difficulty });
+        console.log('[ChartMode] Entries from ALL (pre-resolve):', chartEntries.length);
+      }
+
+      // Cap chart entries to a reasonable number before Spotify resolution to avoid long delays
+      const MAX_TO_RESOLVE = 300; // Adjust as needed
+      if (chartEntries.length > MAX_TO_RESOLVE) {
+        console.log(`[ChartMode] Capping chart entries to ${MAX_TO_RESOLVE} for Spotify resolution (was ${chartEntries.length})`);
+        chartEntries = chartEntries.slice(0, MAX_TO_RESOLVE);
+      }
+
+      // Resolve each chart entry to a Spotify track
+      const clientToken = await getClientToken();
+      const resolved = [];
+      for (const entry of chartEntries) {
+        try {
+          const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
+          const resp = await axios.get('https://api.spotify.com/v1/search', {
+            headers: { Authorization: `Bearer ${clientToken}` },
+            params: { q: q, type: 'track', limit: 5, market: markets[0] || 'US' },
+          });
+          const item = (resp.data.tracks.items || [])[0];
+          if (item) {
+            resolved.push({
+              id: item.id,
+              title: item.name,
+              artist: item.artists[0]?.name || entry.artist,
+              year: new Date(item.album.release_date).getFullYear(),
+              uri: item.uri,
+              preview_url: item.preview_url,
+              external_url: item.external_urls.spotify,
+              album_art: item.album.images?.[0]?.url || null,
+              market: markets[0] || 'US',
+              genre: 'chart',
+              popularity: item.popularity,
+              rank: entry.rank,
+              peakPos: entry.peakPos ?? null,
+              weeksOnChart: entry.weeksOnChart ?? null,
+              lastWeek: entry.lastWeek ?? null,
+              source: 'chart',
+              sourceDetails: {
+                chartDate: entry.chartDate || null,
+                rank: entry.rank ?? null,
+                peakPos: entry.peakPos ?? null,
+                weeksOnChart: entry.weeksOnChart ?? null
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('[ChartMode] Resolve failed for entry:', entry.title, 'by', entry.artist, e.message);
+        }
+      }
+
+      // Optional remaster filter
+      let processed = resolved;
+      if (config.featureFlags.enableRemasterFilter) {
+        processed = processed.filter((t) => !isSuspiciousTrack({ title: t.title, album: t.album_art ? '' : '' }));
+      }
+
+      // MusicBrainz enrichment for suspicious or big year anomalies
+      if (config.featureFlags.enableMusicBrainz) {
+        for (const t of processed) {
+          if (isSuspiciousTrack({ title: t.title, album: '' })) {
+            try {
+              const mb = await resolveOriginalYear({ artist: t.artist, title: t.title });
+              if (mb.earliestYear && mb.confidence >= config.musicbrainz.minConfidence) {
+                if (!t.year || Math.abs(t.year - mb.earliestYear) >= config.musicbrainz.yearDiffThreshold) {
+                  t.year = mb.earliestYear;
+                  t.mbEnriched = true;
+                }
+              }
+            } catch (e) {
+              console.warn('[ChartMode][MB] Enrichment failed:', e.message);
+            }
+          }
+        }
+      }
+
+      const diversified = diversifyByArtist(processed, 1);
+      const minSongs = Math.max(60, minSongsNeeded);
+      const shuffled = diversified.sort(() => 0.5 - Math.random()).slice(0, 120);
+
+      // Annotate tracks with debug source and difficulty bucket
+      const difficultyBucket = (rank, pop) => {
+        // In chart mode use rank ceilings from config, fallback to nonChart if no rank
+        if (Number.isFinite(rank)) {
+          if (rank <= config.thresholds.chart.easy) return 'easy';
+          if (rank <= config.thresholds.chart.normal) return 'normal';
+          if (rank <= config.thresholds.chart.hard) return 'hard';
+        }
+        const p = Number(pop || 0);
+        if (p >= config.thresholds.nonChart.easy) return 'easy';
+        if (p >= config.thresholds.nonChart.normal) return 'normal';
+        return 'hard';
+      };
+      const annotated = shuffled.map(t => ({
+        ...t,
+        debugSource: t.source || 'chart', // 'chart' when resolved from Billboard flow
+        debugDifficulty: difficultyBucket(t.rank, t.popularity)
+      }));
+
+      const fetchResult = {
+        tracks: annotated,
+        metadata: {
+          mode: 'chart',
+          chartEntries: chartEntries.length,
+          afterResolve: processed.length,
+          finalCount: annotated.length,
+          difficulty,
+          preferences: musicPreferences,
+          honoredSettings: {
+            difficulty: true,
+            genres: false,
+            markets: true,
+            yearRange: true
+          },
+          chartYearRangeApplied: effectiveRange ? {
+            min: effectiveRange.min,
+            max: effectiveRange.max,
+            expanded: effectiveRange.expanded,
+            minSpan: effectiveRange.minSpan
+          } : null,
+          marketsSearched: markets,
+          playerCount,
+          minSongsNeeded,
+          timestamp: new Date().toISOString(),
+          fetchId: Date.now().toString(),
+        }
+      };
+
+      lastFetchedSongs = fetchResult;
+      lastFetchMetadata = fetchResult.metadata;
+      fetchHistory.unshift({
+        ...fetchResult.metadata,
+        trackCount: annotated.length,
+        sampleTracks: annotated.slice(0, 5).map(t => ({ title: t.title, artist: t.artist, year: t.year, rank: t.rank }))
+      });
+      if (fetchHistory.length > 10) fetchHistory = fetchHistory.slice(0, 10);
+
+      console.log(`[ChartMode] Returning ${annotated.length} tracks (difficulty: ${difficulty})`);
+      return res.json(fetchResult);
+    }
+
+    // Non-chart mode: Spotify search as before
     // Get client credentials token for unbiased market results
     const clientToken = await getClientToken();
     
@@ -302,7 +520,13 @@ app.post('/api/fetch-songs', async (req, res) => {
               album_art: track.album.images && track.album.images.length > 0 ? track.album.images[0].url : null,
               market: market,
               genre: search.includes('genre:') ? search.split('genre:')[1].split(' ')[0] : 'general',
-              popularity: track.popularity
+              popularity: track.popularity,
+              album_name: track.album?.name || '',
+              source: 'spotify',
+              sourceDetails: {
+                query: query,
+                market: market
+              }
             }));
 
           // CRITICAL FIX: Shuffle tracks to counteract alphabetical bias from Spotify
@@ -375,7 +599,8 @@ app.post('/api/fetch-songs', async (req, res) => {
                 album_art: track.album.images && track.album.images.length > 0 ? track.album.images[0].url : null,
                 market: market,
                 genre: 'fallback',
-                popularity: track.popularity
+                popularity: track.popularity,
+                album_name: track.album?.name || ''
               }));
 
             // CRITICAL FIX: Shuffle fallback tracks to counteract alphabetical bias
@@ -390,24 +615,42 @@ app.post('/api/fetch-songs', async (req, res) => {
       }
     }
 
-    // Apply difficulty-based filtering
-    let filteredTracks = uniqueTracks;
-    
-    if (difficulty === 'easy') {
-      // Easy: Only very popular songs (popularity >= 70) and singles
-      filteredTracks = uniqueTracks
-        .filter(track => track.popularity >= 70);
-      console.log(`[Spotify] Easy mode: filtered to ${filteredTracks.length} popular tracks (popularity >= 70)`);
-    } else if (difficulty === 'normal') {
-      // Normal: Moderately popular songs (popularity >= 50) and singles
-      filteredTracks = uniqueTracks
-        .filter(track => track.popularity >= 50);
-      console.log(`[Spotify] Normal mode: filtered to ${filteredTracks.length} moderately popular tracks (popularity >= 50)`);
-    } else if (difficulty === 'hard') {
-      // Hard: All songs including niche ones
-      filteredTracks = uniqueTracks;
-      console.log(`[Spotify] Hard mode: using all ${filteredTracks.length} tracks including niche songs`);
+    // Phase 1: Remaster/live filtering (Spotify-only)
+    let filtered = uniqueTracks;
+    if (config.featureFlags.enableRemasterFilter) {
+      filtered = uniqueTracks.filter(t => {
+        const suspicious = isSuspiciousTrack({ title: t.title, album: t.album_name || '' });
+        return !suspicious;
+      });
+      console.log(`[Filters] Remaster/live filter removed ${uniqueTracks.length - filtered.length} tracks`);
     }
+
+    // Phase 2: MusicBrainz enrichment on suspicious candidates (we already removed most; optionally enrich subset)
+    if (config.featureFlags.enableMusicBrainz) {
+      let adjustedCount = 0;
+      for (const t of filtered) {
+        // Heuristic: if normalized title differs a lot (contains remaster words originally), or if missing year
+        if (!t.year || /remaster|remastered/i.test(t.title)) {
+          try {
+            const mb = await resolveOriginalYear({ artist: t.artist, title: t.title });
+            if (mb.earliestYear && mb.confidence >= config.musicbrainz.minConfidence) {
+              if (!t.year || Math.abs(t.year - mb.earliestYear) >= config.musicbrainz.yearDiffThreshold) {
+                t.year = mb.earliestYear;
+                t.mbEnriched = true;
+                adjustedCount++;
+              }
+            }
+          } catch (e) {
+            console.warn('[MB] Enrichment failed:', e.message);
+          }
+        }
+      }
+      console.log(`[MB] Adjusted years for ${adjustedCount} tracks (minConfidence=${config.musicbrainz.minConfidence})`);
+    }
+
+    // Apply difficulty-based filtering (non-chart using popularity thresholds)
+    let filteredTracks = applyNonChartDifficulty(filtered, difficulty);
+    console.log(`[Spotify] ${difficulty} mode: filtered to ${filteredTracks.length} tracks by popularity thresholds`);
 
     // Apply artist diversification to prevent too many songs from same artist
     const artistDiversifiedTracks = diversifyByArtist(filteredTracks, 1); // Max 1 song per artist
@@ -432,15 +675,36 @@ app.post('/api/fetch-songs', async (req, res) => {
       .slice(0, maxSongs); // Cap at maximum 120 songs
     
     // Store for debugging purposes
+    // Annotate non-chart tracks with debug source and difficulty bucket
+    const ncDifficultyBucket = (pop) => {
+      const p = Number(pop || 0);
+      if (p >= config.thresholds.nonChart.easy) return 'easy';
+      if (p >= config.thresholds.nonChart.normal) return 'normal';
+      return 'hard';
+    };
+    const annotatedNC = shuffled.map(t => ({
+      ...t,
+      debugSource: t.source || 'spotify',
+      debugDifficulty: ncDifficultyBucket(t.popularity)
+    }));
+
     const fetchResult = {
-      tracks: shuffled,
+      tracks: annotatedNC,
       metadata: {
+        mode: 'non-chart',
         totalFound: uniqueTracks.length,
+        afterRemasterFilter: filtered.length,
         filteredByDifficulty: filteredTracks.length,
         afterArtistDiversification: artistDiversifiedTracks.length,
-        finalCount: shuffled.length,
+        finalCount: annotatedNC.length,
         difficulty: difficulty,
         preferences: musicPreferences,
+        honoredSettings: {
+          difficulty: true,
+          genres: true,
+          markets: true,
+          yearRange: true
+        },
         marketsSearched: markets,
         genresSearched: genres,
         playerCount: playerCount,
@@ -465,13 +729,13 @@ app.post('/api/fetch-songs', async (req, res) => {
       fetchHistory = fetchHistory.slice(0, 10);
     }
     
-    console.log(`[Spotify] Returning ${shuffled.length} tracks with difficulty: ${difficulty}`);
+    console.log(`[Spotify] Returning ${shuffled.length} tracks with difficulty: ${difficulty} (non-chart mode)`);
     console.log(`[Spotify DEBUG] Sample tracks:`, shuffled.slice(0, 5).map(t => `${t.title} by ${t.artist} (${t.year})`));
     
     res.json(fetchResult);
   } catch (error) {
-    console.error('Error fetching Spotify tracks:', error);
-    res.status(500).json({ error: 'Failed to fetch tracks from Spotify' });
+    console.error('Error fetching tracks:', error);
+    res.status(500).json({ error: 'Failed to fetch tracks' });
   }
 });
 const server = http.createServer(app);
@@ -2168,10 +2432,160 @@ app.get('/', (req, res) => {
   res.send('Beatably backend running');
 });
 
+/**
+ * Feature flags endpoint
+ * Returns server-side feature flags so the frontend can reflect defaults (e.g. CHART_MODE_ENABLE).
+ */
+app.get('/api/feature-flags', (req, res) => {
+  try {
+    res.json({ featureFlags: config.featureFlags || {} });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read feature flags', message: e.message });
+  }
+});
+
+// Debug endpoint to validate Spotify backend configuration (safe: masks secrets)
+app.get('/api/debug/spotify-config', (req, res) => {
+  try {
+    const cfg = {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      spotify: {
+        clientIdSet: !!process.env.SPOTIFY_CLIENT_ID,
+        clientSecretSet: !!process.env.SPOTIFY_CLIENT_SECRET,
+        redirectUri: process.env.SPOTIFY_REDIRECT_URI || null
+      },
+      frontendUri: process.env.FRONTEND_URI || null,
+      corsOrigins: (process.env.NODE_ENV === 'production'
+        ? [process.env.FRONTEND_URI, 'https://beatably-frontend.netlify.app']
+        : ['http://127.0.0.1:5173', 'http://localhost:5173']),
+      notes: [
+        'clientSecret is not returned for security reasons; only a boolean is shown.',
+        'Ensure SPOTIFY_REDIRECT_URI exactly matches what is configured in the Spotify Dashboard.',
+        'In development, dotenv is loaded (see top of file). In production, ensure env vars are provided by the host.'
+      ],
+      timestamp: new Date().toISOString()
+    };
+    res.json(cfg);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read config', message: e.message });
+  }
+});
+
+// On-demand client credentials token test to diagnose invalid_client
+app.get('/api/debug/spotify-token-test', async (req, res) => {
+  try {
+    const response = await axios.post('https://accounts.spotify.com/api/token',
+      querystring.stringify({
+        grant_type: 'client_credentials',
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+      }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    res.json({
+      ok: true,
+      tokenType: response.data.token_type,
+      expiresIn: response.data.expires_in,
+      // Do NOT return access_token back to clients in real systems; this is for local debug only.
+      // Mask most of it to avoid leakage.
+      accessTokenPreview: response.data.access_token ? response.data.access_token.slice(0, 12) + '…' : null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    const status = error.response?.status || null;
+    const body = error.response?.data || null;
+    res.status(500).json({
+      ok: false,
+      message: 'Token exchange failed',
+      status,
+      body,
+      hints: [
+        'invalid_client usually means SPOTIFY_CLIENT_ID/SECRET are missing or incorrect in this backend process.',
+        'Verify that the env vars are loaded in the same runtime where this endpoint executes.',
+        'If running behind a process manager or cloud host, ensure secrets are set there and not only in local shell.'
+      ],
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Debug endpoint for fetched songs
+app.get('/api/debug/chart-remote-structure', async (req, res) => {
+  try {
+    const mode = req.query.mode || 'recent'; // recent|all|date
+    const date = req.query.date; // YYYY-MM-DD if mode=date
+    const { config } = require('./config');
+    const axios = require('axios');
+
+    let url = config.chart.remoteRecentUrl;
+    if (mode === 'all') url = config.chart.remoteAllUrl;
+    if (mode === 'date' && date) url = `${config.chart.remoteByDatePrefix}${date}.json`;
+
+    const resp = await axios.get(url, { timeout: config.chart.timeoutMs || 12000, headers: { Accept: 'application/json' } });
+    const data = resp.data;
+
+    // Summarize structure safely
+    const summarize = (obj) => {
+      if (Array.isArray(obj)) return { type: 'array', length: obj.length, sampleType: obj.length ? typeof obj[0] : 'unknown' };
+      if (obj && typeof obj === 'object') return { type: 'object', keys: Object.keys(obj) };
+      return { type: typeof obj };
+    };
+
+    let sampleItem = null;
+    if (Array.isArray(data)) {
+      // all.json likely array of { date, chart|songs|entries|data: {…} }
+      for (const day of data) {
+        if (!day) continue;
+        const arr = day.chart || day.songs || day.entries || (Array.isArray(day) ? day : null) || (Array.isArray(day?.data) ? day.data : null);
+        if (Array.isArray(arr) && arr.length) {
+          sampleItem = { chartDate: day.date || null, item: arr[0] };
+          break;
+        }
+        if (Array.isArray(day?.data?.chart) && day.data.chart.length) {
+          sampleItem = { chartDate: day.date || null, item: day.data.chart[0] };
+          break;
+        }
+      }
+    } else if (data && typeof data === 'object') {
+      const arr = data.chart || data.songs || data.entries || (Array.isArray(data.data) ? data.data : null) || (Array.isArray(data?.data?.chart) ? data.data.chart : null);
+      if (Array.isArray(arr) && arr.length) {
+        sampleItem = { chartDate: data.date || null, item: arr[0] };
+      }
+    }
+
+    res.json({
+      ok: true,
+      url,
+      topLevelSummary: summarize(data),
+      topLevelKeys: data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data) : null,
+      arrayLength: Array.isArray(data) ? data.length : null,
+      sampleDayKeys: Array.isArray(data) && data.length ? Object.keys(data[0] || {}) : null,
+      sampleDaySummary: Array.isArray(data) && data.length ? summarize(data[0]) : null,
+      sampleItem,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.get('/api/debug/songs', (req, res) => {
+  // expose per-track debug source and computed debugDifficulty if available
+  const last = lastFetchedSongs ? {
+    ...lastFetchedSongs,
+    tracks: (lastFetchedSongs.tracks || []).map(t => ({
+      title: t.title,
+      artist: t.artist,
+      year: t.year,
+      popularity: t.popularity ?? null,
+      rank: t.rank ?? null,
+      source: t.source ?? null,
+      debugSource: t.debugSource ?? (t.source || null),
+      debugDifficulty: t.debugDifficulty ?? null
+    }))
+  } : null;
+
   res.json({
-    lastFetch: lastFetchedSongs,
+    lastFetch: last,
     metadata: lastFetchMetadata,
     history: fetchHistory,
     timestamp: new Date().toISOString()
@@ -2236,22 +2650,28 @@ app.get('/api/debug/games/:code/songs', (req, res) => {
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });
   }
+
+  const songs = game.sharedDeck.map((song, index) => ({
+    index,
+    title: song.title,
+    artist: song.artist,
+    year: song.year,
+    popularity: song.popularity,
+    rank: song.rank ?? null,
+    source: song.source ?? null,
+    debugSource: song.debugSource ?? (song.source || null),
+    debugDifficulty: song.debugDifficulty ?? null,
+    genre: song.genre,
+    market: song.market,
+    isCurrent: index === game.currentCardIndex,
+    hasBeenPlayed: index < game.currentCardIndex
+  }));
   
   res.json({
     gameCode: code,
     totalSongs: game.sharedDeck.length,
     currentIndex: game.currentCardIndex,
-    songs: game.sharedDeck.map((song, index) => ({
-      index,
-      title: song.title,
-      artist: song.artist,
-      year: song.year,
-      popularity: song.popularity,
-      genre: song.genre,
-      market: song.market,
-      isCurrent: index === game.currentCardIndex,
-      hasBeenPlayed: index < game.currentCardIndex
-    })),
+    songs,
     timestamp: new Date().toISOString()
   });
 });

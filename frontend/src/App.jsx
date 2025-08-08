@@ -200,6 +200,28 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Initialize feature flags (e.g., default chart mode) from backend so UI reflects server defaults
+  useEffect(() => {
+    const loadFlags = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/feature-flags`);
+        if (!res.ok) return;
+        const json = await res.json();
+        const enableChartMode = json?.featureFlags?.enableChartMode;
+        if (typeof enableChartMode === 'boolean') {
+          setGameSettings(s => ({
+            ...s,
+            // Only set useChartMode from server if client hasn't explicitly set it yet
+            useChartMode: (s.useChartMode === undefined || s.useChartMode === null) ? enableChartMode : s.useChartMode
+          }));
+        }
+      } catch (e) {
+        console.warn('[App] Failed to load feature flags:', e);
+      }
+    };
+    loadFlags();
+  }, []);
+
   // Check for existing session on app load
   useEffect(() => {
     const checkForExistingSession = () => {
@@ -906,9 +928,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   };
 
   // Fetch real songs from Spotify with music preferences
-  const fetchSpotifySongs = async (musicPreferences = null) => {
+  // Now includes useChartMode so backend uses the client's intended mode instead of falling back to server env default.
+  const fetchSpotifySongs = async (musicPreferences = null, useChartMode = null) => {
     try {
-      console.log("[Spotify] Fetching songs from backend with preferences:", musicPreferences);
+      const effectiveUseChartMode = (typeof useChartMode === 'boolean') ? useChartMode : (gameSettings.useChartMode ?? false);
+      console.log("[Spotify] Fetching songs from backend with preferences:", musicPreferences, "useChartMode:", effectiveUseChartMode);
       const response = await fetch(`${API_BASE_URL}/api/fetch-songs`, {
         method: 'POST',
         headers: {
@@ -917,7 +941,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         body: JSON.stringify({
           musicPreferences: musicPreferences || gameSettings.musicPreferences,
           difficulty: gameSettings.difficulty,
-          playerCount: players.length || 2
+          playerCount: players.length || 2,
+          useChartMode: effectiveUseChartMode
         })
       });
 
@@ -926,11 +951,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       }
 
       const data = await response.json();
-      console.log("[Spotify] Successfully fetched", data.tracks.length, "songs");
+      console.log("[Spotify] Successfully fetched", data.tracks?.length || 0, "songs");
       console.log("[Spotify] Metadata:", data.metadata);
       
       // Check for warnings and display them
-      if (data.metadata.warning) {
+      if (data.metadata && data.metadata.warning) {
         console.warn("[Spotify] Warning:", data.metadata.warning);
         // You could show this warning in the UI if needed
       }

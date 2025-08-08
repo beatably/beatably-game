@@ -14,17 +14,34 @@ function GameSettings({ settings, onUpdate }) {
   });
 
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [useChartMode, setUseChartMode] = useState(settings?.useChartMode ?? false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [debugData, setDebugData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showSongsButton, setShowSongsButton] = useState(false);
 
   useEffect(() => {
-    setLocalSettings(settings || {
+    // If incoming settings exist, normalize their musicPreferences.genres to lowercase
+    if (settings) {
+      const incomingGenres = (settings.musicPreferences?.genres || []).map(g => String(g || '').toLowerCase());
+      const normalizedSettings = {
+        ...settings,
+        musicPreferences: {
+          ...settings.musicPreferences,
+          genres: Array.from(new Set(incomingGenres))
+        }
+      };
+      setLocalSettings(normalizedSettings);
+      return;
+    }
+
+    // Otherwise use our normalized defaults
+    setLocalSettings({
       difficulty: "normal",
       winCondition: 10,
       musicPreferences: {
-        genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'R&B', 'Reggae', 'Funk', 'Country', 'Jazz', 'Alternative'],
+        // Normalize genres to lowercase canonical tags to avoid mismatches (e.g. 'r&b' vs 'R&B')
+        genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'r&b', 'reggae', 'funk', 'country', 'jazz', 'alternative'],
         yearRange: { min: 1960, max: 2025 },
         markets: ['US']
       }
@@ -45,12 +62,26 @@ function GameSettings({ settings, onUpdate }) {
     onUpdate(updated);
   };
 
+  // Chart mode toggle handler (stored at top-level of settings to keep payload small)
+  const handleChartToggle = (checked) => {
+    setUseChartMode(checked);
+    const updated = { ...localSettings, useChartMode: checked };
+    setLocalSettings(updated);
+    onUpdate(updated);
+  };
+
   const handleMusicPreferenceChange = (key, value) => {
+    // Normalize genres array to lowercase when updating
+    let newVal = value;
+    if (key === 'genres' && Array.isArray(value)) {
+      newVal = Array.from(new Set(value.map(g => String(g || '').toLowerCase())));
+    }
+
     const updated = {
       ...localSettings,
       musicPreferences: {
         ...localSettings.musicPreferences,
-        [key]: value
+        [key]: newVal
       }
     };
     setLocalSettings(updated);
@@ -58,11 +89,19 @@ function GameSettings({ settings, onUpdate }) {
   };
 
   const handleGenreToggle = (genre) => {
-    const currentGenres = localSettings.musicPreferences.genres || [];
-    const newGenres = currentGenres.includes(genre)
-      ? currentGenres.filter(g => g !== genre)
-      : [...currentGenres, genre];
-    
+    // Normalize genre keys to lowercase internal form
+    const key = String(genre || '').toLowerCase();
+    const currentGenres = (localSettings.musicPreferences.genres || []).map(g => String(g || '').toLowerCase());
+    let newGenres;
+    if (currentGenres.includes(key)) {
+      newGenres = currentGenres.filter(g => g !== key);
+    } else {
+      newGenres = [...currentGenres, key];
+    }
+
+    // Deduplicate and keep ordering stable
+    newGenres = Array.from(new Set(newGenres));
+
     // Ensure at least one genre is selected
     if (newGenres.length > 0) {
       handleMusicPreferenceChange('genres', newGenres);
@@ -82,9 +121,11 @@ function GameSettings({ settings, onUpdate }) {
   };
 
   const availableGenres = [
-    'pop', 'rock', 'hip-hop', 'electronic', 'indie', 'Country', 
-    'R&B', 'Jazz', 'classical', 'folk', 'Reggae', 'blues', 'Funk', 'Alternative'
+    'pop', 'rock', 'hip-hop', 'electronic', 'indie', 'country',
+    'r&b', 'jazz', 'classical', 'folk', 'reggae', 'blues', 'funk', 'alternative'
   ];
+
+  const chartModeActive = localSettings.useChartMode ?? useChartMode;
 
   const availableMarkets = [
     { code: 'US', name: 'International (US)' },
@@ -115,6 +156,13 @@ function GameSettings({ settings, onUpdate }) {
   const testFetchSongs = async () => {
     setLoading(true);
     try {
+      const effectiveChartMode = localSettings.useChartMode ?? useChartMode;
+      console.log('[DebugPanel] Sending fetch request with:', {
+        musicPreferences: localSettings.musicPreferences,
+        difficulty: localSettings.difficulty,
+        useChartMode: effectiveChartMode
+      });
+      
       const response = await fetch(`${API_BASE_URL}/api/fetch-songs`, {
         method: 'POST',
         headers: {
@@ -122,10 +170,12 @@ function GameSettings({ settings, onUpdate }) {
         },
         body: JSON.stringify({
           musicPreferences: localSettings.musicPreferences,
-          difficulty: localSettings.difficulty
+          difficulty: localSettings.difficulty,
+          useChartMode: effectiveChartMode
         })
       });
       const data = await response.json();
+      console.log('[DebugPanel] Received fetch response:', data);
       setDebugData({ testFetch: data, timestamp: new Date().toISOString() });
     } catch (error) {
       console.error('Error testing song fetch:', error);
@@ -141,6 +191,22 @@ function GameSettings({ settings, onUpdate }) {
       
       {/* Basic Game Settings - Top Priority */}
       <div className="space-y-4 mb-8">
+        {/* Chart Hits Mode */}
+        <div className="mb-2">
+          <label className="flex items-center space-x-2 text-white text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={useChartMode}
+              onChange={(e) => handleChartToggle(e.target.checked)}
+              className="rounded"
+            />
+            <span>Chart Hits Mode</span>
+          </label>
+          <p className="text-xs text-gray-400 mt-1">
+            When enabled, playlists are built from Billboard Hot 100 charts (remote source with a small local fallback). Genre filters may be limited.
+          </p>
+        </div>
+
         {/* Difficulty - 3-way button selection */}
         <div>
           <label className="block text-white mb-2 text-sm text-left font-medium">DIFFICULTY</label>
@@ -164,6 +230,11 @@ function GameSettings({ settings, onUpdate }) {
         {/* Year Range - Always visible */}
         <div>
           <label className="block text-white mb-2 text-sm font-medium text-left">YEAR RANGE</label>
+          {chartModeActive && (
+            <div className="text-xs text-yellow-400 mb-2">
+              Year range does not filter Chart Hits; chart dates determine year.
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <input
@@ -175,7 +246,8 @@ function GameSettings({ settings, onUpdate }) {
                   ...localSettings.musicPreferences.yearRange,
                   min: parseInt(e.target.value)
                 })}
-                className="w-full p-2 rounded text-black text-sm"
+                disabled={chartModeActive}
+                className="w-full p-2 rounded text-black text-sm disabled:bg-gray-300"
               />
             </div>
             <div>
@@ -188,7 +260,8 @@ function GameSettings({ settings, onUpdate }) {
                   ...localSettings.musicPreferences.yearRange,
                   max: parseInt(e.target.value)
                 })}
-                className="w-full p-2 rounded text-black text-sm"
+                disabled={chartModeActive}
+                className="w-full p-2 rounded text-black text-sm disabled:bg-gray-300"
               />
             </div>
           </div>
@@ -233,19 +306,27 @@ function GameSettings({ settings, onUpdate }) {
             </div>
             {/* Genre Selection */}
             <div>
-              <label className="block text-gray-300 mb-3 text-sm font-medium">Music Genres</label>
-              <div className="grid grid-cols-2 gap-2">
+              <label className="block text-gray-300 mb-1 text-sm font-medium">Music Genres</label>
+              {chartModeActive && (
+                <div className="text-xs text-yellow-400 mb-2">
+                  Genres are not applied in Chart Hits Mode.
+                </div>
+              )}
+              <div className={`grid grid-cols-2 gap-2 ${chartModeActive ? 'opacity-50 pointer-events-none' : ''}`}>
                 {availableGenres.map(genre => (
                   <button
                     key={genre}
                     onClick={() => handleGenreToggle(genre)}
+                    disabled={chartModeActive}
                     className={`py-2 px-3 rounded text-sm font-medium transition-all text-left ${
                       localSettings.musicPreferences.genres.includes(genre)
                         ? 'bg-green-600 text-white shadow-lg'
                         : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
                     }`}
                   >
-                    <span className="capitalize">{genre}</span>
+                    <span>
+                      {genre === 'r&b' ? 'R&B' : (genre.charAt(0).toUpperCase() + genre.slice(1))}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -253,12 +334,18 @@ function GameSettings({ settings, onUpdate }) {
 
             {/* Geography/Markets */}
             <div>
-              <label className="block text-gray-300 mb-3 text-sm font-medium">Geography</label>
-              <div className="space-y-2">
+              <label className="block text-gray-300 mb-1 text-sm font-medium">Geography</label>
+              {chartModeActive && (
+                <div className="text-xs text-yellow-400 mb-2">
+                  In Chart Hits Mode, market selection only affects Spotify resolution market.
+                </div>
+              )}
+              <div className={`space-y-2 ${chartModeActive ? 'opacity-50 pointer-events-none' : ''}`}>
                 {availableMarkets.map(market => (
                   <button
                     key={market.code}
                     onClick={() => handleMarketToggle(market.code)}
+                    disabled={chartModeActive}
                     className={`w-full py-2 px-3 rounded text-sm font-medium transition-all text-left ${
                       localSettings.musicPreferences.markets.includes(market.code)
                         ? 'bg-green-600 text-white shadow-lg'
@@ -350,9 +437,16 @@ function GameSettings({ settings, onUpdate }) {
                                   return (
                                     <>
                                       <div>Difficulty: <span className="text-white">{meta.difficulty}</span></div>
-                                      <div>Total Found: <span className="text-white">{meta.totalFound}</span></div>
-                                      <div>After Filtering: <span className="text-white">{meta.filteredByDifficulty}</span></div>
+                                      {meta.totalFound !== undefined && (
+                                        <div>Total Found: <span className="text-white">{meta.totalFound}</span></div>
+                                      )}
+                                      {meta.filteredByDifficulty !== undefined && (
+                                        <div>After Filtering: <span className="text-white">{meta.filteredByDifficulty}</span></div>
+                                      )}
                                       <div>Final Count: <span className="text-white">{meta.finalCount}</span></div>
+                                      {meta.mode && (
+                                        <div>Mode: <span className="text-white">{meta.mode}</span></div>
+                                      )}
                                       {meta.playerCount && (
                                         <>
                                           <div>Player Count: <span className="text-white">{meta.playerCount}</span></div>
@@ -386,9 +480,19 @@ function GameSettings({ settings, onUpdate }) {
                                   .slice(0, 10)
                                   .map((song, index) => (
                                     <div key={index} className="text-gray-300 border-l-2 border-gray-600 pl-2">
-                                      <div className="text-white font-medium">{song.title}</div>
+                                      <div className="text-white font-medium">
+                                        {song.title}
+                                        <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-700">
+                                          {song.source === 'chart' ? 'Chart' : 'Spotify'}
+                                        </span>
+                                      </div>
                                       <div className="text-gray-400">
                                         {song.artist} • {song.year} • Pop: {song.popularity || 'N/A'} • {song.genre}
+                                        {song.source === 'chart' && (song.rank || song.peakPos) && (
+                                          <span className="ml-2 text-xs text-yellow-300">
+                                            {song.peakPos ? `Peak #${song.peakPos}` : `Rank #${song.rank}`}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                   ))}
