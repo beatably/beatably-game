@@ -1708,24 +1708,33 @@ io.on('connection', (socket) => {
       const respondedCount = game.challengeResponses.size;
       const totalEligible = eligibleChallengers.length;
       
-      game.players.forEach((p) => {
-        io.to(p.id).emit('game_update', {
-          timeline: game.timelines[currentPlayerId],
-          deck: [game.sharedDeck[game.currentCardIndex]],
-          players: game.players,
-          phase: "challenge-window",
-          feedback: null,
-          lastPlaced: game.lastPlaced,
-          removingId: null,
-          currentPlayerIdx: game.currentPlayerIdx,
-          currentPlayerId: currentPlayerId,
-          challengeWindow: {
-            respondedCount,
-            totalEligible,
-            waitingFor: eligibleChallengers.filter(id => !game.challengeResponses.has(id))
-          }
+// CRITICAL: Include the newly placed card visually while showing challenge progress
+      {
+        const originalTimeline = game.timelines[currentPlayerId] || [];
+        const displayTimeline = [...originalTimeline];
+        const currentCardForDisplay = game.sharedDeck[game.currentCardIndex];
+        if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCardForDisplay) {
+          displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCardForDisplay, preview: true, challengeCard: true });
+        }
+        game.players.forEach((p) => {
+          io.to(p.id).emit('game_update', {
+            timeline: displayTimeline,
+            deck: [game.sharedDeck[game.currentCardIndex]],
+            players: game.players,
+            phase: "challenge-window",
+            feedback: null,
+            lastPlaced: game.lastPlaced,
+            removingId: null,
+            currentPlayerIdx: game.currentPlayerIdx,
+            currentPlayerId: currentPlayerId,
+            challengeWindow: {
+              respondedCount,
+              totalEligible,
+              waitingFor: eligibleChallengers.filter(id => !game.challengeResponses.has(id))
+            }
+          });
         });
-      });
+      }
     }
   });
 
@@ -2230,20 +2239,27 @@ io.on('connection', (socket) => {
     // Normalize scores before broadcasting challenge window
     updatePlayerScores(game);
 
-    // Broadcast challenge window state
-    game.players.forEach((p) => {
-      io.to(p.id).emit('game_update', {
-        timeline: game.timelines[currentPlayerId],
-        deck: [currentCard],
-        players: game.players,
-        phase: "challenge-window",
-        feedback: null,
-        lastPlaced: game.lastPlaced,
-        removingId: null,
-        currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: currentPlayerId,
+// CRITICAL: Include the newly placed card visually during the challenge window
+    {
+      const originalTimeline = game.timelines[currentPlayerId] || [];
+      const displayTimeline = [...originalTimeline];
+      if (game.lastPlaced && game.lastPlaced.index !== undefined) {
+        displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true, challengeCard: true });
+      }
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: displayTimeline,
+          deck: [currentCard],
+          players: game.players,
+          phase: "challenge-window",
+          feedback: null,
+          lastPlaced: game.lastPlaced,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: currentPlayerId,
+        });
       });
-    });
+    }
     
     // Broadcast guess result
     game.players.forEach((p) => {
@@ -2276,20 +2292,27 @@ io.on('connection', (socket) => {
     // Normalize scores before broadcasting challenge window
     updatePlayerScores(game);
 
-    // Broadcast challenge window state
-    game.players.forEach((p) => {
-      io.to(p.id).emit('game_update', {
-        timeline: game.timelines[currentPlayerId],
-        deck: [currentCard],
-        players: game.players,
-        phase: "challenge-window",
-        feedback: null,
-        lastPlaced: game.lastPlaced,
-        removingId: null,
-        currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: currentPlayerId,
+// CRITICAL: Include the newly placed card visually during the challenge window
+    {
+      const originalTimeline = game.timelines[currentPlayerId] || [];
+      const displayTimeline = [...originalTimeline];
+      if (game.lastPlaced && game.lastPlaced.index !== undefined) {
+        displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true, challengeCard: true });
+      }
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: displayTimeline,
+          deck: [currentCard],
+          players: game.players,
+          phase: "challenge-window",
+          feedback: null,
+          lastPlaced: game.lastPlaced,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: currentPlayerId,
+        });
       });
-    });
+    }
   });
 
   // Use Beatably card
