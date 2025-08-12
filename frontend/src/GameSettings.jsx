@@ -19,6 +19,10 @@ function GameSettings({ settings, onUpdate }) {
   const [debugData, setDebugData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showSongsButton, setShowSongsButton] = useState(false);
+  const [activeHandle, setActiveHandle] = useState(null);
+  const trackRef = React.useRef(null);
+  // Keep a ref to the active handle so pointer events can be coordinated
+  const activeHandleRef = React.useRef(null);
 
   useEffect(() => {
     // If incoming settings exist, normalize their musicPreferences.genres to lowercase
@@ -55,7 +59,18 @@ function GameSettings({ settings, onUpdate }) {
       setShowSongsButton(savedShowSongsButton === 'true');
     }
   }, []);
-
+  
+  // Track which handle is currently active so we can put it on top for pointer events.
+  useEffect(() => {
+    const clear = () => setActiveHandle(null);
+    window.addEventListener('mouseup', clear);
+    window.addEventListener('touchend', clear);
+    return () => {
+      window.removeEventListener('mouseup', clear);
+      window.removeEventListener('touchend', clear);
+    };
+  }, []);
+  
   const handleChange = (key, value) => {
     const updated = { ...localSettings, [key]: value };
     setLocalSettings(updated);
@@ -118,6 +133,141 @@ function GameSettings({ settings, onUpdate }) {
     if (newMarkets.length > 0) {
       handleMusicPreferenceChange('markets', newMarkets);
     }
+  };
+
+  // Year range slider handlers (5-year steps, enforce minimum gap of 5 years)
+  const handleYearMinChange = (raw) => {
+    const currentMax = localSettings.musicPreferences.yearRange.max;
+    const clamped = Math.min(Math.max(1960, raw), currentMax - 5);
+    handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: clamped });
+  };
+
+  const handleYearMaxChange = (raw) => {
+    const currentMin = localSettings.musicPreferences.yearRange.min;
+    const clamped = Math.max(Math.min(2025, raw), currentMin + 5);
+    handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, max: clamped });
+  };
+
+  // Decade button selection handler
+  // Behavior:
+  // - Clicking a decade lower than the current min extends the min to that decade
+  // - Clicking a decade higher than the current max extends the max to that decade
+  // - Clicking a decade inside the current range collapses the range to that single decade
+  const handleDecadeClick = (decade) => {
+    const currentMin = localSettings.musicPreferences.yearRange.min;
+    const currentMax = localSettings.musicPreferences.yearRange.max;
+
+    if (decade < currentMin) {
+      handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade });
+      return;
+    }
+    if (decade > currentMax) {
+      handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, max: decade });
+      return;
+    }
+
+    // Clicked inside current range -> collapse to single decade
+    handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade, max: decade });
+  };
+
+  // Helper to compute background for dual-range track (selected range highlight)
+  const computeRangePercentages = () => {
+    const min = localSettings.musicPreferences.yearRange.min;
+    const max = localSettings.musicPreferences.yearRange.max;
+    const minPct = ((min - 1960) / (2025 - 1960)) * 100;
+    const maxPct = ((max - 1960) / (2025 - 1960)) * 100;
+    return { minPct, maxPct };
+  };
+
+  const computeRangeBackground = () => {
+    const { minPct, maxPct } = computeRangePercentages();
+    const minP = Math.round(minPct);
+    const maxP = Math.round(maxPct);
+    return `linear-gradient(to right, #4b5563 ${minP}%, #10b981 ${minP}%, #10b981 ${maxP}%, #4b5563 ${maxP}%)`;
+  };
+
+  // Helpers to restrict grabbing to near the visible handle/thumb.
+  const getClientXFromEvent = (e) => {
+    if (!e) return null;
+    if (e.touches && e.touches[0]) return e.touches[0].clientX;
+    return e.clientX ?? null;
+  };
+
+  const isNearHandle = (handle, clientX, thresholdPx = 20) => {
+    if (!trackRef?.current || clientX == null) return false;
+    const rect = trackRef.current.getBoundingClientRect();
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    const { minPct, maxPct } = computeRangePercentages();
+    const targetPct = handle === 'min' ? minPct : maxPct;
+    const pxDist = Math.abs((pct - targetPct) / 100 * rect.width);
+    return pxDist <= thresholdPx;
+  };
+
+  const handlePointerDown = (e, handle) => {
+    if (chartModeActive) return;
+    const clientX = getClientXFromEvent(e);
+    if (!isNearHandle(handle, clientX)) {
+      // Prevent native range from jumping to clicked position when user clicks the track
+      e.preventDefault?.();
+      return;
+    }
+    setActiveHandle(handle);
+    activeHandleRef.current = handle;
+  };
+
+  const handleTouchStart = (e, handle) => {
+    if (chartModeActive) return;
+    const clientX = getClientXFromEvent(e);
+    if (!isNearHandle(handle, clientX)) {
+      e.preventDefault?.();
+      return;
+    }
+    setActiveHandle(handle);
+    activeHandleRef.current = handle;
+  };
+
+  // Start a drag session on a handle (badge). Updates value during pointer move.
+  const startDrag = (handle, e) => {
+    if (chartModeActive) return;
+    const clientX = getClientXFromEvent(e);
+    // Allow a slightly larger grab area when starting from the badge
+    if (!isNearHandle(handle, clientX, 30)) {
+      e.preventDefault?.();
+      return;
+    }
+    setActiveHandle(handle);
+    activeHandleRef.current = handle;
+
+    const onMove = (evt) => {
+      const cx = getClientXFromEvent(evt);
+      if (cx == null || !trackRef.current) return;
+      const rect = trackRef.current.getBoundingClientRect();
+      let pct = (cx - rect.left) / rect.width;
+      pct = Math.max(0, Math.min(1, pct));
+      // Map pct to nearest 5-year step between 1960 and 2025
+      const range = 2025 - 1960;
+      const raw = Math.round((pct * range) / 5) * 5 + 1960;
+      const value = Math.min(2025, Math.max(1960, raw));
+      if (handle === 'min') {
+        handleYearMinChange(value);
+      } else {
+        handleYearMaxChange(value);
+      }
+    };
+
+    const onEnd = () => {
+      setActiveHandle(null);
+      activeHandleRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchend', onEnd);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchend', onEnd);
   };
 
   const availableGenres = [
@@ -235,35 +385,34 @@ function GameSettings({ settings, onUpdate }) {
               Year range does not filter Chart Hits; chart dates determine year.
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <input
-                type="number"
-                min="1950"
-                max="2025"
-                value={localSettings.musicPreferences.yearRange.min}
-                onChange={e => handleMusicPreferenceChange('yearRange', {
-                  ...localSettings.musicPreferences.yearRange,
-                  min: parseInt(e.target.value)
-                })}
-                disabled={chartModeActive}
-                className="w-full p-2 rounded text-black text-sm disabled:bg-gray-300"
-              />
-            </div>
-            <div>
-              <input
-                type="number"
-                min="1950"
-                max="2025"
-                value={localSettings.musicPreferences.yearRange.max}
-                onChange={e => handleMusicPreferenceChange('yearRange', {
-                  ...localSettings.musicPreferences.yearRange,
-                  max: parseInt(e.target.value)
-                })}
-                disabled={chartModeActive}
-                className="w-full p-2 rounded text-black text-sm disabled:bg-gray-300"
-              />
-            </div>
+          <div className="relative">
+            {/* Decade selector buttons (10-year steps). Active decades are highlighted. */}
+            {(() => {
+              const decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
+              const min = localSettings.musicPreferences.yearRange.min;
+              const max = localSettings.musicPreferences.yearRange.max;
+              return (
+                <div className={`grid grid-cols-4 gap-2 ${chartModeActive ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {decades.map(decade => {
+                    const active = decade >= min && decade <= max;
+                    return (
+                      <button
+                        key={decade}
+                        onClick={() => handleDecadeClick(decade)}
+                        disabled={chartModeActive}
+                        className={`py-2 px-3 rounded text-sm font-medium transition-all text-center ${
+                          active ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
+                        }`}
+                        aria-pressed={active}
+                        aria-label={`${decade}s`}
+                      >
+                        {decade}s
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

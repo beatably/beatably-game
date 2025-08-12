@@ -1716,6 +1716,23 @@ io.on('connection', (socket) => {
         if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCardForDisplay) {
           displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCardForDisplay, preview: true, challengeCard: true });
         }
+        // DEBUG: Log detailed state right before broadcasting challenge-window progress (skip_challenge)
+        try {
+          console.log('[DEBUG] challenge-window progress (skip_challenge) broadcast', {
+            code,
+            currentPlayerId,
+            lastPlaced: game.lastPlaced,
+            currentCard: currentCardForDisplay ? { id: currentCardForDisplay.id, year: currentCardForDisplay.year, title: currentCardForDisplay.title } : null,
+            originalTimelineLen: originalTimeline.length,
+            displayTimelineLen: displayTimeline.length,
+            displayTimelineYears: displayTimeline.map(c => c.year),
+            displayTimelineIds: displayTimeline.map(c => c.id),
+            respondedCount,
+            totalEligible
+          });
+        } catch (e) {
+          console.log('[DEBUG] challenge-window progress (skip_challenge) logging failed', e && e.message);
+        }
         game.players.forEach((p) => {
           io.to(p.id).emit('game_update', {
             timeline: displayTimeline,
@@ -1773,21 +1790,48 @@ io.on('connection', (socket) => {
     // Normalize scores before broadcasting challenge state
     updatePlayerScores(game);
 
-    // Broadcast challenge state - challenger places on original player's timeline
-    game.players.forEach((p) => {
-      io.to(p.id).emit('game_update', {
-        timeline: game.timelines[currentPlayerId], // Show original player's timeline
-        deck: [game.sharedDeck[game.currentCardIndex]], // Same card
-        players: game.players,
-        phase: "challenge",
-        challenge: game.challenge,
-        feedback: null,
-        lastPlaced: game.lastPlaced,
-        removingId: null,
-        currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: playerId, // Challenger is now active
+// Broadcast challenge state - challenger places on original player's timeline
+    {
+      // Build a visual timeline that includes the placed card so challengers see what they're challenging
+      const originalTimeline = game.timelines[currentPlayerId] || [];
+      const displayTimeline = [...originalTimeline];
+      const currentCardForDisplay = game.sharedDeck[game.currentCardIndex];
+      if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCardForDisplay) {
+        displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCardForDisplay, preview: true, challengeCard: true });
+      }
+
+      // DEBUG: Log state sent for challenge phase
+      try {
+        console.log('[DEBUG] challenge (initiate_challenge) broadcast', {
+          code,
+          currentPlayerId,
+          challengerId: playerId,
+          lastPlaced: game.lastPlaced,
+          currentCard: currentCardForDisplay ? { id: currentCardForDisplay.id, year: currentCardForDisplay.year, title: currentCardForDisplay.title } : null,
+          originalTimelineLen: originalTimeline.length,
+          displayTimelineLen: displayTimeline.length,
+          displayTimelineYears: displayTimeline.map(c => c.year),
+          displayTimelineIds: displayTimeline.map(c => c.id)
+        });
+      } catch (e) {
+        console.log('[DEBUG] challenge (initiate_challenge) logging failed', e && e.message);
+      }
+
+      game.players.forEach((p) => {
+        io.to(p.id).emit('game_update', {
+          timeline: displayTimeline, // show visual timeline including placed card
+          deck: [game.sharedDeck[game.currentCardIndex]], // Same card
+          players: game.players,
+          phase: "challenge",
+          challenge: game.challenge,
+          feedback: null,
+          lastPlaced: game.lastPlaced,
+          removingId: null,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: playerId, // Challenger is now active
+        });
       });
-    });
+    }
   });
 
   // Challenge card placement
@@ -2246,6 +2290,21 @@ io.on('connection', (socket) => {
       if (game.lastPlaced && game.lastPlaced.index !== undefined) {
         displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true, challengeCard: true });
       }
+      // DEBUG: Log detailed state right before broadcasting challenge-window
+      try {
+        console.log('[DEBUG] challenge-window (guess_song) broadcast', {
+          code,
+          currentPlayerId,
+          lastPlaced: game.lastPlaced,
+          currentCard: { id: currentCard?.id, year: currentCard?.year, title: currentCard?.title },
+          originalTimelineLen: originalTimeline.length,
+          displayTimelineLen: displayTimeline.length,
+          displayTimelineYears: displayTimeline.map(c => c.year),
+          displayTimelineIds: displayTimeline.map(c => c.id)
+        });
+      } catch (e) {
+        console.log('[DEBUG] challenge-window (guess_song) logging failed', e && e.message);
+      }
       game.players.forEach((p) => {
         io.to(p.id).emit('game_update', {
           timeline: displayTimeline,
@@ -2298,6 +2357,21 @@ io.on('connection', (socket) => {
       const displayTimeline = [...originalTimeline];
       if (game.lastPlaced && game.lastPlaced.index !== undefined) {
         displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true, challengeCard: true });
+      }
+      // DEBUG: Log detailed state right before broadcasting challenge-window (skip_song_guess)
+      try {
+        console.log('[DEBUG] challenge-window (skip_song_guess) broadcast', {
+          code,
+          currentPlayerId,
+          lastPlaced: game.lastPlaced,
+          currentCard: { id: currentCard?.id, year: currentCard?.year, title: currentCard?.title },
+          originalTimelineLen: originalTimeline.length,
+          displayTimelineLen: displayTimeline.length,
+          displayTimelineYears: displayTimeline.map(c => c.year),
+          displayTimelineIds: displayTimeline.map(c => c.id)
+        });
+      } catch (e) {
+        console.log('[DEBUG] challenge-window (skip_song_guess) logging failed', e && e.message);
       }
       game.players.forEach((p) => {
         io.to(p.id).emit('game_update', {

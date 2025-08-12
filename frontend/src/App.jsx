@@ -432,6 +432,22 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       deckLength: game.deck?.length || 0,
       winner: game.winner
     });
+    // TEMP DEBUG: store full game_update payload so you can inspect it in the browser console after reproducing
+    try {
+      // Expose the last received update globally for easy inspection
+      window.lastGameUpdate = game;
+      const tl = Array.isArray(game.timeline) ? game.timeline : [];
+      console.log("[DEBUG][client] Stored full game_update in window.lastGameUpdate");
+      console.log("[DEBUG][client] timeline summary:", {
+        length: tl.length,
+        ids: tl.map(c => c && c.id),
+        years: tl.map(c => c && c.year),
+        titles: tl.map(c => c && c.title)
+      });
+      console.log("[DEBUG][client] To copy the full timeline to clipboard, open Console and run: copy(window.lastGameUpdate.timeline)");
+    } catch (e) {
+      console.log("[DEBUG][client] temp logging failed:", e && e.message);
+    }
 
     // If already showing winner, ignore further updates to avoid UI flicker
     if (showWinnerView && winner) {
