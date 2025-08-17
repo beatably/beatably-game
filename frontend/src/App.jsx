@@ -1064,22 +1064,40 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       spotifyAuth.storeDeviceId(newDeviceId);
       setSpotifyDeviceId(newDeviceId);
 
-      // If currently playing music, transfer playback to the selected device and keep playing
-      if (isPlayingMusic && currentCard?.uri) {
-        console.log('[App] Transferring active playback to new device:', newDeviceId);
+      // Check if we have a current song that should be playing
+      const shouldAutoplay = currentCard?.uri && (
+        isPlayingMusic || // Currently playing
+        window.__beatablyPendingAutoplay || // Autoplay was intended
+        phase === 'player-turn' // In active gameplay phase
+      );
+
+      if (shouldAutoplay) {
+        console.log('[App] Transferring and starting playback on new device:', newDeviceId);
         await spotifyAuth.transferPlayback(newDeviceId, false);
         setTimeout(async () => {
           try {
-            const success = await spotifyAuth.startPlayback(newDeviceId, currentCard.uri, 0);
+            const success = await spotifyAuth.verifiedStartPlayback(
+              newDeviceId,
+              currentCard.uri,
+              0,
+              { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 4, verifyDelayMs: 250 }
+            );
             if (success) {
               console.log('[App] Successfully started playback on new device:', newDeviceId);
               setIsPlayingMusic(true);
+              // Clear pending autoplay intent since we've fulfilled it
+              window.__beatablyPendingAutoplay = false;
             }
           } catch (error) {
             console.error('[App] Error starting playback on new device:', error);
           }
         }, 300);
+      } else {
+        // Just transfer without starting playback
+        console.log('[App] Transferring device without autoplay:', newDeviceId);
+        await spotifyAuth.transferPlayback(newDeviceId, false);
       }
+      
       console.log('[App] Device switch completed successfully');
     } catch (error) {
       console.error('[App] Error during device switch:', error);
@@ -1637,6 +1655,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Autoplay when currentCard URI changes to a new song (after first round initial load)
   useEffect(() => {
+    // Expose current card globally for device switching
+    if (currentCard) {
+      window.currentGameCard = currentCard;
+    }
+
     // Preconditions common to both immediate and deferred start
     if (!isCreator) return;
     if (!currentCard?.uri) return;

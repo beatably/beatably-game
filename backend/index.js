@@ -15,6 +15,7 @@ const { resolveOriginalYear, isRemasterMarker, normalizeTitle } = require('./mus
 const { getChartEntries } = require('./chartProvider');
 
 const app = express();
+const discovery = require('./discovery');
 
 // Store client credentials token
 let clientToken = null;
@@ -2540,6 +2541,143 @@ app.get('/api/feature-flags', (req, res) => {
     res.status(500).json({ error: 'Failed to read feature flags', message: e.message });
   }
 });
+
+/**
+ * Local network discovery endpoints and background scanner
+ * - GET /api/local-devices : on-demand discovery (runs a scan)
+ * - GET /api/local-devices/stream : Server-Sent Events pushing periodic device lists
+ * - POST /api/wake-device : best-effort "wake" attempt (TCP probe to common ports)
+ *
+ * Notes:
+ * - Discovery runs on the backend host and can only see devices on the same LAN.
+ * - SSE stream pushes the latest cached scan results.
+ */
+
+// In-memory cache for discovered devices and SSE clients
+let localDevicesCache = [];
+let lastLocalDevicesScanAt = null;
+const sseClients = new Set();
+
+// Helper: push update to connected SSE clients
+function pushLocalDevicesToSse() {
+  const payload = JSON.stringify({ devices: localDevicesCache, timestamp: new Date().toISOString() });
+  sseClients.forEach(res => {
+    try {
+      res.write(`data: ${payload}\n\n`);
+    } catch (e) {
+      // ignore broken clients; they'll be cleaned up on error
+    }
+  });
+}
+
+// On-demand discovery (runs a scan)
+app.get('/api/local-devices', async (req, res) => {
+  try {
+    const timeoutMs = Number(req.query.timeout) || 3000;
+    const devices = await discovery.discoverLocalDevices(timeoutMs);
+    // Update cache
+    localDevicesCache = devices;
+    lastLocalDevicesScanAt = Date.now();
+    // Push to SSE clients
+    pushLocalDevicesToSse();
+    res.json({ ok: true, devices, timestamp: new Date().toISOString() });
+  } catch (e) {
+    console.error('[LocalDiscovery] Error:', e && e.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Discovery failed' });
+  }
+});
+
+// SSE stream for continuous updates
+app.get('/api/local-devices/stream', (req, res) => {
+  // Set headers for SSE
+  res.writeHead(200, {
+    Connection: 'keep-alive',
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Access-Control-Allow-Origin': corsOptions.origin
+  });
+  res.write('\n');
+
+  // Send initial payload immediately if we have cache
+  if (localDevicesCache && localDevicesCache.length) {
+    const payload = JSON.stringify({ devices: localDevicesCache, timestamp: new Date().toISOString() });
+    res.write(`data: ${payload}\n\n`);
+  }
+
+  // Track client
+  sseClients.add(res);
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+// POST /api/wake-device - best-effort probe to a device IP/host
+const net = require('net');
+
+app.post('/api/wake-device', express.json(), async (req, res) => {
+  try {
+    const { ip, ports } = req.body || {};
+    if (!ip) {
+      return res.status(400).json({ ok: false, error: 'Missing ip in body' });
+    }
+
+    const probePorts = Array.isArray(ports) && ports.length ? ports : [8009, 1900, 8008, 8000, 5353]; // common cast/ssdp/http/mdns ports
+
+    let success = false;
+    const results = [];
+
+    // Try TCP connect attempts with short timeout
+    for (const port of probePorts) {
+      /* eslint-disable no-await-in-loop */
+      try {
+        const ok = await new Promise((resolve) => {
+          const socket = new net.Socket();
+          let done = false;
+          socket.setTimeout(1200);
+          socket.on('connect', () => {
+            done = true;
+            socket.destroy();
+            resolve(true);
+          });
+          socket.on('error', () => {
+            if (!done) { done = true; resolve(false); }
+          });
+          socket.on('timeout', () => {
+            if (!done) { done = true; socket.destroy(); resolve(false); }
+          });
+          socket.connect(port, ip);
+        });
+        results.push({ port, ok });
+        if (ok) {
+          success = true;
+          // continue probing other ports for richer diagnostics
+        }
+      } catch (e) {
+        results.push({ port, ok: false, err: e.message });
+      }
+      /* eslint-enable no-await-in-loop */
+    }
+
+    res.json({ ok: success, results, timestamp: new Date().toISOString() });
+  } catch (e) {
+    console.error('[WakeDevice] Error:', e && e.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Wake failed' });
+  }
+});
+
+// Background periodic scan to refresh localDevicesCache every N seconds (if running in LAN)
+const LOCAL_DISCOVERY_POLL_MS = Number(process.env.LOCAL_DISCOVERY_POLL_MS) || 15000;
+setInterval(async () => {
+  try {
+    const devices = await discovery.discoverLocalDevices(3000);
+    localDevicesCache = devices;
+    lastLocalDevicesScanAt = Date.now();
+    pushLocalDevicesToSse();
+    console.log(`[LocalDiscovery] Background scan found ${devices.length} devices at ${new Date().toISOString()}`);
+  } catch (e) {
+    console.warn('[LocalDiscovery] Background scan failed:', e && e.message);
+  }
+}, LOCAL_DISCOVERY_POLL_MS);
 
 // Debug endpoint to validate Spotify backend configuration (safe: masks secrets)
 app.get('/api/debug/spotify-config', (req, res) => {
