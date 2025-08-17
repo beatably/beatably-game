@@ -848,19 +848,21 @@ io.on('connection', (socket) => {
         // Now update the player's socket ID
         game.players[existingPlayerIndex].id = socket.id;
         
-        // CRITICAL FIX: Update currentPlayerId if the reconnecting player is the current player
-        if (game.playerOrder[game.currentPlayerIdx] === oldPlayerId) {
-          game.playerOrder[game.currentPlayerIdx] = socket.id;
-          console.log('[Sessions] Updated current player ID in player order:', {
-            from: oldPlayerId,
-            to: socket.id,
-            currentPlayerIdx: game.currentPlayerIdx
-          });
+        // CRITICAL FIX: Update ALL references to the old player ID in playerOrder
+        for (let i = 0; i < game.playerOrder.length; i++) {
+          if (game.playerOrder[i] === oldPlayerId) {
+            game.playerOrder[i] = socket.id;
+            console.log('[Sessions] Updated player order at index', i, ':', {
+              from: oldPlayerId,
+              to: socket.id
+            });
+          }
         }
         
         // Update the timeline mapping to use the new socket ID
         if (game.timelines[oldPlayerId]) {
           game.timelines[socket.id] = game.timelines[oldPlayerId];
+          delete game.timelines[oldPlayerId]; // Clean up old mapping
           console.log('[Sessions] Timeline mapping updated:', {
             from: oldPlayerId,
             to: socket.id,
@@ -868,8 +870,32 @@ io.on('connection', (socket) => {
           });
         }
         
-        // CRITICAL FIX: Get the updated current player ID after potential player order update
+        // CRITICAL FIX: Get the updated current player ID after player order update
         const updatedCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
+        
+        // CRITICAL FIX: Validate that the current player ID is valid
+        if (!updatedCurrentPlayerId || !game.players.find(p => p.id === updatedCurrentPlayerId)) {
+          console.error('[Sessions] CRITICAL ERROR: Invalid current player ID after reconnection:', {
+            updatedCurrentPlayerId,
+            currentPlayerIdx: game.currentPlayerIdx,
+            playerOrder: game.playerOrder,
+            players: game.players.map(p => ({ id: p.id, name: p.name }))
+          });
+          
+          // Attempt to fix by finding a valid player
+          const validPlayer = game.players.find(p => game.playerOrder.includes(p.id));
+          if (validPlayer) {
+            const validIndex = game.playerOrder.indexOf(validPlayer.id);
+            game.currentPlayerIdx = validIndex;
+            console.log('[Sessions] Fixed current player to valid player:', {
+              playerId: validPlayer.id,
+              playerName: validPlayer.name,
+              newCurrentPlayerIdx: validIndex
+            });
+          }
+        }
+        
+        const finalCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
         
         callback({
           success: true,
@@ -883,7 +909,7 @@ io.on('connection', (socket) => {
             lastPlaced: game.lastPlaced,
             removingId: game.removingId,
             currentPlayerIdx: game.currentPlayerIdx,
-            currentPlayerId: updatedCurrentPlayerId, // Use updated ID
+            currentPlayerId: finalCurrentPlayerId, // Use final validated ID
             challenge: game.challenge
           }
         });
@@ -892,7 +918,7 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           game.players.forEach((p) => {
             io.to(p.id).emit('game_update', {
-              timeline: game.timelines[updatedCurrentPlayerId],
+              timeline: game.timelines[finalCurrentPlayerId],
               deck: [currentCard],
               players: game.players,
               phase: game.phase,
@@ -900,7 +926,7 @@ io.on('connection', (socket) => {
               lastPlaced: game.lastPlaced,
               removingId: game.removingId,
               currentPlayerIdx: game.currentPlayerIdx,
-              currentPlayerId: updatedCurrentPlayerId, // Use updated ID
+              currentPlayerId: finalCurrentPlayerId, // Use final validated ID
               challenge: game.challenge
             });
           });
