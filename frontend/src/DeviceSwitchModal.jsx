@@ -6,11 +6,6 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // UI helper: toggle visibility of raw discovery payload per device for debugging
-  const [rawVisible, setRawVisible] = useState({});
-  const toggleRaw = (id) => {
-    setRawVisible(prev => ({ ...prev, [id]: !prev[id] }));
-  };
 
   useEffect(() => {
     if (isOpen) {
@@ -230,23 +225,7 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
                     </div>
                   </button>
 
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => toggleRaw(device.id)}
-                      className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-white rounded"
-                    >
-                      {rawVisible[device.id] ? 'Hide details' : 'Show details'}
-                    </button>
-                  </div>
                 </div>
-
-                {rawVisible[device.id] && (
-                  <div className="mt-2 p-2 bg-black bg-opacity-20 text-xs text-gray-200 rounded">
-                    <pre className="whitespace-pre-wrap break-words text-xs">
-                      {JSON.stringify(device.raw || device, null, 2)}
-                    </pre>
-                  </div>
-                )}
               </div>
             ))}
           </div>
