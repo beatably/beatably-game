@@ -20,7 +20,8 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
     try {
       const tokenValidation = await spotifyAuth.ensureValidToken();
       if (!tokenValidation.valid) {
-        setError('Spotify authentication expired. Please re-authenticate.');
+        // Auto-trigger Spotify re-authentication (no manual button)
+        spotifyAuth.initiateReauth();
         setLoading(false);
         return;
       }
@@ -101,7 +102,8 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
     try {
       const tokenValidation = await spotifyAuth.ensureValidToken();
       if (!tokenValidation.valid) {
-        setError('Spotify authentication expired. Please re-authenticate.');
+        // Auto-trigger Spotify re-authentication (no manual button)
+        spotifyAuth.initiateReauth();
         return;
       }
 

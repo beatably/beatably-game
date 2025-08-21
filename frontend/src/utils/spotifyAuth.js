@@ -74,16 +74,12 @@ class SpotifyAuthManager {
     const token = this.getToken();
     if (!token) {
       console.log('[SpotifyAuth] No token found, authentication required');
-      window.alert("Your session has expired. Please log in again.");
-      this.initiateReauth();
       return { valid: false, requiresAuth: true };
     }
 
     const isValid = await this.validateToken(token);
     if (!isValid) {
       console.log('[SpotifyAuth] Token invalid, authentication required');
-      window.alert("Your session has expired. Please log in again.");
-      this.initiateReauth();
       return { valid: false, requiresAuth: true };
     }
 
@@ -95,6 +91,23 @@ class SpotifyAuthManager {
     console.log('[SpotifyAuth] Initiating re-authentication');
     
     // Save current game state if provided
+    if (gameState) {
+      localStorage.setItem('game_state_backup', JSON.stringify({
+        ...gameState,
+        timestamp: Date.now()
+      }));
+      localStorage.setItem('pending_reauth', 'true');
+    }
+    
+    // Emit custom event for UI components to handle
+    const event = new CustomEvent('spotify_auth_required', {
+      detail: { gameState }
+    });
+    window.dispatchEvent(event);
+  }
+
+  // Direct redirect method for when user confirms re-auth
+  redirectToAuth(gameState = null) {
     if (gameState) {
       localStorage.setItem('game_state_backup', JSON.stringify({
         ...gameState,

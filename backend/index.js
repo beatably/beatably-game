@@ -17,6 +17,146 @@ const { getChartEntries } = require('./chartProvider');
 const app = express();
 const discovery = require('./discovery');
 
+// --- Persistent state (lobbies/games) across backend restarts ---
+const fs = require('fs');
+const path = require('path');
+
+const STATE_DIR = path.join(__dirname, 'cache');
+const STATE_FILE = path.join(STATE_DIR, 'state.json');
+
+function sanitizeForSave(obj) {
+  // JSON-safe deep clone with Set support
+  const replacer = (key, value) => {
+    if (value instanceof Set) {
+      return { __type: 'Set', values: Array.from(value) };
+    }
+    return value;
+  };
+  try {
+    return JSON.parse(JSON.stringify(obj, replacer));
+  } catch (e) {
+    console.warn('[State] sanitizeForSave failed:', e && e.message);
+    return null;
+  }
+}
+
+function reviveAfterLoad(data) {
+  if (!data || typeof data !== 'object') return data;
+
+  // Helper to revive Set saved as { __type: 'Set', values: [...] } or plain array
+  const reviveMaybeSet = (val) => {
+    if (!val) return new Set();
+    if (val instanceof Set) return val;
+    if (Array.isArray(val)) return new Set(val);
+    if (typeof val === 'object' && val.__type === 'Set' && Array.isArray(val.values)) {
+      return new Set(val.values);
+    }
+    return val;
+  };
+
+  try {
+    const gamesObj = data.games || {};
+    Object.keys(gamesObj).forEach(code => {
+      const game = gamesObj[code];
+      if (!game) return;
+      game.playedCards = reviveMaybeSet(game.playedCards);
+      game.challengeResponses = reviveMaybeSet(game.challengeResponses);
+    });
+  } catch (e) {
+    console.warn('[State] reviveAfterLoad failed:', e && e.message);
+  }
+  return data;
+}
+
+function persistState() {
+  try {
+    if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
+    const payload = {
+      lobbies,
+      games,
+      savedAt: new Date().toISOString()
+      // Note: playerSessions deliberately NOT persisted (socket ids are transient)
+    };
+    const serializable = sanitizeForSave(payload);
+    if (!serializable) return;
+    fs.writeFileSync(STATE_FILE, JSON.stringify(serializable));
+    console.log('[State] Saved to', STATE_FILE);
+  } catch (e) {
+    console.warn('[State] Save failed:', e && e.message);
+  }
+}
+
+function loadStateFromDisk() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) {
+      console.log('[State] No prior state file, starting fresh');
+      return false;
+    }
+    const raw = fs.readFileSync(STATE_FILE, 'utf8');
+    const revived = reviveAfterLoad(JSON.parse(raw));
+    if (!revived || !revived.lobbies || !revived.games) {
+      console.warn('[State] Invalid state file format, ignoring');
+      return false;
+    }
+    // Populate existing containers
+    Object.keys(revived.lobbies).forEach(code => { lobbies[code] = revived.lobbies[code]; });
+    Object.keys(revived.games).forEach(code => { games[code] = revived.games[code]; });
+    console.log('[State] Loaded lobbies/games from disk. Rooms:', {
+      lobbies: Object.keys(lobbies),
+      games: Object.keys(games)
+    });
+    return true;
+  } catch (e) {
+    console.warn('[State] Load failed:', e && e.message);
+    return false;
+  }
+}
+
+// Debounced saver, called after any mutating event
+let __saveScheduled = false;
+function schedulePersist() {
+  if (__saveScheduled) return;
+  __saveScheduled = true;
+  setTimeout(() => {
+    __saveScheduled = false;
+    persistState();
+  }, 250);
+}
+
+// Safety: periodic snapshot in case of long idle periods
+setInterval(() => {
+  try { persistState(); } catch (e) {}
+}, 15000);
+
+// Safety: persist state on common termination signals
+['SIGINT', 'SIGTERM', 'SIGHUP'].forEach(sig => {
+  try {
+    process.on(sig, () => {
+      try {
+        console.log('[State] Signal received:', sig, '- saving state');
+        persistState();
+      } catch (e) {
+        console.warn('[State] Failed to save on signal:', e && e.message);
+      } finally {
+        process.exit(0);
+      }
+    });
+  } catch (e) {
+    // ignore if not supported
+  }
+});
+
+// Safety: persist on uncaught exceptions
+try {
+  process.on('uncaughtException', (err) => {
+    console.error('[State] Uncaught exception - saving state:', err && err.stack || err);
+    try { persistState(); } catch (e) {}
+    process.exit(1);
+  });
+} catch (e) {
+  // ignore
+}
+
 // Store client credentials token
 let clientToken = null;
 let clientTokenExpiry = null;
@@ -758,6 +898,9 @@ const games = {};
 // Store player sessions for reconnection: { sessionId: { playerId, roomCode, playerName, isCreator, timestamp } }
 const playerSessions = {};
 
+// Attempt to load prior state (lobbies/games) from disk on startup
+loadStateFromDisk();
+
 // Session timeout (30 minutes)
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 
@@ -782,7 +925,326 @@ io.on('connection', (socket) => {
     // Check if session exists and is valid
     const session = playerSessions[sessionId];
     if (!session) {
-      console.log('[Sessions] Session not found:', sessionId);
+      // Fallback path: backend likely restarted and lost in-memory sessions.
+      // Attempt stateless rejoin by roomCode + playerName matching in active game/lobby.
+      console.log('[Sessions] Session not found, attempting stateless rejoin:', { sessionId, roomCode, playerName, socketId: socket.id });
+
+      const lobby = lobbies[roomCode];
+      const game = games[roomCode];
+
+      if (game) {
+        const existingPlayerIndex = game.players.findIndex(p => p.name === playerName);
+        if (existingPlayerIndex !== -1) {
+          const oldPlayerId = game.players[existingPlayerIndex].id;
+
+          socket.join(roomCode);
+          console.log('[Sessions] Stateless rejoin matched game by name:', { roomCode, playerName, oldPlayerId, newSocketId: socket.id });
+
+          // Current pointers
+          const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+          const currentCard = game.sharedDeck[game.currentCardIndex];
+
+          // Player's timeline with old id
+          const playerTimeline = game.timelines[oldPlayerId] || [];
+
+          // Update player's socket id
+          game.players[existingPlayerIndex].id = socket.id;
+
+          // Update playerOrder mapping
+          for (let i = 0; i < game.playerOrder.length; i++) {
+            if (game.playerOrder[i] === oldPlayerId) {
+              game.playerOrder[i] = socket.id;
+              console.log('[Sessions] Updated player order (stateless):', { index: i, from: oldPlayerId, to: socket.id });
+            }
+          }
+
+          // Update timeline mapping
+          if (game.timelines[oldPlayerId]) {
+            if (oldPlayerId !== socket.id) {
+              game.timelines[socket.id] = game.timelines[oldPlayerId];
+              delete game.timelines[oldPlayerId];
+              console.log('[Sessions] Moved timeline mapping (stateless):', {
+                from: oldPlayerId,
+                to: socket.id,
+                timelineLength: (game.timelines[socket.id] ? game.timelines[socket.id].length : 0)
+              });
+            } else {
+              game.timelines[socket.id] = game.timelines[socket.id] || [];
+              console.log('[Sessions] Timeline mapping unchanged (same id) on stateless rejoin');
+            }
+          } else {
+            console.warn('[Sessions] No existing timeline for old id on stateless rejoin:', { oldPlayerId, newId: socket.id });
+            game.timelines[socket.id] = game.timelines[socket.id] || [];
+          }
+
+          // Validate/fix current player pointer
+          if (!game.playerOrder[game.currentPlayerIdx] ||
+              !game.players.find(p => p.id === game.playerOrder[game.currentPlayerIdx])) {
+            console.error('[Sessions] Invalid current player after stateless rejoin; repairing');
+            const valid = game.players.find(p => game.playerOrder.includes(p.id));
+            if (valid) {
+              game.currentPlayerIdx = game.playerOrder.indexOf(valid.id);
+              console.log('[Sessions] Repaired currentPlayerIdx:', game.currentPlayerIdx);
+            }
+          }
+
+          const finalCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
+
+          // Recreate session entry so further reconnects work
+          try {
+            playerSessions[sessionId] = {
+              sessionId,
+              playerId: socket.id,
+              roomCode,
+              playerName,
+              isCreator: !!game.players[existingPlayerIndex].isCreator,
+              timestamp: Date.now()
+            };
+            console.log('[Sessions] Recreated session after stateless rejoin:', sessionId);
+          } catch (e) {
+            console.warn('[Sessions] Failed to recreate session on stateless rejoin:', e && e.message);
+          }
+
+          callback({
+            success: true,
+            view: 'game',
+            gameState: {
+              timeline: playerTimeline,
+              deck: [currentCard],
+              players: game.players,
+              phase: game.phase,
+              feedback: game.feedback,
+              lastPlaced: game.lastPlaced,
+              removingId: game.removingId,
+              currentPlayerIdx: game.currentPlayerIdx,
+              currentPlayerId: finalCurrentPlayerId,
+              challenge: game.challenge
+            }
+          });
+
+          // Sync everyone with validated current player/timeline
+          setTimeout(() => {
+            game.players.forEach((p) => {
+              io.to(p.id).emit('game_update', {
+                timeline: game.timelines[finalCurrentPlayerId] || [],
+                deck: [game.sharedDeck[game.currentCardIndex]],
+                players: game.players,
+                phase: game.phase,
+                feedback: game.feedback,
+                lastPlaced: game.lastPlaced,
+                removingId: game.removingId,
+                currentPlayerIdx: game.currentPlayerIdx,
+                currentPlayerId: finalCurrentPlayerId,
+                challenge: game.challenge
+              });
+            });
+          }, 100);
+
+          socket.to(roomCode).emit('player_reconnected', {
+            playerName,
+            playerId: socket.id
+          });
+          return;
+        } else {
+          console.log('[Sessions] Stateless rejoin: player name not found in game:', { roomCode, playerName });
+        }
+      }
+
+      if (lobby) {
+        const existingPlayerIndex = lobby.players.findIndex(p => p.name === playerName);
+        let isCreator = false;
+        if (existingPlayerIndex !== -1) {
+          isCreator = !!lobby.players[existingPlayerIndex].isCreator;
+          lobby.players[existingPlayerIndex].id = socket.id;
+        } else {
+          // Infer creator by checking if a creator already exists
+          isCreator = !!lobby.players.find(p => p.isCreator && p.name === playerName);
+          lobby.players.push({
+            id: socket.id,
+            name: playerName,
+            isCreator,
+            isReady: true
+          });
+        }
+
+        socket.join(roomCode);
+        console.log('[Sessions] Stateless rejoin matched lobby by name:', { roomCode, playerName, isCreator });
+
+        // Recreate session entry
+        try {
+          playerSessions[sessionId] = {
+            sessionId,
+            playerId: socket.id,
+            roomCode,
+            playerName,
+            isCreator,
+            timestamp: Date.now()
+          };
+          console.log('[Sessions] Recreated session for lobby after stateless rejoin:', sessionId);
+        } catch (e) {
+          console.warn('[Sessions] Failed to recreate session for lobby on stateless rejoin:', e && e.message);
+        }
+
+        callback({
+          success: true,
+          view: 'waiting',
+          lobby,
+          player: lobby.players.find(p => p.id === socket.id)
+        });
+        io.to(roomCode).emit('lobby_update', lobby);
+        return;
+      }
+
+      console.log('[Sessions] Stateless rejoin failed; room not found:', roomCode);
+
+      // EXTRA FALLBACK: search by playerName across existing games/lobbies (room code may be missing after restart)
+      try {
+        // Search games
+        let foundCode = null;
+        for (const code of Object.keys(games)) {
+          const g = games[code];
+          if (g && Array.isArray(g.players) && g.players.some(p => p && p.name === playerName)) {
+            foundCode = code;
+            break;
+          }
+        }
+        // If not in games, search lobbies
+        if (!foundCode) {
+          for (const code of Object.keys(lobbies)) {
+            const lb = lobbies[code];
+            if (lb && Array.isArray(lb.players) && lb.players.some(p => p && p.name === playerName)) {
+              foundCode = code;
+              break;
+            }
+          }
+        }
+
+        if (foundCode) {
+          console.log('[Sessions] Name-based fallback matched code:', foundCode, 'for player:', playerName);
+          const fallbackGame = games[foundCode];
+          const fallbackLobby = lobbies[foundCode];
+
+          if (fallbackGame) {
+            const idx = fallbackGame.players.findIndex(p => p.name === playerName);
+            if (idx !== -1) {
+              const oldId = fallbackGame.players[idx].id;
+              socket.join(foundCode);
+
+              const currentPlayerId = fallbackGame.playerOrder[fallbackGame.currentPlayerIdx];
+              const currentCard = fallbackGame.sharedDeck[fallbackGame.currentCardIndex];
+              const playerTimeline = fallbackGame.timelines[oldId] || [];
+
+              // Remap ids
+              fallbackGame.players[idx].id = socket.id;
+              for (let i = 0; i < fallbackGame.playerOrder.length; i++) {
+                if (fallbackGame.playerOrder[i] === oldId) {
+                  fallbackGame.playerOrder[i] = socket.id;
+                }
+              }
+              if (fallbackGame.timelines[oldId] && oldId !== socket.id) {
+                fallbackGame.timelines[socket.id] = fallbackGame.timelines[oldId];
+                delete fallbackGame.timelines[oldId];
+              } else {
+                fallbackGame.timelines[socket.id] = fallbackGame.timelines[socket.id] || [];
+              }
+
+              const finalCurrentPlayerId = fallbackGame.playerOrder[fallbackGame.currentPlayerIdx];
+
+              // Recreate session entry
+              playerSessions[sessionId] = {
+                sessionId,
+                playerId: socket.id,
+                roomCode: foundCode,
+                playerName,
+                isCreator: !!fallbackGame.players[idx].isCreator,
+                timestamp: Date.now()
+              };
+
+              callback({
+                success: true,
+                view: 'game',
+                gameState: {
+                  timeline: playerTimeline,
+                  deck: [currentCard],
+                  players: fallbackGame.players,
+                  phase: fallbackGame.phase,
+                  feedback: fallbackGame.feedback,
+                  lastPlaced: fallbackGame.lastPlaced,
+                  removingId: fallbackGame.removingId,
+                  currentPlayerIdx: fallbackGame.currentPlayerIdx,
+                  currentPlayerId: finalCurrentPlayerId,
+                  challenge: fallbackGame.challenge
+                }
+              });
+
+              setTimeout(() => {
+                fallbackGame.players.forEach((p) => {
+                  io.to(p.id).emit('game_update', {
+                    timeline: fallbackGame.timelines[finalCurrentPlayerId] || [],
+                    deck: [fallbackGame.sharedDeck[fallbackGame.currentCardIndex]],
+                    players: fallbackGame.players,
+                    phase: fallbackGame.phase,
+                    feedback: fallbackGame.feedback,
+                    lastPlaced: fallbackGame.lastPlaced,
+                    removingId: fallbackGame.removingId,
+                    currentPlayerIdx: fallbackGame.currentPlayerIdx,
+                    currentPlayerId: finalCurrentPlayerId,
+                    challenge: fallbackGame.challenge
+                  });
+                });
+              }, 100);
+
+              socket.to(foundCode).emit('player_reconnected', {
+                playerName,
+                playerId: socket.id
+              });
+
+              schedulePersist();
+              return;
+            }
+          }
+
+          if (fallbackLobby) {
+            const existingPlayerIndex = fallbackLobby.players.findIndex(p => p.name === playerName);
+            let isCreator = false;
+            if (existingPlayerIndex !== -1) {
+              isCreator = !!fallbackLobby.players[existingPlayerIndex].isCreator;
+              fallbackLobby.players[existingPlayerIndex].id = socket.id;
+            } else {
+              isCreator = !!fallbackLobby.players.find(p => p.isCreator && p.name === playerName);
+              fallbackLobby.players.push({
+                id: socket.id,
+                name: playerName,
+                isCreator,
+                isReady: true
+              });
+            }
+            socket.join(foundCode);
+
+            playerSessions[sessionId] = {
+              sessionId,
+              playerId: socket.id,
+              roomCode: foundCode,
+              playerName,
+              isCreator,
+              timestamp: Date.now()
+            };
+
+            callback({
+              success: true,
+              view: 'waiting',
+              lobby: fallbackLobby,
+              player: fallbackLobby.players.find(p => p.id === socket.id)
+            });
+            io.to(foundCode).emit('lobby_update', fallbackLobby);
+            schedulePersist();
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[Sessions] Name-based fallback error:', e && e.message);
+      }
+
       callback({ error: "Session not found or expired" });
       return;
     }
@@ -859,15 +1321,29 @@ io.on('connection', (socket) => {
           }
         }
         
-        // Update the timeline mapping to use the new socket ID
+        // Update the timeline mapping to use the new socket ID (guard same-id case)
         if (game.timelines[oldPlayerId]) {
-          game.timelines[socket.id] = game.timelines[oldPlayerId];
-          delete game.timelines[oldPlayerId]; // Clean up old mapping
-          console.log('[Sessions] Timeline mapping updated:', {
-            from: oldPlayerId,
-            to: socket.id,
-            timelineLength: game.timelines[socket.id].length
-          });
+          if (oldPlayerId !== socket.id) {
+            game.timelines[socket.id] = game.timelines[oldPlayerId];
+            delete game.timelines[oldPlayerId]; // Clean up old mapping
+            console.log('[Sessions] Timeline mapping updated:', {
+              from: oldPlayerId,
+              to: socket.id,
+              timelineLength: (game.timelines[socket.id] ? game.timelines[socket.id].length : 0)
+            });
+          } else {
+            // If the socket id didn't actually change, do not delete the mapping
+            console.log('[Sessions] Timeline mapping unchanged (same socket id):', {
+              id: socket.id,
+              timelineLength: (game.timelines[socket.id] ? game.timelines[socket.id].length : 0)
+            });
+            // Ensure mapping exists
+            game.timelines[socket.id] = game.timelines[socket.id] || [];
+          }
+        } else {
+          console.warn('[Sessions] No existing timeline found for oldPlayerId during reconnection:', { oldPlayerId, newId: socket.id });
+          // Ensure we at least have an empty timeline mapping to avoid crashes
+          game.timelines[socket.id] = game.timelines[socket.id] || [];
         }
         
         // CRITICAL FIX: Get the updated current player ID after player order update
@@ -918,7 +1394,7 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           game.players.forEach((p) => {
             io.to(p.id).emit('game_update', {
-              timeline: game.timelines[finalCurrentPlayerId],
+              timeline: game.timelines[finalCurrentPlayerId] || [],
               deck: [currentCard],
               players: game.players,
               phase: game.phase,
@@ -2529,6 +3005,8 @@ io.on('connection', (socket) => {
       console.log('[Backend] Available lobbies:', Object.keys(lobbies));
       console.log('[Backend] Available games:', Object.keys(games));
     }
+    // Persist state periodically after events (safe even if event was read-only)
+    try { schedulePersist(); } catch (e) { /* ignore */ }
   });
 
   // Log socket connection details

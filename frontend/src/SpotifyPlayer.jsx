@@ -234,8 +234,9 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
           console.error('[SpotifyPlayer] Authentication error:', message);
           setConnectionStatus('error');
           setErrorMessage('Authentication failed - token may be expired');
-          // Clear token and suggest refresh
+          // Clear token and trigger re-auth flow
           spotifyAuth.clearToken();
+          spotifyAuth.initiateReauth();
         });
 
         spotifyPlayer.addListener('account_error', ({ message }) => {
@@ -373,14 +374,8 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
           {isTokenExpired ? (
             <button 
               onClick={() => {
-                // Save current game state before re-auth
-                const gameState = {
-                  view: 'game',
-                  timestamp: Date.now()
-                };
-                localStorage.setItem('game_state_backup', JSON.stringify(gameState));
-                localStorage.setItem('pending_reauth', 'true');
-                window.location.href = "http://localhost:3001/login";
+                // Use centralized re-auth flow (no hardcoded URLs)
+                spotifyAuth.initiateReauth({ view: 'game', timestamp: Date.now() });
               }}
               className="mt-2 px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
             >

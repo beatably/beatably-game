@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import spotifyAuth from "./utils/spotifyAuth";
-import { API_BASE_URL } from './config';
 import DeviceSwitchModal from './DeviceSwitchModal';
 
 function GameFooter({ 
@@ -135,6 +134,7 @@ function GameFooter({
         console.error('[GameFooter] Token validation failed');
         if (tokenValidation.requiresAuth) {
           handleTokenExpiration();
+          return false;
         }
         return false;
       }
@@ -153,7 +153,7 @@ function GameFooter({
         return true;
       } else {
         console.log('[GameFooter] Spotify playback failed, trying fallback');
-        return await tryPreviewFallback();
+        return false;
       }
     } catch (error) {
       console.error('[GameFooter] Error triggering Spotify playback:', error);
@@ -164,28 +164,10 @@ function GameFooter({
       }
 
       // Try preview fallback on any error
-      return await tryPreviewFallback();
+      return false;
     }
   };
 
-  // Fallback to preview URL playback
-  const tryPreviewFallback = async () => {
-    if (currentCard?.preview_url) {
-      try {
-        console.log('[GameFooter] Trying preview URL as fallback');
-        const audio = new Audio(currentCard.preview_url);
-        audio.volume = 0.5;
-        await audio.play();
-        console.log('[GameFooter] Playing preview audio');
-        setLocalIsPlaying(true);
-        return true;
-      } catch (err) {
-        console.log('[GameFooter] Preview audio failed:', err.message);
-        return false;
-      }
-    }
-    return false;
-  };
 
   // Function to pause Spotify playback with enhanced error handling
   const pauseSpotifyPlayback = async () => {
@@ -312,14 +294,8 @@ function GameFooter({
       timestamp: Date.now()
     };
     
-    localStorage.setItem('game_state_backup', JSON.stringify(gameState));
-    localStorage.setItem('pending_reauth', 'true');
-    
-    // Show non-blocking notification instead of popup
-    setTokenExpiredNotification({
-      gameState,
-      timestamp: Date.now()
-    });
+    // Use the new spotifyAuth system to trigger re-authentication
+    spotifyAuth.initiateReauth(gameState);
   };
 
   // Handle play/pause button click with real Spotify state awareness
@@ -333,6 +309,26 @@ function GameFooter({
       currentCardUri: currentCard?.uri,
       currentCardTitle: currentCard?.title
     });
+
+    // Check if this is a creator who should have Spotify access
+    const hasSpotifyToken = !!localStorage.getItem('access_token');
+    
+    // If creator has no token at all, immediately trigger re-auth (no buttons)
+    if (isCreator && !hasSpotifyToken) {
+      console.log('[GameFooter] No Spotify token for creator - triggering re-auth');
+      handleTokenExpiration();
+      return;
+    }
+    
+    if (isCreator && hasSpotifyToken) {
+      // Validate token first before attempting any Spotify operations
+      const tokenValidation = await spotifyAuth.ensureValidToken();
+      if (!tokenValidation.valid) {
+        console.log('[GameFooter] Token validation failed, triggering re-auth');
+        handleTokenExpiration();
+        return;
+      }
+    }
 
     if (isCreator && spotifyDeviceId) {
       try {
@@ -384,8 +380,8 @@ function GameFooter({
         console.log('[GameFooter] Error in Spotify playback:', error);
       }
     } else {
-      // Non-creator local audio fallback
-      console.log('[GameFooter] Using local playback mode');
+      // Non-creator: no-op (creator controls playback)
+      return;
 
       if (!localIsPlaying) {
         setLocalIsPlaying(true);
@@ -440,8 +436,10 @@ function GameFooter({
   const [songTitle, setSongTitle] = useState('');
   const [songArtist, setSongArtist] = useState('');
   const [newSongRequest, setNewSongRequest] = useState(null); // For creator notifications
-  const [tokenExpiredNotification, setTokenExpiredNotification] = useState(null); // For token expiration notifications
+  // Removed tokenExpiredNotification UI: re-auth is mandatory; no local fallback
   const [showDeviceModal, setShowDeviceModal] = useState(false);
+  // Prevent spamming skip_song while backend reconnects or processes the request
+  const skipInFlightRef = React.useRef(false);
 
   // Format time mm:ss
   const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
@@ -460,6 +458,17 @@ function GameFooter({
 
   const handleTokenAction = (action, targetPlayerId = null) => {
     console.log('[GameFooter] handleTokenAction called:', { action, targetPlayerId, myPlayerId, isMyTurn });
+    
+    // Throttle skip_song to avoid repeated pauses when backend is reconnecting
+    if (action === 'skip_song') {
+      if (skipInFlightRef.current) {
+        console.log('[GameFooter] skip_song ignored (in-flight)');
+        return;
+      }
+      skipInFlightRef.current = true;
+      // Reset guard after a short window; backend also updates state which will naturally clear it
+      setTimeout(() => { skipInFlightRef.current = false; }, 2000);
+    }
     
     // CRITICAL FIX: Pause music immediately when "New Song" is clicked
     // This works for both creators and guests
@@ -967,37 +976,6 @@ function GameFooter({
         </div>
       )}
 
-      {/* Token Expired Notification */}
-      {tokenExpiredNotification && (
-        <div className="w-full max-w-md p-3 mb-2 text-center bg-red-900/50 border border-red-500 rounded">
-          <div className="text-red-400 font-bold mb-2">
-            🔒 Spotify Session Expired
-          </div>
-          <div className="text-red-300 text-sm mb-3">
-            Your Spotify authentication has expired. Re-authenticate to continue with Spotify playback.
-          </div>
-          <div className="flex gap-2 justify-center">
-            <button 
-              onClick={() => {
-                // Use the auth utility for consistent re-auth handling
-                spotifyAuth.initiateReauth(tokenExpiredNotification.gameState);
-              }}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-sm text-white rounded"
-            >
-              Re-authenticate with Spotify
-            </button>
-            <button 
-              onClick={() => {
-                // Dismiss notification and continue with local playback
-                setTokenExpiredNotification(null);
-              }}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-sm text-white rounded"
-            >
-              Continue without Spotify
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* New Song Request Notification removed:
           Backend auto-loads and emits the new song; autoplay occurs on creator device. */}

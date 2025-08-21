@@ -9,6 +9,7 @@ import SpotifyPlayer from "./SpotifyPlayer";
 import SongDebugPanel from "./SongDebugPanel";
 import SongGuessNotification from "./SongGuessNotification";
 import SessionRestore from "./SessionRestore";
+import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
 import './App.css';
@@ -178,6 +179,10 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [showSessionRestore, setShowSessionRestore] = useState(false);
   const [sessionRestoreData, setSessionRestoreData] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  // Spotify authorization renewal state
+  const [showSpotifyAuthRenewal, setShowSpotifyAuthRenewal] = useState(false);
+  const [authRenewalGameState, setAuthRenewalGameState] = useState(null);
 
   // Load showDebugButton state from localStorage
   useEffect(() => {
@@ -395,6 +400,96 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         console.log("[Socket] Connected, id:", socketRef.current.id);
         setPlayerId(socketRef.current.id);
         setSocketReady(true);
+
+        // AUTO-REJOIN: if we have a saved session and we are in (or were in) a game/lobby,
+        // immediately rebind this new socket.id to the existing player identity on the server.
+        // This fixes the "my view becomes another player/spectator" issue after backend restarts.
+        try {
+          const hasSession = sessionManager.hasValidSession && sessionManager.hasValidSession();
+          const saved = hasSession ? sessionManager.getSession() : null;
+          const savedShouldRejoin =
+            !!saved &&
+            (view === 'game' || view === 'waiting' || saved?.view === 'game' || saved?.view === 'waiting') &&
+            saved?.sessionId && saved?.roomCode && saved?.playerName;
+
+          const doApplyResponse = (sid, response) => {
+            if (response && response.success) {
+              if (sid) setSessionId(sid);
+              if (response.view === 'waiting' && response.lobby) {
+                setPlayers(response.lobby.players);
+                setGameSettings(response.lobby.settings || gameSettings);
+                setView('waiting');
+              } else if (response.view === 'game' && response.gameState) {
+                const gameState = response.gameState;
+                setPlayers(gameState.players);
+                setCurrentPlayerIdx(gameState.currentPlayerIdx || 0);
+                setTimeline(gameState.timeline || []);
+                setDeck(gameState.deck || []);
+                setPhase(gameState.phase);
+                setFeedback(gameState.feedback);
+                setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
+                setLastPlaced(gameState.lastPlaced);
+                setRemovingId(gameState.removingId);
+                setChallenge(gameState.challenge);
+                setCurrentPlayerId(gameState.currentPlayerId);
+                setView('game');
+              }
+            }
+          };
+
+          const attemptStateless = () => {
+            if (playerName && roomCode) {
+              const sid =
+                (sessionManager.generateSessionId && sessionManager.generateSessionId()) ||
+                `stateless_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+              console.log('[Socket] Auto-rejoin (stateless) using name/room', {
+                sessionId: sid, roomCode, playerName
+              });
+              socketRef.current.emit(
+                'reconnect_session',
+                { sessionId: sid, roomCode, playerName },
+                (resp2) => {
+                  console.log('[Socket] Auto-rejoin (stateless) response:', resp2);
+                  doApplyResponse(sid, resp2);
+                  if (!(resp2 && resp2.success)) {
+                    console.warn('[Socket] Stateless auto-rejoin failed:', resp2 && resp2.error);
+                  }
+                }
+              );
+              return true;
+            }
+            return false;
+          };
+
+          if (savedShouldRejoin) {
+            console.log('[Socket] Auto-rejoin using saved session', {
+              sessionId: saved.sessionId, roomCode: saved.roomCode, playerName: saved.playerName
+            });
+            socketRef.current.emit(
+              'reconnect_session',
+              {
+                sessionId: saved.sessionId,
+                roomCode: saved.roomCode,
+                playerName: saved.playerName
+              },
+              (response) => {
+                console.log('[Socket] Auto-rejoin response:', response);
+                if (response && response.success) {
+                  doApplyResponse(saved.sessionId, response);
+                } else {
+                  console.warn('[Socket] Auto-rejoin failed:', response && response.error);
+                  // Fallback: stateless rejoin by name/room if available
+                  attemptStateless();
+                }
+              }
+            );
+          } else {
+            // No saved session: try stateless rejoin using in-memory name/room
+            attemptStateless();
+          }
+        } catch (e) {
+          console.warn('[Socket] Auto-rejoin check failed:', e && e.message);
+        }
       });
       socketRef.current.on("auto_proceed", () => {
         console.log("[Socket] Auto proceed event received; ignoring it.");
@@ -907,27 +1002,69 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         if (Date.now() - gameState.timestamp < 10 * 60 * 1000) {
           console.log("[Spotify] Restoring game state after re-authentication");
           
-          setView(gameState.view);
-          setPlayerName(gameState.playerName);
-          setRoomCode(gameState.roomCode);
-          setIsCreator(gameState.isCreator);
-          setPlayers(gameState.players);
-          setCurrentPlayerId(gameState.currentPlayerId);
-          setPhase(gameState.phase);
-          setTimeline(gameState.timeline);
-          setDeck(gameState.deck);
-          setCurrentCard(gameState.currentCard);
-          setFeedback(gameState.feedback);
-          setShowFeedback(gameState.showFeedback);
-          setLastPlaced(gameState.lastPlaced);
-          setRemovingId(gameState.removingId);
-          setChallenge(gameState.challenge);
-          setGameRound(gameState.gameRound);
-          setGameSettings(gameState.gameSettings);
+          // Show the auth renewal success modal first
+          setAuthRenewalGameState(gameState);
+          setShowSpotifyAuthRenewal(true);
           
-          // Clear backup
-          localStorage.removeItem('game_state_backup');
-          localStorage.removeItem('pending_reauth');
+          // Auto-restore the game state after a brief delay
+          setTimeout(() => {
+            setView(gameState.view);
+            setPlayerName(gameState.playerName);
+            setRoomCode(gameState.roomCode);
+            setIsCreator(gameState.isCreator);
+            setPlayers(gameState.players);
+            setCurrentPlayerId(gameState.currentPlayerId);
+            setPhase(gameState.phase);
+            setTimeline(gameState.timeline);
+            setDeck(gameState.deck);
+            setCurrentCard(gameState.currentCard);
+            setFeedback(gameState.feedback);
+            setShowFeedback(gameState.showFeedback);
+            setLastPlaced(gameState.lastPlaced);
+            setRemovingId(gameState.removingId);
+            setChallenge(gameState.challenge);
+            setGameRound(gameState.gameRound);
+            setGameSettings(gameState.gameSettings);
+            
+            // Hide the renewal modal after restoration
+            setShowSpotifyAuthRenewal(false);
+            setAuthRenewalGameState(null);
+            
+            // Clear backup
+            localStorage.removeItem('game_state_backup');
+            localStorage.removeItem('pending_reauth');
+            
+            // If we're in a game, try to reconnect to the backend session
+            if (gameState.view === 'game' && socketRef.current && socketRef.current.connected) {
+              console.log('[Spotify] Attempting to reconnect to backend session after auth');
+              socketRef.current.emit('reconnect_session', {
+                sessionId: gameState.sessionId,
+                roomCode: gameState.roomCode,
+                playerName: gameState.playerName
+              }, (response) => {
+                if (response.success) {
+                  console.log('[Spotify] Successfully reconnected to backend after auth');
+                  // Update with fresh game state from backend
+                  if (response.view === 'game' && response.gameState) {
+                    const freshGameState = response.gameState;
+                    setPlayers(freshGameState.players);
+                    setCurrentPlayerIdx(freshGameState.currentPlayerIdx || 0);
+                    setTimeline(freshGameState.timeline || []);
+                    setDeck(freshGameState.deck || []);
+                    setPhase(freshGameState.phase);
+                    setFeedback(freshGameState.feedback);
+                    setShowFeedback(!!freshGameState.feedback && freshGameState.phase === 'reveal');
+                    setLastPlaced(freshGameState.lastPlaced);
+                    setRemovingId(freshGameState.removingId);
+                    setChallenge(freshGameState.challenge);
+                    setCurrentPlayerId(freshGameState.currentPlayerId);
+                  }
+                } else {
+                  console.warn('[Spotify] Failed to reconnect to backend after auth:', response.error);
+                }
+              });
+            }
+          }, 2000); // Show success message for 2 seconds before auto-restoring
           
           return true;
         }
@@ -1839,6 +1976,98 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [gameSettings.musicPreferences, isCreator]);
 
+  // Auto-detect missing/expired Spotify auth at initialization and when host enters views
+  useEffect(() => {
+    const autoDetectAndReauth = async () => {
+      // Only for host/creator
+      if (!isCreator) return;
+
+      // Skip if we're currently processing an OAuth callback with access_token in the URL
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('access_token')) return;
+      } catch {}
+
+      const minimalGameState = {
+        view,
+        playerName,
+        roomCode,
+        isCreator,
+        timestamp: Date.now()
+      };
+
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        // Triggers centralized listener which immediately redirects
+        spotifyAuth.initiateReauth(minimalGameState);
+        return;
+      }
+
+      try {
+        const status = await spotifyAuth.ensureValidToken();
+        if (!status.valid) {
+          spotifyAuth.initiateReauth(minimalGameState);
+        }
+      } catch (e) {
+        // Network or transient error; do not block UX here
+        console.warn('[App] Token validation error during init check:', e?.message || e);
+      }
+    };
+    autoDetectAndReauth();
+  }, [isCreator, view, playerName, roomCode]);
+
+  // Listen for Spotify auth required events
+  useEffect(() => {
+    const handleSpotifyAuthRequired = (event) => {
+      console.log('[App] Spotify auth required event received:', event.detail);
+      
+      // Prepare game state for restoration
+      const gameState = {
+        view,
+        playerName,
+        roomCode,
+        isCreator,
+        players,
+        currentPlayerId,
+        phase,
+        timeline,
+        deck,
+        currentCard,
+        feedback,
+        showFeedback,
+        lastPlaced,
+        removingId,
+        challenge,
+        gameRound,
+        gameSettings,
+        timestamp: Date.now()
+      };
+      
+      // Immediately redirect to Spotify auth without requiring any user interaction
+      spotifyAuth.redirectToAuth(gameState);
+    };
+
+    window.addEventListener('spotify_auth_required', handleSpotifyAuthRequired);
+    
+    return () => {
+      window.removeEventListener('spotify_auth_required', handleSpotifyAuthRequired);
+    };
+  }, [view, playerName, roomCode, isCreator, players, currentPlayerId, phase, 
+      timeline, deck, currentCard, feedback, showFeedback, lastPlaced, 
+      removingId, challenge, gameRound, gameSettings]);
+
+  // Spotify auth renewal handlers
+  const handleSpotifyAuthRenewal = () => {
+    console.log('[App] User confirmed Spotify auth renewal');
+    spotifyAuth.redirectToAuth(authRenewalGameState);
+  };
+
+  const handleSpotifyAuthRenewalDismiss = () => {
+    console.log('[App] User dismissed Spotify auth renewal');
+    setShowSpotifyAuthRenewal(false);
+    setAuthRenewalGameState(null);
+  };
+
   // WinnerView takes priority over all other views
   if (showWinnerView && winner) {
     return (
@@ -1908,6 +2137,15 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             </div>
           </div>
         )}
+        {showSpotifyAuthRenewal && (
+          <SpotifyAuthRenewal
+            isVisible={showSpotifyAuthRenewal}
+            onRenew={handleSpotifyAuthRenewal}
+            onDismiss={handleSpotifyAuthRenewalDismiss}
+            gameState={authRenewalGameState}
+            autoRedirect={false}
+          />
+        )}
       </>
     );
   }
@@ -1936,19 +2174,30 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
 
     return (
-      <WaitingRoom
-        code={roomCode}
-        players={players}
-        currentPlayer={currentPlayer}
-        onReady={handleReady}
-        onKick={handleKick}
-        onStart={handleStart}
-        onLeave={handleLeave}
-        settings={gameSettings}
-        onUpdateSettings={handleUpdateSettings}
-        externalLoadingStage={externalLoadingStage}
-        isLoadingExternally={isLoadingExternally}
-      />
+      <>
+        <WaitingRoom
+          code={roomCode}
+          players={players}
+          currentPlayer={currentPlayer}
+          onReady={handleReady}
+          onKick={handleKick}
+          onStart={handleStart}
+          onLeave={handleLeave}
+          settings={gameSettings}
+          onUpdateSettings={handleUpdateSettings}
+          externalLoadingStage={externalLoadingStage}
+          isLoadingExternally={isLoadingExternally}
+        />
+        {showSpotifyAuthRenewal && (
+          <SpotifyAuthRenewal
+            isVisible={showSpotifyAuthRenewal}
+            onRenew={handleSpotifyAuthRenewal}
+            onDismiss={handleSpotifyAuthRenewalDismiss}
+            gameState={authRenewalGameState}
+            autoRedirect={false}
+          />
+        )}
+      </>
     );
   }
   if (view === 'game') {
@@ -2087,6 +2336,17 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             >
               🐛
             </button>
+          )}
+
+          {/* Spotify Authorization Renewal Modal */}
+          {showSpotifyAuthRenewal && (
+            <SpotifyAuthRenewal
+              isVisible={showSpotifyAuthRenewal}
+              onRenew={handleSpotifyAuthRenewal}
+              onDismiss={handleSpotifyAuthRenewalDismiss}
+              gameState={authRenewalGameState}
+              autoRedirect={false}
+            />
           )}
         </div>
       </DndProvider>
