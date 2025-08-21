@@ -151,23 +151,26 @@ function GameSettings({ settings, onUpdate }) {
   // Decade button selection handler
   // Behavior:
   // - Clicking a decade lower than the current min extends the min to that decade
-  // - Clicking a decade higher than the current max extends the max to that decade
-  // - Clicking a decade inside the current range collapses the range to that single decade
+  // - Clicking a decade higher than the current max extends the max to that decade + 9 (end of decade)
+  // - Clicking a decade inside the current range collapses the range to that single decade (decade to decade + 9)
   const handleDecadeClick = (decade) => {
     const currentMin = localSettings.musicPreferences.yearRange.min;
     const currentMax = localSettings.musicPreferences.yearRange.max;
+
+    // CRITICAL FIX: Convert decade to decade range (e.g., 1990 -> 1990-1999, 2020 -> 2020-2029)
+    const decadeEnd = decade + 9;
 
     if (decade < currentMin) {
       handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade });
       return;
     }
-    if (decade > currentMax) {
-      handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, max: decade });
+    if (decadeEnd > currentMax) {
+      handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, max: decadeEnd });
       return;
     }
 
-    // Clicked inside current range -> collapse to single decade
-    handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade, max: decade });
+    // Clicked inside current range -> collapse to single decade range
+    handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade, max: decadeEnd });
   };
 
   // Helper to compute background for dual-range track (selected range highlight)

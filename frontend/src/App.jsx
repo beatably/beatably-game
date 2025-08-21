@@ -47,6 +47,7 @@ function App() {
         return;
       }
 
+
       // resume a pending "create game" request (saved before redirect)
       const pending = localStorage.getItem("pending_create");
       if (pending) {
@@ -60,9 +61,14 @@ function App() {
     }
   }, []);
 
+  // Socket, view, and restore modal state must be declared before effects that reference them
+  const socketRef = useRef(null);
+  const [view, setView] = useState('landing');
+  const [showSessionRestore, setShowSessionRestore] = useState(false);
+
   // Create lobby when we have token + pending name + socket ready
   useEffect(() => {
-    if (spotifyToken && pendingCreate && socketReady && socketRef.current) {
+    if (spotifyToken && pendingCreate && socketReady && socketRef.current && !showSessionRestore && view === 'landing') {
       console.log("[App] All conditions met, creating lobby for:", pendingCreate);
       const name = pendingCreate;
       setPendingCreate(null);
@@ -111,10 +117,16 @@ function App() {
         }
       }, 100);
     }
-  }, [spotifyToken, pendingCreate, socketReady]);
+  }, [spotifyToken, pendingCreate, socketReady, showSessionRestore, view]);
 
   // Socket.IO connection
-  const socketRef = useRef(null);
+  // socketRef declared earlier to satisfy hook ordering for upper effects
+  const suppressAutoRejoinRef = useRef(true);
+  // Track whether this client is actively joined to a room/session
+  const joinedRef = useRef(false);
+  // Fallback restore (sessionStorage) support for environments where localStorage backup may be missing
+  const SESSION_RESTORE_FALLBACK_TTL = 30 * 60 * 1000; // 30 minutes
+  const PENDING_RESTORE_KEY = 'beatably_pending_restore';
 
   // Centralized game state
   const [players, setPlayers] = useState([]); // [{id, name, isCreator, isReady}]
@@ -133,7 +145,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [gameRound, setGameRound] = useState(1);
 
   // Lobby/game state
-  const [view, setView] = useState('landing');
   const [playerName, setPlayerName] = useState("");
   const [playerId, setPlayerId] = useState(""); // local socket id
   const [roomCode, setRoomCode] = useState("");
@@ -176,7 +187,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Session management state
   const [sessionId, setSessionId] = useState(null);
-  const [showSessionRestore, setShowSessionRestore] = useState(false);
   const [sessionRestoreData, setSessionRestoreData] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
 
@@ -230,17 +240,76 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Check for existing session on app load
   useEffect(() => {
     const checkForExistingSession = () => {
-      if (sessionManager.hasValidSession()) {
-        const sessionData = sessionManager.getSession();
-        console.log('[SessionManager] Found existing session:', sessionData);
+      const hasSession = sessionManager.hasValidSession && sessionManager.hasValidSession();
+      const hasBackup = sessionManager.hasValidGameBackup && sessionManager.hasValidGameBackup();
+
+      // Fallback: read from sessionStorage if no localStorage session/backup present
+      let fallback = null;
+      if (!hasSession && !hasBackup) {
+        try {
+          const raw = sessionStorage.getItem(PENDING_RESTORE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.roomCode && parsed.playerName && parsed.view === 'game') {
+              const fresh = (Date.now() - (parsed.timestamp || 0)) < SESSION_RESTORE_FALLBACK_TTL;
+              if (fresh) {
+                fallback = parsed;
+              } else {
+                sessionStorage.removeItem(PENDING_RESTORE_KEY);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[SessionRestore][fallback] Failed to read sessionStorage:', e?.message || e);
+        }
+      }
+
+      const shouldRestore = hasSession || hasBackup || !!fallback;
+
+      if (shouldRestore) {
+        const sessionData = hasSession
+          ? sessionManager.getSession()
+          : (hasBackup ? sessionManager.getGameBackup() : fallback);
+
+        console.log('[SessionManager] Found existing session/backup/fallback:', sessionData);
         setSessionRestoreData(sessionData);
         setShowSessionRestore(true);
+        // Defer any automatic rejoin until user decides via SessionRestore modal
+        suppressAutoRejoinRef.current = true;
+        // Mark as not joined until user explicitly restores or starts a new flow
+        joinedRef.current = false;
       }
     };
 
     // Only check for session if we're on the landing page and not already restoring
     if (view === 'landing' && !isRestoring && !showSessionRestore) {
-      checkForExistingSession();
+      // Skip restore modal during OAuth callback or when explicit user intent exists
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('access_token')) {
+          // OAuth callback: do not block flows or show restore modal
+          suppressAutoRejoinRef.current = false;
+          return;
+        }
+      } catch {}
+      const hasPendingCreate = !!localStorage.getItem('pending_create');
+      const hasPendingReauth = !!localStorage.getItem('pending_reauth');
+      if (hasPendingCreate || hasPendingReauth) {
+        // Explicit intent flows: allow to proceed, no modal
+        suppressAutoRejoinRef.current = false;
+        return;
+      }
+
+      const hasAnySaved =
+        (sessionManager.hasValidSession && sessionManager.hasValidSession()) ||
+        (sessionManager.hasValidGameBackup && sessionManager.hasValidGameBackup());
+
+      if (hasAnySaved) {
+        checkForExistingSession();
+      } else {
+        // No saved session: allow normal flows (including stateless rejoin)
+        suppressAutoRejoinRef.current = false;
+      }
     }
   }, [view, isRestoring, showSessionRestore]);
 
@@ -322,7 +391,18 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         challenge
       };
       
-      sessionManager.saveSession(sessionManager.createSessionData(currentState));
+      const payload = sessionManager.createSessionData(currentState);
+      sessionManager.saveSession(payload);
+      sessionManager.saveGameBackup(payload);
+      try {
+        // Also persist a sessionStorage fallback so refreshes in incognito reliably trigger restore
+        sessionStorage.setItem(PENDING_RESTORE_KEY, JSON.stringify({
+          ...payload,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn('[SessionRestore][fallback] Failed to write sessionStorage:', e?.message || e);
+      }
     }
   }, [sessionId, view, roomCode, playerName, isCreator, players, gameSettings, 
       currentPlayerId, currentPlayerIdx, phase, timeline, deck, gameRound, 
@@ -401,10 +481,14 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setPlayerId(socketRef.current.id);
         setSocketReady(true);
 
-        // AUTO-REJOIN: if we have a saved session and we are in (or were in) a game/lobby,
-        // immediately rebind this new socket.id to the existing player identity on the server.
-        // This fixes the "my view becomes another player/spectator" issue after backend restarts.
-        try {
+        // AUTO-REJOIN gating: if a session restore prompt is active, defer automatic rejoin until user decides.
+        if (suppressAutoRejoinRef.current) {
+          console.log("[Socket] Skipping auto-rejoin due to pending session restore prompt.");
+        } else {
+          // AUTO-REJOIN: if we have a saved session and we are in (or were in) a game/lobby,
+          // immediately rebind this new socket.id to the existing player identity on the server.
+          // This fixes the "my view becomes another player/spectator" issue after backend restarts.
+          try {
           const hasSession = sessionManager.hasValidSession && sessionManager.hasValidSession();
           const saved = hasSession ? sessionManager.getSession() : null;
           const savedShouldRejoin =
@@ -414,6 +498,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
           const doApplyResponse = (sid, response) => {
             if (response && response.success) {
+              joinedRef.current = true;
               if (sid) setSessionId(sid);
               if (response.view === 'waiting' && response.lobby) {
                 setPlayers(response.lobby.players);
@@ -490,6 +575,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         } catch (e) {
           console.warn('[Socket] Auto-rejoin check failed:', e && e.message);
         }
+        }
       });
       socketRef.current.on("auto_proceed", () => {
         console.log("[Socket] Auto proceed event received; ignoring it.");
@@ -503,6 +589,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       // Listen for game start
       socketRef.current.on("game_started", (game) => {
         console.log("[Socket] Received game_started:", game);
+        // While auto-rejoin is suppressed and user hasn't joined, ignore to prevent jumping views
+        if (suppressAutoRejoinRef.current && !joinedRef.current) {
+          console.log("[Socket] Ignoring game_started due to suppressed auto-rejoin");
+          return;
+        }
         setPlayers(game.players);
         setCurrentPlayerIdx(game.currentPlayerIdx || 0);
         setTimeline(game.timeline || []);
@@ -542,6 +633,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       console.log("[DEBUG][client] To copy the full timeline to clipboard, open Console and run: copy(window.lastGameUpdate.timeline)");
     } catch (e) {
       console.log("[DEBUG][client] temp logging failed:", e && e.message);
+    }
+
+    // While auto-rejoin is suppressed and user hasn't joined, ignore unsolicited updates
+    if (suppressAutoRejoinRef.current && !joinedRef.current) {
+      return;
     }
 
     // If already showing winner, ignore further updates to avoid UI flicker
@@ -906,6 +1002,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setRoomCode("");
         setPlayerName("");
         setIsCreator(false);
+        joinedRef.current = false;
       });
       socketRef.current.on("connect_error", (err) => {
         console.error("[Socket] Connection error:", err);
@@ -1317,6 +1414,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             
             setShowSessionRestore(false);
             setIsRestoring(false);
+            // Mark joined and clear auto-rejoin suppression after explicit user-driven restoration
+            joinedRef.current = true;
+            suppressAutoRejoinRef.current = false;
             console.log('[SessionManager] Session restoration complete');
           }
         });
@@ -1335,8 +1435,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const handleDeclineRestore = () => {
     console.log('[SessionManager] User declined session restoration');
     sessionManager.clearSession();
+    try { sessionStorage.removeItem(PENDING_RESTORE_KEY); } catch {}
     setShowSessionRestore(false);
     setSessionRestoreData(null);
+    // Allow pending flows (e.g., create lobby) and future auto-rejoin attempts
+    suppressAutoRejoinRef.current = false;
   };
 
   // Create game handler (calls backend)
@@ -1388,9 +1491,10 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           setSessionId(returnedSessionId);
         }
         
-        setPlayers(lobby.players);
-        setGameSettings(lobby.settings);
-        setView("waiting");
+              setPlayers(lobby.players);
+              setGameSettings(lobby.settings);
+              setView("waiting");
+              joinedRef.current = true;
       }
     );
   };
@@ -1429,6 +1533,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setPlayers(lobby.players);
         setGameSettings(lobby.settings);
         setView("waiting");
+        joinedRef.current = true;
       }
     );
   };
@@ -1452,6 +1557,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       setIsCreator(false);
       setPlayers([]);
       setView("landing");
+      joinedRef.current = false;
+      try { sessionStorage.removeItem(PENDING_RESTORE_KEY); } catch {}
     });
   };
 
