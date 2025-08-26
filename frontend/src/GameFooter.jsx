@@ -590,7 +590,7 @@ function GameFooter({
   // Render compact footer during drag operations, but show full interface when pending drop
   if (isDragging && pendingDropIndex === null) {
     return (
-      <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-gray-800 shadow flex flex-col items-center px-1 py-1 border-t border-gray-700">
+      <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 border-t border-border">
         {/* Compact player during drag */}
         <div className="w-full max-w-md flex items-center justify-center py-1">
           {/* Essential controls only */}
@@ -614,10 +614,10 @@ function GameFooter({
           )}
           
           {/* Minimal progress bar */}
-          <div className="flex-1 flex items-center gap-1 text-xs text-gray-400">
+          <div className="flex-1 flex items-center gap-1 text-xs text-muted-foreground">
             <span className="text-xs">{formatTime(progress)}</span>
-            <div className="relative flex-1 h-1 bg-[#404040] rounded-full overflow-hidden">
-              <div className="absolute left-0 top-0 h-1 bg-[#1db954] rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
+            <div className="relative flex-1 h-1 bg-input rounded-full overflow-hidden">
+              <div className="absolute left-0 top-0 h-1 bg-primary rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
             </div>
             <span className="text-xs">{formatTime(duration)}</span>
           </div>
@@ -627,16 +627,16 @@ function GameFooter({
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-gray-800 shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-gray-700">
+    <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl">
       {/* Spotify-style player */}
       <div className="w-full max-w-md flex flex-col items-center">
-        <div className="w-full bg-none rounded-2xl shadow-2xl shadow-gray-900 p-3 md:p-2 flex flex-col items-center mb-3">
+        <div className="w-full bg-none rounded-2xl shadow-2xl shadow-background p-3 md:p-2 flex flex-col items-center mb-3">
           {/* Artist, title, year with album art - show during reveal phase or challenge-resolved */}
           {currentCard && ((showFeedback && feedback) || (phase === 'challenge-resolved' && feedback)) && (
             <div className="mb-2 flex items-center gap-4 justify-center w-full">
               {/* Album Art - only during reveal */}
               {(currentCard?.album_art || currentCard?.image || currentCard?.album?.images?.[0]?.url) && (
-                <div className="w-20 h-20 md:w-32 md:h-32 rounded overflow-hidden bg-gray-700 flex-shrink-0">
+                <div className="w-20 h-20 md:w-32 md:h-32 rounded overflow-hidden bg-card flex-shrink-0">
                   <img 
                     src={currentCard?.album_art || currentCard?.image || currentCard?.album?.images?.[0]?.url} 
                     alt="Album cover"
@@ -647,7 +647,7 @@ function GameFooter({
                   />
                 </div>
               )}
-              <div className="text-sm md:text-base text-gray-400 text-left flex-1 min-w-0">
+              <div className="text-sm md:text-base text-muted-foreground text-left flex-1 min-w-0">
                 <div className="font-medium leading-tight mb-2">
                   {currentCard.title}
                 </div>
@@ -660,7 +660,7 @@ function GameFooter({
           
           {/* Hidden song info during gameplay */}
           {currentCard && !((showFeedback && feedback) || (phase === 'challenge-resolved' && feedback)) && (
-            <div className="hidden mb-2 text-xs md:text-base text-gray-500 text-center w-full">
+            <div className="hidden mb-2 text-xs md:text-base text-muted-foreground text-center w-full">
               🎵 Mystery Song
             </div>
           )}
@@ -671,7 +671,7 @@ function GameFooter({
               <>
                 {/* Restart button - moved to left */}
                 <button
-                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-600 hover:bg-gray-500 active:bg-gray-500 flex-shrink-0"
+                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-input hover:bg-input/90 active:bg-input/90 flex-shrink-0"
                   onClick={handleRestartClick}
                   aria-label="Restart track"
                   style={{ 
@@ -689,7 +689,7 @@ function GameFooter({
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 shadow-[0_10px_15px_-3px_theme(colors.green.300)/50] border-4 border-green-500/20 flex-shrink-0"
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-primary hover:bg-primary/90 active:bg-primary/90 shadow-[0_10px_15px_-3px_theme(colors.primary.300)/50] border-4 border-primary/20 flex-shrink-0"
                   onClick={handlePlayPauseClick}
                   aria-label={actualIsPlaying ? "Pause" : "Play"}
                   style={{ 
@@ -717,16 +717,16 @@ function GameFooter({
               )}
               
               <div className="flex-1 flex flex-col">
-                <div className="flex items-center gap-1 text-xs md:text-base text-gray-400">
+                <div className="flex items-center gap-1 text-xs md:text-base text-muted-foreground">
                 <span>{formatTime(progress)}</span>
-                <div className="relative flex-1 h-2 bg-[#404040] rounded-full overflow-hidden">
-                  <div className="absolute left-0 top-0 h-2 bg-[#1db954] rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
+                <div className="relative flex-1 h-2 bg-input rounded-full overflow-hidden">
+                  <div className="absolute left-0 top-0 h-2 bg-primary rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
                 </div>
                 <span>{formatTime(duration)}</span>
                 {isCreator && (
                   <button
                   onClick={() => setShowDeviceModal(true)}
-                  className="ml-2 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-gray-600 hover:bg-gray-500 text-white text-xs"
+                  className="ml-2 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-input hover:bg-input/90 text-foreground text-xs"
                   title="Switch device"
                   aria-label="Switch Spotify device"
                   >
@@ -743,23 +743,23 @@ function GameFooter({
               
               {/* Spotify Debug Info - only for creator */}
           {isCreator && (
-            <div className="hidden text-xs text-gray-500 text-center space-y-1">
+<div className="hidden text-xs text-muted-foreground text-center space-y-1">
               {spotifyDeviceId ? (
-                <div className="text-green-400">
+                <div className="text-primary">
                   ✓ Spotify Ready | {isPlayingMusic ? 'Playing' : 'Paused'}
                 </div>
               ) : (
-                <div className="text-yellow-400">
+                <div className="text-muted-foreground">
                   ⚠ Spotify Initializing...
                 </div>
               )}
-              <div className="text-gray-400">
+              <div className="text-muted-foreground">
                 Device: {spotifyDeviceId ? spotifyDeviceId.substring(0, 8) + '...' : 'None'}
               </div>
-              <div className="text-gray-400">
+              <div className="text-muted-foreground">
                 Track: {currentCard?.title || 'None'} | Progress: {progress}s/{duration}s
               </div>
-              <div className="text-gray-400">
+              <div className="text-muted-foreground">
                 Phase: {phase} | My Turn: {isMyTurn ? 'Yes' : 'No'}
               </div>
             </div>
@@ -775,13 +775,13 @@ function GameFooter({
           <div className="flex gap-2 justify-center">
             <button 
               onClick={() => onChallengeResponse(true)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground rounded"
             >
               Accept (Remove card)
             </button>
             <button 
               onClick={() => onChallengeResponse(false)}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+              className="px-4 py-2 bg-input hover:bg-input/90 text-foreground rounded"
             >
               Reject (Keep card)
             </button>
@@ -799,7 +799,7 @@ function GameFooter({
               placeholder="Song title"
               value={songTitle}
               onChange={(e) => setSongTitle(e.target.value)}
-              className="w-full p-2 rounded border-gray-700 border-2 bg-gray-800 text-white"
+              className="w-full p-2 rounded border-border border-2 bg-input text-foreground"
             />
             <input
               type="text"
@@ -811,13 +811,13 @@ function GameFooter({
             <div className="flex justify-center gap-2 pt-2">
               <button 
                 onClick={handleSongGuess}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+                className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground rounded"
               >
                 Submit Guess
               </button>
               <button 
                 onClick={() => setShowSongGuess(false)}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                className="px-4 py-2 bg-input hover:bg-input/90 text-foreground rounded"
               >
                 Cancel
               </button>
@@ -858,13 +858,13 @@ function GameFooter({
           <div className="flex gap-2 justify-center">
             <button 
               onClick={() => setShowSongGuess(true)}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground text-sm rounded"
             >
-              Guess Song & Artist
+              Guess Song
             </button>
             <button 
               onClick={() => onSkipSongGuess()}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded"
+              className="px-4 py-2 bg-input hover:bg-input/90 text-foreground text-sm rounded"
             >
               Skip
             </button>
@@ -969,7 +969,7 @@ function GameFooter({
           </div>
           <button 
             onClick={onContinueAfterChallenge}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded mt-3"
+            className="px-6 py-2 bg-primary hover:bg-primary/90 text-foreground text-sm rounded mt-3"
           >
             Continue to Next Turn
           </button>
@@ -989,13 +989,13 @@ function GameFooter({
           <div className="flex gap-2 justify-center">
             <button 
               onClick={onConfirmDrop}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+              className="px-6 py-2 bg-primary hover:bg-primary/90 text-foreground rounded"
             >
               Confirm Placement
             </button>
             <button 
               onClick={onCancelDrop}
-              className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+              className="px-6 py-2 bg-destructive hover:bg-destructive/90 text-foreground rounded"
             >
               Cancel
             </button>
@@ -1007,7 +1007,7 @@ function GameFooter({
       <div className="w-full max-w-md flex flex-col items-center">
         {showFeedback && feedback ? (
           <div className="w-full p-3 rounded text-center bg-none mb-2">
-            <div className={`${feedback.correct ? "text-green-400" : "text-red-400"} font-bold text-lg md:text-2xl mb-4`}>
+            <div className={`${feedback.correct ? "text-primary" : "text-destructive"} font-bold text-lg md:text-2xl mb-4`}>
               {feedback.correct ? "Correct!" : "Incorrect."}
             </div>
             
@@ -1027,7 +1027,7 @@ function GameFooter({
           </div>
         ) : currentCard && phase === 'player-turn' && pendingDropIndex === null ? (
           <div className="w-full p-2 md:p-4 rounded text-center bg-none mb-1">
-            <div className="text-gray-200 text-md md:text-2xl font-bold">
+            <div className="text-foreground text-md md:text-2xl font-bold">
               {isMyTurn ? "Place this card in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}
             </div>
             
@@ -1037,7 +1037,7 @@ function GameFooter({
                 <div className="text-gray-300 text-sm mb-4">You can pay 1 token to get another song</div>
                 <button 
                   onClick={() => handleTokenAction('skip_song')}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground rounded-md text-sm"
                 >
                   New Song (1 token)
                 </button>

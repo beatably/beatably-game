@@ -60,13 +60,13 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-card container-card rounded-xl border border-border max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
-          <h2 className="text-xl font-bold text-white">Song Debug Panel</h2>
+          <h2 className="text-xl font-semibold text-foreground">Song Debug Panel</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-muted-foreground hover:text-foreground text-2xl p-2 -m-2 rounded focus:outline-none"
           >
             ×
           </button>
@@ -78,8 +78,8 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
             onClick={() => setActiveTab('current')}
             className={`px-4 py-2 text-sm font-medium ${
               activeTab === 'current'
-                ? 'text-yellow-300 border-b-2 border-yellow-300'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Current Game Songs
@@ -88,8 +88,8 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
             onClick={() => setActiveTab('fetch')}
             className={`px-4 py-2 text-sm font-medium ${
               activeTab === 'fetch'
-                ? 'text-yellow-300 border-b-2 border-yellow-300'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Last Fetch
@@ -98,8 +98,8 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
             onClick={() => setActiveTab('games')}
             className={`px-4 py-2 text-sm font-medium ${
               activeTab === 'games'
-                ? 'text-yellow-300 border-b-2 border-yellow-300'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             All Games
@@ -113,7 +113,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
               <button
                 onClick={fetchGameSongs}
                 disabled={loading || !roomCode}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-sm text-white"
+                className="px-3 py-1 h-10 rounded-md border border-border bg-transparent text-foreground text-sm font-semibold touch-button disabled:opacity-60"
               >
                 {loading ? 'Loading...' : 'Refresh Game Songs'}
               </button>
@@ -122,7 +122,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
               <button
                 onClick={fetchLastFetch}
                 disabled={loading}
-                className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 rounded text-sm text-white"
+                className="px-3 py-1 h-10 rounded-md border border-border bg-transparent text-foreground text-sm font-semibold touch-button disabled:opacity-60"
               >
                 {loading ? 'Loading...' : 'Refresh Last Fetch'}
               </button>
@@ -131,7 +131,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
               <button
                 onClick={fetchAllGames}
                 disabled={loading}
-                className="px-3 py-1 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 rounded text-sm text-white"
+                className="px-3 py-1 h-10 rounded-md border border-border bg-transparent text-foreground text-sm font-semibold touch-button disabled:opacity-60"
               >
                 {loading ? 'Loading...' : 'Refresh All Games'}
               </button>
@@ -153,7 +153,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
               {activeTab === 'current' && debugData.songs && (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-yellow-300 mb-2">
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
                       Game {debugData.gameCode} - Songs ({debugData.totalSongs} total)
                     </h3>
                     <div className="text-sm text-gray-300 space-y-1">
@@ -189,10 +189,10 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
                           </div>
                           <div className="text-xs">
                             {song.isCurrent && (
-                              <span className="bg-yellow-600 text-white px-2 py-1 rounded">CURRENT</span>
+                              <span className="bg-primary text-primary-foreground px-2 py-1 rounded">CURRENT</span>
                             )}
                             {song.hasBeenPlayed && !song.isCurrent && (
-                              <span className="bg-gray-600 text-white px-2 py-1 rounded">PLAYED</span>
+                              <span className="bg-input text-foreground px-2 py-1 rounded">PLAYED</span>
                             )}
                           </div>
                         </div>
@@ -208,7 +208,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
                   {/* Metadata */}
                   {(debugData.metadata || debugData.lastFetch?.metadata) && (
                     <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-yellow-300 mb-2">Fetch Metadata</h3>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">Fetch Metadata</h3>
                       <div className="bg-gray-700 p-3 rounded text-sm space-y-1">
                         {(() => {
                           const meta = debugData.metadata || debugData.lastFetch?.metadata;
@@ -231,7 +231,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
                   {/* Songs */}
                   {(debugData.lastFetch?.tracks || debugData.tracks) && (
                     <div>
-                      <h3 className="text-lg font-semibold text-yellow-300 mb-2">
+                      <h3 className="text-lg font-semibold text-foreground mb-2">
                         Fetched Songs ({(debugData.lastFetch?.tracks || debugData.tracks).length})
                       </h3>
                       <div className="space-y-2">
@@ -253,7 +253,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
                   {/* History */}
                   {debugData.history && debugData.history.length > 0 && (
                     <div className="mt-6">
-                      <h3 className="text-lg font-semibold text-yellow-300 mb-2">Recent Fetches</h3>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">Recent Fetches</h3>
                       <div className="space-y-2">
                         {debugData.history.map((fetch, index) => (
                           <div key={index} className="bg-gray-700 p-3 rounded">
@@ -274,15 +274,15 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
               {/* All Games Tab */}
               {activeTab === 'games' && debugData.games && (
                 <div>
-                  <h3 className="text-lg font-semibold text-yellow-300 mb-2">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
                     All Active Games ({Object.keys(debugData.games).length})
                   </h3>
                   <div className="space-y-4">
                     {Object.entries(debugData.games).map(([gameCode, game]) => (
                       <div key={gameCode} className="bg-gray-700 p-4 rounded">
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-white font-medium">Game {gameCode}</h4>
-                          <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded">
+                          <h4 className="text-foreground font-medium">Game {gameCode}</h4>
+                          <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-1 rounded border border-primary/20">
                             {game.phase}
                           </span>
                         </div>
@@ -338,7 +338,7 @@ function SongDebugPanel({ roomCode, isVisible, onClose }) {
 
               {/* Raw Data */}
               <details className="mt-6">
-                <summary className="text-yellow-300 cursor-pointer text-sm">Show Raw Data</summary>
+                <summary className="text-primary cursor-pointer text-sm">Show Raw Data</summary>
                 <pre className="text-xs text-gray-400 mt-2 whitespace-pre-wrap break-words bg-gray-900 p-3 rounded overflow-x-auto">
                   {JSON.stringify(debugData, null, 2)}
                 </pre>

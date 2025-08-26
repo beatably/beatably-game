@@ -177,52 +177,54 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+      <div className="bg-card container-card border border-border p-6 max-w-sm w-full max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-white">Switch Device</h2>
+          <h2 className="text-lg font-semibold text-foreground">Switch Device</h2>
           
         </div>
 
         {loading && (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
-            <p className="text-gray-400 mt-2">Loading devices...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground mt-2">Loading devices...</p>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-900/50 border border-red-500 rounded p-3 mb-4">
-            <p className="text-red-400 text-sm">{error}</p>
+          <div className="bg-destructive/10 border border-destructive rounded p-3 mb-4">
+            <p className="text-destructive-foreground text-sm">{error}</p>
           </div>
         )}
 
         {!loading && !error && devices.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-gray-400">No devices found</p>
-            <p className="text-gray-500 text-sm mt-2">Make sure Spotify is open on your devices</p>
+            <p className="text-muted-foreground">No devices found</p>
+            <p className="text-muted-foreground text-sm mt-2">Make sure Spotify is open on your devices</p>
           </div>
         )}
 
         {!loading && !error && devices.length > 0 && (
           <div className="space-y-2">
             {devices.map((device) => (
-              <div key={device.id} className="border rounded-lg p-1">
+              <div key={device.id} className="p-1">
                 <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => transferPlayback(device.id)}
-                    className={`flex-1 text-left p-3 rounded-lg transition-colors ${
+                    className={`flex-1 text-left rounded-md setting-button touch-button h-12 px-3 ${
                       device.is_active
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        ? 'bg-primary text-primary-foreground border border-primary/20'
+                        : 'bg-input text-foreground border border-border hover:bg-input/90'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium">{device.name}</div>
-                        <div className="text-sm opacity-75">{device.type}</div>
+                        <div className="font-medium text-foreground">{device.name}</div>
+                        <div className="text-sm text-muted-foreground">{device.type}</div>
                       </div>
                       {device.is_active && (
-                        <div className="text-sm">✓ Active</div>
+                        <div className="text-sm bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded border border-primary/20">
+                          ✓ Active
+                        </div>
                       )}
                     </div>
                   </button>
@@ -236,13 +238,13 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
         <div className="mt-4 pt-6">
           <button
             onClick={fetchDevices}
-            className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
+            className="w-full h-12 flex items-center justify-center border border-border bg-transparent text-foreground rounded-md font-semibold touch-button"
           >
             Refresh Devices
           </button>
           <button
             onClick={onClose}
-            className="w-full py-2 mt-3 bg-green-700 hover:bg-green-600 text-white rounded"
+            className="w-full h-12 flex items-center justify-center mt-3 border border-border bg-transparent text-foreground rounded-md font-semibold touch-button"
           >
             Close
           </button>

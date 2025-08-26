@@ -5,8 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <title>Beatably</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Beatably">
     
@@ -20,8 +20,12 @@
     <link rel="manifest" href="/manifest.json">
     
     <!-- Theme color for mobile browsers -->
-    <meta name="theme-color" content="#111827">
-    <meta name="msapplication-TileColor" content="#111827">
+    <meta name="theme-color" content="#121212">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+    <meta name="msapplication-TileColor" content="#121212">
+    <meta name="color-scheme" content="dark light">
+    <!-- Immediate inline background to avoid white flash before external CSS loads -->
+    <style>html,body,#root{background-color:#121212!important;margin:0;height:100%;min-height:100%}</style>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

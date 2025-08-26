@@ -1,10 +1,14 @@
 import React, { useState } from "react";
 import beatablyLogo from "./assets/beatably_logo.png";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function Landing({ onCreate, onJoin }) {
   const [name, setName] = useState("");
-  const [joinCode, setJoinCode] = useState("");
+  const [joinCode, setJoinCode] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
+  const [joining, setJoining] = useState(false);
 
   const handleCreate = () => {
     if (!name.trim()) {
@@ -15,63 +19,158 @@ function Landing({ onCreate, onJoin }) {
     onCreate(name);
   };
 
-  const handleJoin = () => {
+  const handleStartJoin = () => {
     if (!name.trim()) {
       setError("Please enter your name");
       return;
     }
-    if (!/^\d{4}$/.test(joinCode)) {
+    setError("");
+    setJoining(true);
+  };
+
+  const handleCancelJoin = () => {
+    setError("");
+    setJoining(false);
+    setJoinCode(["", "", "", ""]);
+  };
+
+  const handleJoin = () => {
+    // Name should already be set from first step, but validate defensively
+    if (!name.trim()) {
+      setError("Please enter your name");
+      setJoining(false);
+      return;
+    }
+    const code = joinCode.join("");
+    if (!/^\d{4}$/.test(code)) {
       setError("Enter a valid 4-digit code");
       return;
     }
     setError("");
-    onJoin(name, joinCode);
+    onJoin(name, code);
+  };
+
+  const handleCodeChange = (index, value) => {
+    // Only allow digits
+    if (value && !/^\d$/.test(value)) return;
+
+    const newCode = [...joinCode];
+    newCode[index] = value;
+    setJoinCode(newCode);
+
+    // Auto-advance to next field
+    if (value && index < 3) {
+      const nextInput = document.getElementById(`code-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index, e) => {
+    // Handle backspace to go to previous field
+    if (e.key === "Backspace" && !joinCode[index] && index > 0) {
+      const prevInput = document.getElementById(`code-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
-      <div className="items-center justify-center text-center mb-8 px-24">
-        <img src={beatablyLogo} alt="Beatably Logo"></img>
+    <div
+      className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground px-6 py-4"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}
+    >
+      {/* Minimal Header */}
+      <div className="text-center mb-8">
+        <img
+          src={beatablyLogo}
+          alt="Beatably Logo"
+          className="h-12 w-auto mx-auto"
+        />
       </div>
-      <div className="w-full max-w-lg p-8">
-        <div className="mb-4 text-left">
-          <label className="block text-sm font-medium mb-1">NAME</label>
-          <input
-            className="w-full p-2 rounded text-black"
-            placeholder="Enter your or your teams' name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            maxLength={16}
-          />
-        </div>
-        <div className="flex flex-col mt-24 gap-4">
-          <button
-            className="bg-green-600 py-2 px-6 rounded font-semibold disabled:bg-gray-700 disabled:text-gray-400 transition-colors hover:bg-green-700 w-full"
-            disabled={!name.trim()}
-            onClick={handleCreate}
-          >
-            Create New Game
-          </button>
-          <div className="mt-2">OR</div>
-          <div className="flex flex-col gap-3">
-            <label className="block text-sm font-medium -mb-2 text-left">GAME CODE</label>
-            <input
-              className="w-full p-2 rounded text-black text-left mb-2"
-              placeholder="4-digit code from the host"
-              value={joinCode}
-              onChange={e => setJoinCode(e.target.value.toUpperCase().slice(0,4))}
-              maxLength={4}
-            />
-            <button
-              className="bg-green-600 py-2 rounded font-semibold  disabled:bg-gray-700 disabled:text-gray-400 transition-colors hover:bg-green-700 w-full"
-              disabled={!name.trim() || joinCode.length !== 4}
+
+      <div className="w-full max-w-sm space-y-4">
+        {!joining ? (
+          <>
+            {/* Name Input */}
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-sm text-muted-foreground">
+                Your Name
+              </Label>
+              <Input
+                id="name"
+                className="bg-input border-border text-foreground h-11 focus:ring-primary"
+                placeholder="Enter your name..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={16}
+              />
+            </div>
+
+            {/* Primary CTA: Create a new game */}
+            <Button
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button"
+              disabled={!name.trim()}
+              onClick={handleCreate}
+            >
+              Create a new game
+            </Button>
+
+            {/* Secondary: Reveal join with code */}
+            <Button
+              variant="outline"
+              className="w-full h-12 font-semibold touch-button"
+              disabled={!name.trim()}
+              onClick={handleStartJoin}
+            >
+              Join existing game with a code
+            </Button>
+          </>
+        ) : (
+          <>
+            {/* Join with 4-digit code */}
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Game Code</Label>
+              <div className="flex gap-2 justify-center">
+                {joinCode.map((digit, index) => (
+                  <Input
+                    key={index}
+                    id={`code-${index}`}
+                    className="bg-input border-border text-foreground text-center h-12 w-12 text-lg focus:ring-primary"
+                    value={digit}
+                    onChange={(e) => handleCodeChange(index, e.target.value)}
+                    onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                    maxLength={1}
+                    inputMode="numeric"
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Primary CTA in join view */}
+            <Button
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button"
+              disabled={!name.trim() || joinCode.some((d) => !d)}
               onClick={handleJoin}
             >
               Join Game
-            </button>
+            </Button>
+
+            {/* Secondary: Cancel back to name input */}
+            <Button
+              variant="outline"
+              className="w-full h-12 font-semibold touch-button"
+              onClick={handleCancelJoin}
+            >
+              Cancel
+            </Button>
+          </>
+        )}
+
+        {/* Error Message - Inline */}
+        {error && (
+          <div className="text-destructive text-center text-sm mt-3 p-2 bg-destructive/10 rounded-md">
+            {error}
           </div>
-        </div>
-        {error && <div className="text-red-400 mt-4 text-center">{error}</div>}
+        )}
       </div>
     </div>
   );

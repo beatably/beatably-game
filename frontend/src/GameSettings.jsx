@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from './config';
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
@@ -335,172 +338,131 @@ function GameSettings({ settings, onUpdate }) {
     }
   };
 
-  return (
-    <div className="bg-none p-3 rounded mb-20">
-      <h3 className="font-medium mb-6">Game Settings</h3>
-      
-      {/* Basic Game Settings - Top Priority */}
-      <div className="space-y-6 mb-8">
-        {/* Chart Hits Mode - iOS-style toggle */}
-        <div>
-          <div className="flex items-start justify-between">
-            <span className="text-white text-sm font-medium">Chart Hits Mode</span>
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={useChartMode}
-                onChange={(e) => handleChartToggle(e.target.checked)}
-                className="sr-only"
-                id="chartModeToggle"
-              />
-              <label
-                htmlFor="chartModeToggle"
-                className={`relative inline-flex h-6 w-11 items-center rounded-full cursor-pointer transition-colors ${
-                  useChartMode ? 'bg-green-600' : 'bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    useChartMode ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </label>
-            </div>
-          </div>
-          <p className="text-xs text-gray-400 mt-1">
-            When enabled, playlists are built from US Billboard Hot 100 charts.
-          </p>
-        </div>
+    return (
+    <div className="space-y-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}>
+      {/* Chart Hits Mode - iOS-style toggle */}
+      <div className="flex items-center justify-between">
+          <Label className="font-semibold text-foreground">Chart Hits Mode</Label>
+        <Switch
+          checked={chartModeActive}
+          onCheckedChange={handleChartToggle}
+          className="touch-button"
+        />
+      </div>
+      <p className="text-sm text-muted-foreground mt-2 text-center">
+        Use Billboard Hot 100 charts instead of Spotify discovery
+      </p>
 
-        {/* Difficulty - 3-way button selection */}
-        <div>
-          <label className="block text-white mb-2 text-sm text-left font-medium">DIFFICULTY</label>
-          <div className="grid grid-cols-3 gap-1">
-            {['easy', 'normal', 'hard'].map(level => (
-              <button
-                key={level}
-                onClick={() => handleChange('difficulty', level)}
-                className={`py-2 px-3 rounded text-sm font-medium transition-all ${
-                  localSettings.difficulty === level
-                    ? 'bg-green-700 text-white shadow-lg'
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
-                }`}
-              >
-                {level.charAt(0).toUpperCase() + level.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Win Condition - Multi-button option - Moved here after difficulty */}
-        <div>
-          <label className="block text-white mb-2 text-sm font-medium text-left">CARDS TO WIN</label>
-          <div className="grid grid-cols-3 gap-1">
-            {[8, 10, 12].map(cardCount => (
-              <button
-                key={cardCount}
-                onClick={() => {
-                  const updated = { ...localSettings, winCondition: cardCount };
-                  setLocalSettings(updated);
-                  onUpdate(updated);
-                }}
-                className={`py-2 px-3 rounded text-sm font-medium transition-all ${
-                  (localSettings.winCondition ?? 10) === cardCount
-                    ? 'bg-green-700 text-white shadow-lg'
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
-                }`}
-              >
-                {cardCount} cards
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Year Range - Always visible */}
-        <div>
-          <label className="block text-white mb-2 text-sm font-medium text-left">YEAR RANGE</label>
-          <div className="relative">
-            {/* Decade selector buttons (10-year steps). Active decades are highlighted. */}
-            {(() => {
-              const decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
-              const min = localSettings.musicPreferences.yearRange.min;
-              const max = localSettings.musicPreferences.yearRange.max;
-              return (
-                <div className="grid grid-cols-4 gap-2">
-                  {decades.map(decade => {
-                    const active = decade >= min && decade <= max;
-                    return (
-                      <button
-                        key={decade}
-                        onClick={() => handleDecadeClick(decade)}
-                        className={`py-2 px-3 rounded text-sm font-medium transition-all text-center ${
-                          active ? 'bg-green-600 text-white shadow-lg' : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
-                        }`}
-                        aria-pressed={active}
-                        aria-label={`${decade}s`}
-                      >
-                        {decade}s
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </div>
+      {/* Difficulty */}
+      <div className="space-y-3">
+        <Label className="text-xl font-semibold text-foreground">Difficulty</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {['easy', 'normal', 'hard'].map(level => (
+            <Button
+              key={level}
+              variant={localSettings.difficulty === level ? "default" : "ghost"}
+              size="sm"
+              className="h-10 touch-button setting-button border border-border"
+              onClick={() => handleChange('difficulty', level)}
+            >
+              {level.charAt(0).toUpperCase() + level.slice(1)}
+            </Button>
+          ))}
         </div>
       </div>
-      
-      {/* All Settings - Now Always Visible */}
-      <div className="space-y-6">
-        {/* Genre Selection - Hidden when Chart Mode is active */}
-        {!chartModeActive && (
-          <div>
-            <label className="block text-white mb-2 text-sm font-medium text-left">MUSIC GENRES</label>
-            <div className="grid grid-cols-2 gap-2">
-              {availableGenres.map(genre => (
-                <button
-                  key={genre}
-                  onClick={() => handleGenreToggle(genre)}
-                  className={`py-2 px-3 rounded text-sm font-medium transition-all text-left ${
-                    localSettings.musicPreferences.genres.includes(genre)
-                      ? 'bg-green-600 text-white shadow-lg'
-                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
-                  }`}
-                >
-                  <span>
-                    {genre === 'r&b' ? 'R&B' : (genre.charAt(0).toUpperCase() + genre.slice(1))}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Geography/Markets - Hidden when Chart Mode is active */}
-        {!chartModeActive && (
-          <div>
-            <label className="block text-white mb-2 text-sm font-medium text-left">GEOGRAPHY</label>
-            <div className="grid grid-cols-2 gap-2">
-              {availableMarkets.map(market => (
-                <button
-                  key={market.code}
-                  onClick={() => handleMarketToggle(market.code)}
-                  className={`py-2 px-3 rounded text-sm font-medium transition-all text-left ${
-                    localSettings.musicPreferences.markets.includes(market.code)
-                      ? 'bg-green-600 text-white shadow-lg'
-                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500 hover:text-white'
-                  }`}
-                >
-                  {market.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Win Condition */}
+      <div className="space-y-3">
+        <Label className="text-xl font-semibold text-foreground">Cards to Win</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {[8, 10, 12].map(cardCount => (
+            <Button
+              key={cardCount}
+              variant={(localSettings.winCondition ?? 10) === cardCount ? "default" : "ghost"}
+              size="sm"
+              className="h-10 touch-button border border-border"
+              onClick={() => {
+                const updated = { ...localSettings, winCondition: cardCount };
+                setLocalSettings(updated);
+                onUpdate(updated);
+              }}
+            >
+              {cardCount} cards
+            </Button>
+          ))}
+        </div>
+      </div>
 
-        {/* Reset to Defaults */}
-        <button
-          onClick={() => {
+      {/* Year Range */}
+      <div className="space-y-3">
+        <Label className="text-xl font-semibold text-foreground">Year Range</Label>
+        <div className="grid grid-cols-4 gap-1">
+          {[1960, 1970, 1980, 1990, 2000, 2010, 2020].map(decade => {
+            const min = localSettings.musicPreferences.yearRange.min;
+            const max = localSettings.musicPreferences.yearRange.max;
+            const active = decade >= min && decade <= max;
+            return (
+              <Button
+                key={decade}
+                variant={active ? "default" : "ghost"}
+                className="h-10 text-sm touch-button setting-button border border-border"
+                onClick={() => handleDecadeClick(decade)}
+              >
+                {decade}s
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Genre Selection - Hidden when Chart Mode is active */}
+      {!chartModeActive && (
+        <div className="space-y-3">
+          <Label className="text-xl font-semibold text-foreground">Music Genres</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {availableGenres.map(genre => (
+              <Button
+                key={genre}
+                variant={localSettings.musicPreferences.genres.includes(genre) ? "default" : "ghost"}
+                className={`h-10 text-sm justify-start touch-button setting-button border border-border ${
+                  !localSettings.musicPreferences.genres.includes(genre) ? 'focus:ring-0 focus:bg-transparent' : ''
+                }`}
+                onClick={() => handleGenreToggle(genre)}
+              >
+                {genre === 'r&b' ? 'R&B' : (genre.charAt(0).toUpperCase() + genre.slice(1))}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Geography/Markets - Hidden when Chart Mode is active */}
+      {!chartModeActive && (
+        <div className="space-y-3">
+          <Label className="text-xl font-semibold text-foreground">Geography</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {availableMarkets.map(market => (
+              <Button
+                key={market.code}
+                variant={localSettings.musicPreferences.markets.includes(market.code) ? "default" : "ghost"}
+                className={`h-10 text-sm justify-start touch-button setting-button border border-border ${
+                  !localSettings.musicPreferences.markets.includes(market.code) ? 'focus:ring-0 focus:bg-transparent' : ''
+                }`}
+                onClick={() => handleMarketToggle(market.code)}
+              >
+                {market.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reset to Defaults (inline text action) */}
+      <div className="flex justify-center">
+        <a
+          href="#reset"
+          onClick={(e) => {
+            e.preventDefault();
             const defaultSettings = {
               difficulty: "normal",
               winCondition: 10,
@@ -515,174 +477,26 @@ function GameSettings({ settings, onUpdate }) {
             setUseChartMode(false);
             onUpdate(defaultSettings);
           }}
-          className="w-full py-2 px-3 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
+          role="button"
+          className="inline-link-button"
+          aria-label="Reset settings to defaults"
         >
-          Reset to Defaults
-        </button>
-
-        {/* Debug Panel */}
-        <div>
-          <button
-            onClick={() => setShowDebugPanel(!showDebugPanel)}
-            className="w-full py-1 px-2 bg-yellow-600 hover:bg-yellow-500 rounded text-xs transition font-medium"
+          <svg
+            className="w-4 h-4 text-muted-foreground"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
           >
-            {showDebugPanel ? "Hide" : "Show"} Song Debug Panel
-          </button>
-
-          {showDebugPanel && (
-            <div className="mt-3 space-y-3">
-              <div className="text-xs text-yellow-300 bg-yellow-900 bg-opacity-30 p-2 rounded">
-                <strong>Debug Panel:</strong> Use this to check what songs are being fetched from Spotify and verify that your settings are working correctly.
-              </div>
-
-              {/* Show Songs Button Toggle */}
-              <div className="flex items-center space-x-2 p-2 bg-gray-700 rounded">
-                <input
-                  type="checkbox"
-                  id="showSongsButton"
-                  checked={showSongsButton}
-                  onChange={(e) => {
-                    setShowSongsButton(e.target.checked);
-                    localStorage.setItem('showSongsButton', e.target.checked.toString());
-                  }}
-                  className="rounded"
-                />
-                <label htmlFor="showSongsButton" className="text-xs text-gray-300 cursor-pointer">
-                  Show "All Songs" button in game footer during play
-                </label>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={fetchDebugData}
-                  disabled={loading}
-                  className="py-1 px-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-xs transition"
-                >
-                  {loading ? "Loading..." : "View Last Fetch"}
-                </button>
-                <button
-                  onClick={testFetchSongs}
-                  disabled={loading}
-                  className="py-1 px-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 rounded text-xs transition"
-                >
-                  {loading ? "Loading..." : "Test Current Settings"}
-                </button>
-              </div>
-
-              {debugData && (
-                <div className="bg-gray-800 p-3 rounded text-xs max-h-96 overflow-y-auto">
-                  {debugData.error ? (
-                    <div className="text-red-400">
-                      <strong>Error:</strong> {debugData.error}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {/* Metadata */}
-                      {(debugData.metadata || debugData.testFetch?.metadata) && (
-                        <div>
-                          <h4 className="text-yellow-300 font-medium mb-2">Fetch Metadata:</h4>
-                          <div className="text-gray-300 space-y-1">
-                            {(() => {
-                              const meta = debugData.metadata || debugData.testFetch?.metadata;
-                              return (
-                                <>
-                                  <div>Difficulty: <span className="text-white">{meta.difficulty}</span></div>
-                                  {meta.totalFound !== undefined && (
-                                    <div>Total Found: <span className="text-white">{meta.totalFound}</span></div>
-                                  )}
-                                  {meta.filteredByDifficulty !== undefined && (
-                                    <div>After Filtering: <span className="text-white">{meta.filteredByDifficulty}</span></div>
-                                  )}
-                                  <div>Final Count: <span className="text-white">{meta.finalCount}</span></div>
-                                  {meta.mode && (
-                                    <div>Mode: <span className="text-white">{meta.mode}</span></div>
-                                  )}
-                                  {meta.playerCount && (
-                                    <>
-                                      <div>Player Count: <span className="text-white">{meta.playerCount}</span></div>
-                                      <div>Min Songs Needed: <span className="text-white">{meta.minSongsNeeded}</span></div>
-                                      <div>Has Enough Songs: <span className={meta.hasEnoughSongs ? "text-green-400" : "text-red-400"}>{meta.hasEnoughSongs ? "Yes" : "No"}</span></div>
-                                    </>
-                                  )}
-                                  {meta.warning && (
-                                    <div className="bg-yellow-900 bg-opacity-50 p-2 rounded mt-2">
-                                      <div className="text-yellow-300 font-medium">Warning:</div>
-                                      <div className="text-yellow-200 text-xs">{meta.warning}</div>
-                                    </div>
-                                  )}
-                                  <div>Genres: <span className="text-white">{meta.genresSearched?.join(', ')}</span></div>
-                                  <div>Markets: <span className="text-white">{meta.marketsSearched?.join(', ')}</span></div>
-                                  <div>Year Range: <span className="text-white">{meta.preferences?.yearRange?.min}-{meta.preferences?.yearRange?.max}</span></div>
-                                  <div>Timestamp: <span className="text-white">{new Date(meta.timestamp).toLocaleString()}</span></div>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Sample Songs */}
-                      {(debugData.lastFetch?.tracks || debugData.testFetch?.tracks) && (
-                        <div>
-                          <h4 className="text-yellow-300 font-medium mb-2">Sample Songs (first 10):</h4>
-                          <div className="space-y-1">
-                            {(debugData.lastFetch?.tracks || debugData.testFetch?.tracks)
-                              .slice(0, 10)
-                              .map((song, index) => (
-                                <div key={index} className="text-gray-300 border-l-2 border-gray-600 pl-2">
-                                  <div className="text-white font-medium">
-                                    {song.title}
-                                    <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-700">
-                                      {song.source === 'chart' ? 'Chart' : 'Spotify'}
-                                    </span>
-                                  </div>
-                                  <div className="text-gray-400">
-                                    {song.artist} • {song.year} • Pop: {song.popularity || 'N/A'} • {song.genre}
-                                    {song.source === 'chart' && (song.rank || song.peakPos) && (
-                                      <span className="ml-2 text-xs text-yellow-300">
-                                        {song.peakPos ? `Peak #${song.peakPos}` : `Rank #${song.rank}`}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Fetch History */}
-                      {debugData.history && debugData.history.length > 0 && (
-                        <div>
-                          <h4 className="text-yellow-300 font-medium mb-2">Recent Fetches:</h4>
-                          <div className="space-y-2">
-                            {debugData.history.slice(0, 3).map((fetch, index) => (
-                              <div key={index} className="bg-gray-700 p-2 rounded">
-                                <div className="text-white text-xs">
-                                  {fetch.trackCount} songs • {fetch.difficulty} • {new Date(fetch.timestamp).toLocaleString()}
-                                </div>
-                                <div className="text-gray-400 text-xs mt-1">
-                                  Sample: {fetch.sampleTracks?.map(t => `${t.title} (${t.year})`).join(', ')}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Raw Data Toggle */}
-                      <details className="mt-3">
-                        <summary className="text-yellow-300 cursor-pointer text-xs">Show Raw Data</summary>
-                        <pre className="text-xs text-gray-400 mt-2 whitespace-pre-wrap break-words">
-                          {JSON.stringify(debugData, null, 2)}
-                        </pre>
-                      </details>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            <path d="M21 12a9 9 0 1 1-3-6.708" />
+            <path d="M21 3v6h-6" />
+          </svg>
+          Reset
+        </a>
       </div>
     </div>
   );

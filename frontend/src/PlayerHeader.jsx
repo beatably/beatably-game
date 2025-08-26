@@ -61,7 +61,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
   };
 
   return (
-    <header className="relative sticky top-0 z-30 w-full bg-gray-900 shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
+    <header className="relative sticky top-0 z-30 w-full bg-card mobile-shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
       <div className="absolute left-16 top-5">
         <img className="w-0" src={beatablyLogo} alt="Beatably Logo"></img>
       </div>
@@ -71,15 +71,15 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
           <div
             key={p.id}
             className={`flex flex-col rounded-md items-center px-1.5 py-1 md:px-2 md:py-1 min-w-[70px] md:min-w-[80px] justify-center ${
-              p.id === currentPlayerId ? "bg-gray-700 ring-1 ring-gray-500" : "bg-none"
+              p.id === currentPlayerId ? "bg-input ring-1 ring-primary" : "bg-transparent"
             }`}
           >
-            <span className="font-bold truncate max-w-[70px] md:max-w-[60px] mb-0.5 md:mb-1">{p.name}</span>
+            <span className="font-bold text-foreground truncate max-w-[70px] md:max-w-[60px] mb-0.5 md:mb-1">{p.name}</span>
             <div className={`flex items-center gap-0.5 transition-all duration-500 ${
-              animatingTokens[p.id] ? 'animate-pulse bg-green-500/20 rounded-md px-1' : ''
+              animatingTokens[p.id] ? 'animate-pulse bg-primary/10 rounded-md px-1' : ''
             }`}>
-              <span className="font-semibold text-base md:text-lg">{p.score}</span>
-              <span className="text-gray-400 xs:inline">pts</span>
+              <span className="font-semibold text-base md:text-lg text-foreground">{p.score}</span>
+              <span className="text-muted-foreground xs:inline">pts</span>
               <div className={`transition-transform duration-300 ${
                 animatingTokens[p.id] ? 'scale-110' : 'scale-100'
               }`}>
@@ -90,13 +90,13 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
         ))}
       </div>
       {players.length > 0 && (
-        <div className="absolute left-2 top-2">
+          <div className="absolute left-2 top-2">
           <button 
             onClick={() => setMenuOpen(!menuOpen)} 
-            className="bg-gray-700 text-white p-2 rounded hover:bg-gray-600 flex items-center justify-center"
+            className="bg-input text-foreground p-2 rounded hover:bg-card flex items-center justify-center"
             aria-label="Menu"
           >
-            <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
+            <svg width="16" height="16" viewBox="0 0 24 24" className="text-foreground">
               <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
@@ -112,25 +112,25 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
               
               {/* Modal content */}
               <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                <div className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+                <div className="bg-card rounded-lg mobile-shadow p-6 w-full max-w-sm">
                   <div className="space-y-3">
                     <button 
                       onClick={players.length > 0 && players[0].id === currentPlayerId ? handleRestart : undefined} 
-                      className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${players.length > 0 && players[0].id === currentPlayerId ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gray-400 text-gray-200 cursor-not-allowed'}`}
+                      className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${players.length > 0 && players[0].id === currentPlayerId ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground' : 'border border-border text-muted-foreground cursor-not-allowed bg-transparent'}`}
                       disabled={!(players.length > 0 && players[0].id === currentPlayerId)}
                     >
                       Restart Game
                     </button>
                     <button 
                       onClick={handleExit} 
-                      className="w-full bg-gray-600 hover:bg-gray-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                      className="w-full border border-border bg-background hover:bg-input text-foreground py-3 px-4 rounded-lg font-medium transition-colors"
                     >
                       Exit to Lobby
                     </button>
                   </div>
                   <button 
                     onClick={() => setMenuOpen(false)}
-                    className="w-full mt-6 bg-transparent border border-gray-600 hover:bg-gray-700 text-gray-300 py-3 px-4 rounded-lg font-medium transition-colors"
+                    className="w-full mt-6 bg-transparent border border-border hover:bg-input text-foreground py-3 px-4 rounded-lg font-medium transition-colors"
                   >
                     Cancel
                   </button>

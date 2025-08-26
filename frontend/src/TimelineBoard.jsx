@@ -171,8 +171,8 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
   // Determine layout based on screen size - always use side-by-side on mobile
   const isMobile = window.innerWidth < 768; // md breakpoint
   const containerClasses = isMobile 
-    ? "flex flex-row w-full max-w-3xl items-start justify-center gap-2"
-    : "flex flex-col md:flex-row w-full max-w-3xl items-center md:items-start justify-center gap-2 md:gap-4";
+    ? "bg-background flex flex-row w-full max-w-3xl items-start justify-center gap-2"
+    : "bg-background flex flex-col md:flex-row w-full max-w-3xl items-center md:items-start justify-center gap-2 md:gap-4";
   
   const timelineClasses = isMobile
     ? "flex flex-col items-center p-2 rounded-lg min-h-[700px] w-48 relative order-1"
@@ -188,10 +188,10 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
   return (
     <div className={containerClasses}>
       {/* Timeline - Always visible regardless of whose turn it is */}
-      <div className={timelineClasses}>
-        <div className="text-xs text-gray-600 mb-1">↑ Older songs</div>
+      <div className={`${timelineClasses} bg-background border-border`}>
+        <div className="text-xs text-muted-foreground mb-1">↑ Older songs</div>
         {dropZones}
-        <div className="text-xs text-gray-600 mt-1">↓ Newer songs</div>
+        <div className="text-xs text-muted-foreground mt-1">↓ Newer songs</div>
       </div>
       
       
@@ -222,15 +222,15 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
 
 function TimelineCard({ card, outline, animateRemove, hideYear }) {
   let outlineClass = '';
-  if (outline === 'green') outlineClass = 'ring-4 ring-green-500';
-  if (outline === 'red') outlineClass = 'ring-4 ring-red-500';
-  if (outline === 'grey') outlineClass = 'ring-4 ring-gray-400';
-  if (outline === 'blue') outlineClass = 'ring-4 ring-blue-500';
+  if (outline === 'green') outlineClass = 'ring-4 ring-primary';
+  if (outline === 'red') outlineClass = 'ring-4 ring-destructive';
+  if (outline === 'grey') outlineClass = 'ring-4 ring-border';
+  if (outline === 'blue') outlineClass = 'ring-4 ring-accent';
   let removeClass = '';
   if (animateRemove) removeClass = 'animate-fadeOutUp';
   return (
-    <div className={`bg-gray-700 px-2 py-1.5 rounded-lg shadow-xl shadow-black/20 text-center min-w-[80px] my-[1px] flex flex-col items-center transition-all duration-400 ${outlineClass} ${removeClass}`}>
-      <div className="font-bold text-md">{hideYear ? '?' : card.year}</div>
+    <div className={`bg-card px-2 py-1.5 rounded-lg shadow-xl shadow-black/20 text-center min-w-[80px] my-[1px] flex flex-col items-center transition-all duration-400 ${outlineClass} ${removeClass}`}>
+      <div className="font-bold text-md text-card-foreground">{hideYear ? '?' : card.year}</div>
     </div>
   );
 }
@@ -260,21 +260,21 @@ function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback,
   let opacity = "opacity-30";
   
   if (disabled) {
-    borderColor = "border-red-300";
-    backgroundColor = "bg-red-100";
+    borderColor = "border-destructive";
+    backgroundColor = "bg-destructive/10";
     opacity = "opacity-50";
   } else if (isActive && feedback) {
-    borderColor = feedback.correct ? "border-green-500" : "border-red-500";
-    backgroundColor = "bg-gray-600";
+    borderColor = feedback.correct ? "border-primary" : "border-destructive";
+    backgroundColor = "bg-card";
     opacity = "opacity-100";
   } else if (isActive || isOver) {
-    borderColor = "border-blue-400";
-    backgroundColor = "bg-gray-600";
+    borderColor = "border-primary";
+    backgroundColor = "bg-card";
     opacity = "opacity-100";
   } else if (isDragging && canDrop) {
     // Show all drop zones when dragging on mobile
-    borderColor = "border-gray-500";
-    backgroundColor = "bg-gray-700";
+    borderColor = "border-border";
+    backgroundColor = "bg-card";
     opacity = "opacity-60";
   }
 
@@ -297,11 +297,11 @@ function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback,
         pointerEvents: canDrop && !disabled ? "auto" : "none",
       }}
     >
-      {(isActive || isOver) && !disabled && <span className="text-xs text-gray-300">Place here</span>}
+      {(isActive || isOver) && !disabled && <span className="text-xs text-muted-foreground">Place here</span>}
       {isDragging && canDrop && !isActive && !isOver && !disabled && (
-        <span className="text-xs text-gray-400">Drop zone</span>
+        <span className="text-xs text-muted-foreground">Drop zone</span>
       )}
-      {disabled && <span className="text-xs text-red-400">Blocked</span>}
+      {disabled && <span className="text-xs text-destructive">Blocked</span>}
     </div>
   );
 }
