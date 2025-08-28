@@ -29,6 +29,9 @@ pids
 *.seed
 *.pid.lock
 
+# Backend cache files (runtime state)
+backend/cache/
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
