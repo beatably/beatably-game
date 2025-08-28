@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from './config';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 
 function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
@@ -26,6 +25,19 @@ function GameSettings({ settings, onUpdate }) {
   const trackRef = React.useRef(null);
   // Keep a ref to the active handle so pointer events can be coordinated
   const activeHandleRef = React.useRef(null);
+
+  // Enhanced carousel state management
+  const carouselRef = React.useRef(null);
+  const carouselStartXRef = React.useRef(null);
+  const carouselStartTimeRef = React.useRef(null);
+  const carouselLastXRef = React.useRef(null);
+  const carouselVelocityRef = React.useRef(0);
+  const carouselActiveRef = React.useRef(false);
+  const animationFrameRef = React.useRef(null);
+  
+  // Real-time drag position state
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
     // If incoming settings exist, normalize their musicPreferences.genres to lowercase
@@ -80,13 +92,145 @@ function GameSettings({ settings, onUpdate }) {
     onUpdate(updated);
   };
 
-  // Chart mode toggle handler (stored at top-level of settings to keep payload small)
-  const handleChartToggle = (checked) => {
-    setUseChartMode(checked);
-    const updated = { ...localSettings, useChartMode: checked };
+  // Playing mode change handler (stored at top-level of settings to keep payload small)
+  const handlePlayingModeChange = (isBillboardMode) => {
+    setUseChartMode(isBillboardMode);
+    const updated = { ...localSettings, useChartMode: isBillboardMode };
     setLocalSettings(updated);
     onUpdate(updated);
   };
+
+  // iOS-style carousel physics and animation
+  const animateToPosition = (targetOffset, duration = 300) => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    setIsAnimating(true);
+    const startOffset = dragOffset;
+    const startTime = Date.now();
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // iOS-style spring easing
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      const currentOffset = startOffset + (targetOffset - startOffset) * easeProgress;
+      
+      setDragOffset(currentOffset);
+      
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        setDragOffset(targetOffset);
+      }
+    };
+    
+    animationFrameRef.current = requestAnimationFrame(animate);
+  };
+
+  // Enhanced carousel event handlers with real-time feedback
+  const onCarouselStart = (e) => {
+    const clientX = getClientXFromEvent(e);
+    if (clientX == null) return;
+    
+    // Cancel any ongoing animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    setIsAnimating(false);
+    
+    carouselStartXRef.current = clientX;
+    carouselStartTimeRef.current = Date.now();
+    carouselLastXRef.current = clientX;
+    carouselVelocityRef.current = 0;
+    carouselActiveRef.current = true;
+    
+    e.preventDefault();
+  };
+
+  const onCarouselMove = (e) => {
+    if (!carouselActiveRef.current || carouselStartXRef.current == null) return;
+    
+    const clientX = getClientXFromEvent(e);
+    if (clientX == null) return;
+    
+    const currentTime = Date.now();
+    const deltaX = clientX - carouselStartXRef.current;
+    
+    // Calculate velocity for momentum
+    if (carouselLastXRef.current != null) {
+      const timeDelta = currentTime - (carouselStartTimeRef.current || currentTime);
+      if (timeDelta > 0) {
+        carouselVelocityRef.current = (clientX - carouselLastXRef.current) / timeDelta;
+      }
+    }
+    
+    carouselLastXRef.current = clientX;
+    
+    // Apply rubber band effect at boundaries
+    let constrainedDelta = deltaX;
+    const maxDrag = 100; // Maximum drag distance beyond boundaries
+    
+    if (!chartModeActive && deltaX > 0) {
+      // Dragging right when Spotify is active (at right boundary)
+      constrainedDelta = maxDrag * (1 - Math.exp(-deltaX / maxDrag));
+    } else if (chartModeActive && deltaX < 0) {
+      // Dragging left when Billboard is active (at left boundary)
+      constrainedDelta = -maxDrag * (1 - Math.exp(deltaX / maxDrag));
+    }
+    
+    // Real-time drag feedback
+    setDragOffset(constrainedDelta);
+  };
+
+  const onCarouselEnd = (e) => {
+    if (!carouselActiveRef.current) return;
+    
+    const velocity = carouselVelocityRef.current || 0;
+    const currentDelta = dragOffset;
+    
+    // Determine target based on velocity and position
+    let targetMode = chartModeActive;
+    const velocityThreshold = 0.5; // px/ms
+    const positionThreshold = 50; // px
+    
+    if (Math.abs(velocity) > velocityThreshold) {
+      // High velocity - use velocity direction
+      targetMode = velocity > 0; // Right swipe = Billboard (true)
+    } else if (Math.abs(currentDelta) > positionThreshold) {
+      // Low velocity - use position threshold
+      targetMode = currentDelta > 0; // Right drag = Billboard (true)
+    }
+    
+    // Reset drag offset immediately for smooth CSS transition
+    setDragOffset(0);
+    
+    // Update mode immediately if changed (no delay for smooth carousel behavior)
+    if (targetMode !== chartModeActive) {
+      handlePlayingModeChange(targetMode);
+    }
+    
+    // Reset carousel state
+    carouselStartXRef.current = null;
+    carouselStartTimeRef.current = null;
+    carouselLastXRef.current = null;
+    carouselVelocityRef.current = 0;
+    carouselActiveRef.current = false;
+    
+    e.preventDefault();
+  };
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   const handleMusicPreferenceChange = (key, value) => {
     // Normalize genres array to lowercase when updating
@@ -340,18 +484,96 @@ function GameSettings({ settings, onUpdate }) {
 
     return (
     <div className="space-y-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}>
-      {/* Chart Hits Mode - iOS-style toggle */}
-      <div className="flex items-center justify-between">
-          <Label className="font-semibold text-foreground">Chart Hits Mode</Label>
-        <Switch
-          checked={chartModeActive}
-          onCheckedChange={handleChartToggle}
-          className="touch-button"
-        />
+      {/* Playing Mode - Enhanced iOS-style Carousel */}
+      <div className="space-y-3">
+        <Label className="text-xl font-semibold text-foreground">Playing Mode</Label>
+        <div className="relative h-48 overflow-hidden -mx-4"> {/* Fixed height container, extends beyond parent padding */}
+          <div 
+            ref={carouselRef}
+            className="absolute inset-0"
+            style={{ touchAction: 'pan-y' }}
+            onTouchStart={onCarouselStart}
+            onTouchMove={onCarouselMove}
+            onTouchEnd={onCarouselEnd}
+            onMouseDown={onCarouselStart}
+            onMouseMove={onCarouselMove}
+            onMouseUp={onCarouselEnd}
+          >
+            <div 
+              className="flex h-full"
+              style={{ 
+                transform: `translateX(calc(${chartModeActive ? '7%' : '-27%'} + ${dragOffset}px))`,
+                width: '200%',
+                transition: isAnimating || carouselActiveRef.current ? 'none' : 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              }}
+            >
+              {/* Billboard Mode Card */}
+              <div 
+                className="flex-shrink-0 flex flex-col justify-center"
+                style={{ width: '35%', paddingLeft: '16px', paddingRight: '8px' }}
+                onClick={() => !carouselActiveRef.current && handlePlayingModeChange(true)}
+              >
+                <div className="space-y-3">
+                  <div className={`
+                    relative h-32 rounded-xl border-2 overflow-hidden cursor-pointer
+                    transition-all duration-300 ease-out
+                    ${chartModeActive 
+                      ? 'border-primary shadow-xl scale-105 opacity-100' 
+                      : 'border-border shadow-md scale-95 opacity-80'
+                    }
+                  `}>
+                    <img 
+                      src="/img/spotify-mode.png" 
+                      alt="Billboard Mode"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="text-center px-2">
+                    <h3 className={`font-semibold text-sm transition-colors duration-200 ${
+                      chartModeActive ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
+                      Billboard Mode
+                    </h3>
+                    <p className="text-muted-foreground text-xs mt-1">Chart hits & classics</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Spotify Mode Card */}
+              <div 
+                className="flex-shrink-0 flex flex-col justify-center"
+                style={{ width: '35%', paddingLeft: '8px', paddingRight: '16px' }}
+                onClick={() => !carouselActiveRef.current && handlePlayingModeChange(false)}
+              >
+                <div className="space-y-3">
+                  <div className={`
+                    relative h-32 rounded-xl border-2 overflow-hidden cursor-pointer
+                    transition-all duration-300 ease-out
+                    ${!chartModeActive 
+                      ? 'border-primary shadow-xl scale-105 opacity-100' 
+                      : 'border-border shadow-md scale-95 opacity-80'
+                    }
+                  `}>
+                    <img 
+                      src="/img/billboard-mode.png" 
+                      alt="Spotify Mode"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="text-center px-2">
+                    <h3 className={`font-semibold text-sm transition-colors duration-200 ${
+                      !chartModeActive ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
+                      Spotify Mode
+                    </h3>
+                    <p className="text-muted-foreground text-xs mt-1">Discovery & variety</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <p className="text-sm text-muted-foreground mt-2 text-center">
-        Use Billboard Hot 100 charts instead of Spotify discovery
-      </p>
 
       {/* Difficulty */}
       <div className="space-y-3">

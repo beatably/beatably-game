@@ -82,8 +82,25 @@ const SessionRestore = ({
           {sessionData.players && sessionData.players.length > 0 && (
             <button
               onClick={() => setShowDetails(!showDetails)}
-              className="text-foreground underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none mt-2"
+              aria-expanded={showDetails}
+              className="inline-link-button flex items-center text-foreground text-sm font-semibold p-2 -m-2 hover:text-foreground/80 focus:outline-none mt-2"
             >
+              <svg
+                className="w-4 h-4 text-muted-foreground mr-2"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                <path d="M16 3.13a4 4 0 010 7.75" />
+              </svg>
               {showDetails ? 'Hide' : 'Show'} player details
             </button>
           )}
@@ -113,14 +130,14 @@ const SessionRestore = ({
           <button
             onClick={onDecline}
             disabled={isRestoring}
-            className="flex-1 h-12 border border-border bg-transparent text-foreground rounded-md font-semibold touch-button disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 h-12 flex items-center justify-center px-4 whitespace-nowrap border border-border bg-transparent text-foreground rounded-md font-semibold touch-button disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Start New Game
+            New Game
           </button>
           <button
             onClick={onRestore}
             disabled={isRestoring}
-            className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md font-semibold touch-button disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center"
+            className="flex-1 h-12 flex items-center justify-center px-4 whitespace-nowrap bg-primary hover:bg-primary/90 text-primary-foreground rounded-md font-semibold touch-button disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isRestoring ? (
               <>

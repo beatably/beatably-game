@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import beatablyLogo from "./assets/beatably_logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,15 @@ function Landing({ onCreate, onJoin }) {
   const [joinCode, setJoinCode] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
+
+  const firstCodeRef = useRef(null);
+
+  useEffect(() => {
+    if (joining) {
+      // Focus the first code input when the join view appears
+      firstCodeRef.current?.focus();
+    }
+  }, [joining]);
 
   const handleCreate = () => {
     if (!name.trim()) {
@@ -133,6 +142,7 @@ function Landing({ onCreate, onJoin }) {
                 {joinCode.map((digit, index) => (
                   <Input
                     key={index}
+                    ref={index === 0 ? firstCodeRef : null}
                     id={`code-${index}`}
                     className="bg-input border-border text-foreground text-center h-12 w-12 text-lg focus:ring-primary"
                     value={digit}

@@ -6,6 +6,15 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+
+  useEffect(() => {
+    // When modal opens and devices are loaded, default to the active device or first device
+    if (isOpen && devices && devices.length > 0) {
+      const active = devices.find(d => d.is_active);
+      setSelectedDeviceId(active ? active.id : devices[0].id);
+    }
+  }, [isOpen, devices]);
 
   useEffect(() => {
     if (isOpen) {
@@ -205,49 +214,73 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
 
         {!loading && !error && devices.length > 0 && (
           <div className="space-y-2">
-            {devices.map((device) => (
-              <div key={device.id} className="p-1">
-                <div className="flex items-center justify-between gap-2">
+            <div role="radiogroup" aria-label="Available devices" className="space-y-2">
+              {devices.map((device) => (
+                <div key={device.id} className="p-0">
                   <button
-                    onClick={() => transferPlayback(device.id)}
-                    className={`flex-1 text-left rounded-md setting-button touch-button h-12 px-3 ${
-                      device.is_active
-                        ? 'bg-primary text-primary-foreground border border-primary/20'
-                        : 'bg-input text-foreground border border-border hover:bg-input/90'
-                    }`}
+                    type="button"
+                    onClick={() => setSelectedDeviceId(device.id)}
+                    role="radio"
+                    aria-checked={selectedDeviceId === device.id}
+                    className="w-full flex items-center justify-between h-12 px-4 touch-button border-b border-border bg-transparent focus:outline-none"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-foreground">{device.name}</div>
-                        <div className="text-sm text-muted-foreground">{device.type}</div>
-                      </div>
+                    <div className={`flex items-center gap-3 ${selectedDeviceId === device.id ? 'font-semibold text-foreground' : 'text-foreground'}`}>
+                      <span className="sr-only">{selectedDeviceId === device.id ? 'Selected' : 'Not selected'}</span>
+                      <div className="font-medium">{device.name}</div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
                       {device.is_active && (
                         <div className="text-sm bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded border border-primary/20">
-                          ✓ Active
+                          Active
                         </div>
+                      )}
+                      {selectedDeviceId === device.id ? (
+                        <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                          <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : (
+                        <div className="w-5 h-5" aria-hidden />
                       )}
                     </div>
                   </button>
-
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
         <div className="mt-4 pt-6">
-          <button
-            onClick={fetchDevices}
-            className="w-full h-12 flex items-center justify-center border border-border bg-transparent text-foreground rounded-md font-semibold touch-button"
-          >
-            Refresh Devices
-          </button>
-          <button
-            onClick={onClose}
-            className="w-full h-12 flex items-center justify-center mt-3 border border-border bg-transparent text-foreground rounded-md font-semibold touch-button"
-          >
-            Close
-          </button>
+          <div className="flex justify-center">
+            <a
+              href="#refresh"
+              onClick={(e) => { e.preventDefault(); fetchDevices(); }}
+              role="button"
+              className="inline-link-button flex items-center text-foreground text-sm font-semibold p-2 -m-2 hover:text-foreground/80 focus:outline-none"
+            >
+              <svg className="w-4 h-4 text-muted-foreground mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 12a9 9 0 1 1-3-6.708"/>
+                <path d="M21 3v6h-6"/>
+              </svg>
+              Refresh Devices
+            </a>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              onClick={onClose}
+              className="h-12 w-full border border-border bg-transparent text-foreground rounded-md font-semibold touch-button"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => transferPlayback(selectedDeviceId)}
+              disabled={!selectedDeviceId}
+              className={`h-12 w-full rounded-md font-semibold touch-button ${selectedDeviceId ? 'bg-primary text-primary-foreground' : 'bg-input text-muted-foreground cursor-not-allowed'}`}
+            >
+              Confirm
+            </button>
+          </div>
         </div>
       </div>
     </div>

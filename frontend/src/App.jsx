@@ -2325,13 +2325,13 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="min-h-screen bg-background text-white flex flex-col">
+        <div className="min-h-screen bg- text-white flex flex-col">
           <PlayerHeader 
             players={players} 
             currentPlayerId={currentPlayerId} 
             tokenAnimations={tokenAnimations}
           />
-          <div className="sticky hidden top-0 z-20 bg-gray-900 bg-opacity-95  py-3 md:py-4 px-1">
+          <div className="sticky hidden top-0 z-20 bg-background bg-opacity-95  py-3 md:py-4 px-1">
             <h1 className="text-lg md:text-xl font-semibold text-center">
               {isMyTurn
                 ? "Your turn"

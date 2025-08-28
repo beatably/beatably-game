@@ -127,24 +127,29 @@ Example CSS utilities (already included):
 
 ## 6) Buttons & CTAs
 
-Primary CTA (use only green):
+Primary CTA (use only green). Guidance to avoid text wrapping and ensure parity across views:
 ```jsx
-<Button className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button">
-  Primary Action
+{/* Use h-12 (48px), horizontal padding, prevent wrapping, and center content */}
+<Button className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2">
+  <span>Primary Action</span>
 </Button>
 ```
 
-Secondary (outline):
+Secondary (outline). Match height and padding to primary so buttons appear consistent across screens:
 ```jsx
-<Button variant="outline" className="w-full h-12 font-semibold touch-button">
+<Button variant="outline" className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2">
   Secondary Action
 </Button>
 ```
 
 Spec:
-- Height: h-12 (48px) for main page CTAs.
+- Height: h-12 (48px) for main page CTAs and page-level secondary buttons to keep visual parity.
+- Horizontal padding: use `px-4` on button containers (prevents tight text and keeps consistent visual rhythm).
+- Text wrapping: apply `whitespace-nowrap` to prevent label wrapping; if a label must be longer, prefer a shorter label or adjust layout rather than wrapping.
+- Content layout: prefer `flex items-center justify-center gap-2` inside buttons so icons + text align consistently.
 - Weight: `font-semibold` for readability and prominence.
 - DO NOT use purple for CTAs. Purple is for accents only.
+- When using icon-only buttons, still maintain accessible hit area by applying `p-2 -m-2` on the button element (visual small, touch area ≥44px).
 
 ---
 
