@@ -120,7 +120,7 @@ function Landing({ onCreate, onJoin }) {
               disabled={!name.trim()}
               onClick={handleCreate}
             >
-              Create a new game
+              Create new game
             </Button>
 
             {/* Secondary: Reveal join with code */}
@@ -130,7 +130,7 @@ function Landing({ onCreate, onJoin }) {
               disabled={!name.trim()}
               onClick={handleStartJoin}
             >
-              Join existing game with a code
+              Join game with code
             </Button>
           </>
         ) : (
