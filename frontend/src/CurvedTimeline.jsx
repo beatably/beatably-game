@@ -294,44 +294,7 @@ const CurvedTimeline = ({
       mainPath += ` L ${lastNode.x} ${lastNode.y}`;
     }
     
-    // Add continuation lines from each node
-    nodes.forEach((node, index) => {
-      if (index < nodes.length - 1) {
-        const nextNode = nodes[index + 1];
-        const dx = nextNode.x - node.x;
-        const dy = nextNode.y - node.y;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        
-        if (length > 0) {
-          const unitX = dx / length;
-          const unitY = dy / length;
-          
-          // Continuation line for better visibility (20px)
-          const lineEndX = node.x + unitX * 20;
-          const lineEndY = node.y + unitY * 20;
-          
-          continuationPaths.push(`M ${node.x} ${node.y} L ${lineEndX} ${lineEndY}`);
-        }
-      } else {
-        // For the last node, add a fading extension line
-        let extensionX, extensionY;
-        
-        if (index > 0) {
-          const prevNode = nodes[index - 1];
-          const direction = node.x > prevNode.x ? 1 : -1;
-          extensionX = node.x + (direction * 60);
-          extensionY = node.y;
-        } else {
-          extensionX = node.x + 60;
-          extensionY = node.y;
-        }
-        
-        continuationPaths.push({
-          path: `M ${node.x} ${node.y} L ${extensionX} ${extensionY}`,
-          fading: true
-        });
-      }
-    });
+    // Removed all continuation lines from nodes
     
     return { mainPath, continuationPaths };
   }, [timelineLayout]);
@@ -372,11 +335,11 @@ const CurvedTimeline = ({
     return 'normal';
   };
 
-  // Check if a node should be disabled during challenge
+  // Check if a node should be disabled during challenge or challenge-window
   const isNodeDisabled = (nodeIndex) => {
-    if (phase !== 'challenge' || !challenge || !lastPlaced) return false;
+    if ((phase !== 'challenge' && phase !== 'challenge-window') || !lastPlaced) return false;
     
-    // During challenge, disable the node where the original card was placed
+    // During challenge or challenge-window, disable the node where the original card was placed
     // Find the original card's position in the timeline
     const originalCardIndex = timeline.findIndex(card => card.id === lastPlaced.id);
     if (originalCardIndex >= 0) {
@@ -430,6 +393,18 @@ const CurvedTimeline = ({
     }
     // Show years for all other confirmed cards
     return true;
+  };
+
+  // Helper function to check if we should show node labels (only for single year scenario)
+  const shouldShowNodeLabels = () => {
+    const confirmedYears = timelineLayout.filter(item => item.type === 'year');
+    return confirmedYears.length === 1 && (phase === 'player-turn' || phase === 'challenge');
+  };
+
+  // Get the single year value for labels
+  const getSingleYearValue = () => {
+    const confirmedYears = timelineLayout.filter(item => item.type === 'year');
+    return confirmedYears.length === 1 ? confirmedYears[0].card.year : null;
   };
 
   return (
@@ -526,7 +501,7 @@ const CurvedTimeline = ({
                 <div
                   className={`w-6 h-6 rounded-full border-2 transition-all duration-200 ${
                     nodeDisabled
-                      ? 'bg-green-500 border-green-400 shadow-lg shadow-green-500/50'
+                      ? 'bg-green-500 border-green-400 shadow-lg shadow-green-500/50 opacity-70'
                       : nodeState === 'selected'
                       ? 'bg-green-500 border-green-400 shadow-lg shadow-green-500/50'
                       : nodeState === 'hovered'
@@ -545,6 +520,15 @@ const CurvedTimeline = ({
                 {/* Selection indicator - only show flashing for non-disabled selected nodes */}
                 {nodeState === 'selected' && !nodeDisabled && (
                   <div className="absolute inset-0 rounded-full border-2 border-green-300 animate-ping opacity-75" />
+                )}
+                
+                {/* Node labels for single year scenario */}
+                {shouldShowNodeLabels() && (
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 pointer-events-none">
+                    <div className=" text-gray-500 text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                      {item.index === 0 ? `← before` : `after →`}
+                    </div>
+                  </div>
                 )}
               </div>
             );

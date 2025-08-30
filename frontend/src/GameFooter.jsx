@@ -774,16 +774,17 @@ function GameFooter({
           </div>
           <div className="flex gap-2 justify-center">
             <button 
-              onClick={() => onChallengeResponse(true)}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground rounded"
-            >
-              Accept (Remove card)
-            </button>
-            <button 
               onClick={() => onChallengeResponse(false)}
-              className="px-4 py-2 bg-input hover:bg-input/90 text-foreground rounded"
+              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+              style={{ background: 'transparent' }}
             >
               Reject (Keep card)
+            </button>
+            <button 
+              onClick={() => onChallengeResponse(true)}
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+            >
+              Accept (Remove card)
             </button>
           </div>
         </div>
@@ -792,34 +793,38 @@ function GameFooter({
       {/* Song guessing modal */}
       {showSongGuess && (
         <div className="w-full max-w-md p-3 rounded bg-none mb-2">
-          <div className="text-white font-bold mb-4 text-center">Guess the song for bonus tokens!</div>
+          <div className="text-white mb-4 text-center">Both title and artist must be correct for the bonus!</div>
           <div className="space-y-3">
             <input
               type="text"
               placeholder="Song title"
               value={songTitle}
               onChange={(e) => setSongTitle(e.target.value)}
-              className="w-full p-2 rounded border-border border-2 bg-input text-foreground"
+              className="bg-input border-border text-foreground h-11 focus:ring-primary w-full rounded-md border px-3 py-2"
             />
             <input
               type="text"
               placeholder="Artist"
               value={songArtist}
               onChange={(e) => setSongArtist(e.target.value)}
-              className="w-full p-2 rounded border-gray-700 border-2 bg-gray-800 text-white"
+              className="bg-input border-border text-foreground h-11 focus:ring-primary w-full rounded-md border px-3 py-2"
             />
             <div className="flex justify-center gap-2 pt-2">
               <button 
-                onClick={handleSongGuess}
-                className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground rounded"
+                onClick={() => {
+                  setShowSongGuess(false);
+                  onSkipSongGuess();
+                }}
+                className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                style={{ background: 'transparent' }}
               >
-                Submit Guess
+                Skip
               </button>
               <button 
-                onClick={() => setShowSongGuess(false)}
-                className="px-4 py-2 bg-input hover:bg-input/90 text-foreground rounded"
+                onClick={handleSongGuess}
+                className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
               >
-                Cancel
+                Submit Guess
               </button>
             </div>
           </div>
@@ -850,21 +855,22 @@ function GameFooter({
 
 
       {/* Song guess section - only for current player */}
-      {phase === 'song-guess' && isMyTurn && (
+      {phase === 'song-guess' && isMyTurn && !showSongGuess && (
         <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
-          <div className="text-white font-bold mb-4">
+          <div className="text-white mb-8">
             Do you want to guess the song for bonus tokens?
           </div>
           <div className="flex gap-2 justify-center">
             <button 
               onClick={() => setShowSongGuess(true)}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground text-sm rounded"
+              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+              style={{ background: 'transparent' }}
             >
               Guess Song
             </button>
             <button 
               onClick={() => onSkipSongGuess()}
-              className="px-4 py-2 bg-input hover:bg-input/90 text-foreground text-sm rounded"
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
             >
               Skip
             </button>
@@ -875,7 +881,7 @@ function GameFooter({
       {/* Song guess section - waiting for current player */}
       {phase === 'song-guess' && !isMyTurn && (
         <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
-          <div className="text-white font-bold mb-4">
+          <div className="text-white mb-4">
             {players?.find(p => p.id === currentPlayerId)?.name} is deciding whether to guess the song...
           </div>
         </div>
@@ -897,20 +903,21 @@ function GameFooter({
         }
         return (
           <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
-            <div className="text-white font-bold mb-2">
+            <div className="text-white font-bold mb-8">
               Other players can now challenge.
             </div>
             {!isMyTurn && myPlayer && myPlayer.tokens > 0 && !hasResponded ? (
               <div className="flex gap-2 justify-center">
                 <button 
                   onClick={() => onInitiateChallenge()}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+                  className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                  style={{ background: 'transparent' }}
                 >
                   Challenge (1 token)
                 </button>
                 <button 
                   onClick={() => onSkipChallenge()}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded"
+                  className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
                 >
                   Skip
                 </button>
@@ -920,7 +927,7 @@ function GameFooter({
                 <div className="text-white text-sm">No tokens to challenge</div>
                 <button 
                   onClick={() => onSkipChallenge()}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded"
+                  className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
                 >
                   OK
                 </button>
@@ -938,16 +945,21 @@ function GameFooter({
 
       {/* Challenge in progress section */}
       {phase === 'challenge' && challenge && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+        <div className="w-full max-w-md p-3 rounded bg-none mb-8 text-center">
           <div className="text-white font-bold mb-2">
-            {players?.find(p => p.id === challenge.challengerId)?.name} is challenging the placement!
-          </div>
-          <div className="text-white text-sm">
             {challenge.challengerId === myPlayerId ? 
-              "Place the card where you think it belongs" : 
-              "Waiting for challenger to place the card..."
+              "You are challenging the placement!" : 
+              `${players?.find(p => p.id === challenge.challengerId)?.name} is challenging the placement!`
             }
           </div>
+          {pendingDropIndex === null && (
+            <div className="text-white text-sm">
+              {challenge.challengerId === myPlayerId ? 
+                "Select a place on timeline where you think the song belongs" : 
+                "Waiting for challenger to place their guess..."
+              }
+            </div>
+          )}
         </div>
       )}
 
@@ -957,19 +969,19 @@ function GameFooter({
           <div className="text-white font-bold">
             Challenge Complete!
           </div>
-          <div className="text-white text-sm mb-4">
+          <div className="text-white text-sm mb-8">
             {challenge.result?.challengeWon ? 
               `${players?.find(p => p.id === challenge.challengerId)?.name} won the challenge!` :
               challenge.result?.originalCorrect ?
                 `${players?.find(p => p.id === challenge.originalPlayerId)?.name} placed it correctly!` :
                 challenge.result?.challengerCorrect ?
                   `${players?.find(p => p.id === challenge.challengerId)?.name} placed it correctly, but ${players?.find(p => p.id === challenge.originalPlayerId)?.name} went first!` :
-                  `Both players placed it incorrectly! No one gets the card.`
+                  `Both players placed it incorrectly! No one gets the year.`
             }
           </div>
           <button 
             onClick={onContinueAfterChallenge}
-            className="px-6 py-2 bg-primary hover:bg-primary/90 text-foreground text-sm rounded mt-3"
+            className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button mt-3"
           >
             Continue to Next Turn
           </button>
@@ -983,21 +995,22 @@ function GameFooter({
       {/* Pending drop confirmation section */}
       {pendingDropIndex !== null && isMyTurn && (
         <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
-          <div className="text-white font-bold mb-4">
-            Confirm placement at position {pendingDropIndex + 1}
+          <div className="text-white mb-8">
+            You have now selected a place on the timeline.
           </div>
           <div className="flex gap-2 justify-center">
             <button 
-              onClick={onConfirmDrop}
-              className="px-6 py-2 bg-primary hover:bg-primary/90 text-foreground rounded"
-            >
-              Confirm Placement
-            </button>
-            <button 
               onClick={onCancelDrop}
-              className="px-6 py-2 bg-destructive hover:bg-destructive/90 text-foreground rounded"
+              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+              style={{ background: 'transparent' }}
             >
               Cancel
+            </button>
+            <button 
+              onClick={onConfirmDrop}
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+            >
+              Confirm Placement
             </button>
           </div>
         </div>
@@ -1007,37 +1020,37 @@ function GameFooter({
       <div className="w-full max-w-md flex flex-col items-center">
         {showFeedback && feedback ? (
           <div className="w-full p-3 rounded text-center bg-none mb-2">
-            <div className={`${feedback.correct ? "text-primary" : "text-destructive"} font-bold text-lg md:text-2xl mb-4`}>
-              {feedback.correct ? "Correct!" : "Incorrect."}
+            <div className="font-bold mb-4">
+              {feedback.correct ? "Yay, your answer is correct!" : "Wrong answer!"}
             </div>
             
             {/* Continue button - only creator can click */}
             {isCreator ? (
               <button 
-                className="mt-3 px-6 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded" 
+                className="mt-3 w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button" 
                 onClick={handleContinueClick}
               >
                 Continue to Next Turn
               </button>
             ) : (
-              <div className="mt-3 px-6 py-2 text-white rounded font-bold">
+              <div className="mt-3 px-6 py-2 text-white rounded">
                 Waiting for host to start next turn...
               </div>
             )}
           </div>
         ) : currentCard && phase === 'player-turn' && pendingDropIndex === null ? (
           <div className="w-full p-2 md:p-4 rounded text-center bg-none mb-1">
-            <div className="text-foreground text-md md:text-2xl font-bold">
-              {isMyTurn ? "Place this card in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}
+            <div className="text-foreground text-md md:text-2xl font-bold mb-1">
+              {isMyTurn ? "Select a place in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}
             </div>
             
             {/* New Song button - only for current player with tokens */}
             {isMyTurn && myPlayer && myPlayer.tokens > 0 && (
               <div className="flex flex-col items-center">
-                <div className="text-gray-300 text-sm mb-4">You can pay 1 token to get another song</div>
+                <div className="text-gray-300 text-sm mb-8">You can pay 1 token to get another song</div>
                 <button 
                   onClick={() => handleTokenAction('skip_song')}
-                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-foreground rounded-md text-sm"
+                  className="h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
                 >
                   New Song (1 token)
                 </button>

@@ -2314,6 +2314,25 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       ? (players.find((p) => p.id === currentPlayerId)?.name || "Unknown")
       : "Unknown";
     
+    // During challenge phase, we need to show the original timeline owner's name
+    // instead of the challenger's name
+    const timelineOwnerName = (() => {
+      if (phase === 'challenge' && challenge) {
+        // Try targetId first
+        if (challenge.targetId) {
+          const targetPlayer = players.find(p => p.id === challenge.targetId);
+          return targetPlayer?.name || "Unknown";
+        }
+        // Try originalPlayerId as fallback
+        if (challenge.originalPlayerId) {
+          const originalPlayer = players.find(p => p.id === challenge.originalPlayerId);
+          return originalPlayer?.name || "Unknown";
+        }
+      }
+      // For all other phases, use the current player name
+      return currentPlayerName;
+    })();
+    
     console.log("[App] Render game view:", {
       myId: socketRef.current?.id,
       currentPlayerId,
@@ -2369,7 +2388,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               onDragStateChange={setIsDragging}
               pendingDropIndex={pendingDropIndex}
               onPendingDrop={handlePendingDrop}
-              currentPlayerName={currentPlayerName}
+              currentPlayerName={timelineOwnerName}
             />
           </div>
           <GameFooter
