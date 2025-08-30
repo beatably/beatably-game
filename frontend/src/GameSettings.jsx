@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from './config';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import SongDebugPanel from './SongDebugPanel';
 
 function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
@@ -681,8 +683,7 @@ function GameSettings({ settings, onUpdate }) {
 
       {/* Reset to Defaults (inline text action) */}
       <div className="flex justify-center">
-        <a
-          href="#reset"
+        <button
           onClick={(e) => {
             e.preventDefault();
             const defaultSettings = {
@@ -699,12 +700,11 @@ function GameSettings({ settings, onUpdate }) {
             setUseChartMode(false);
             onUpdate(defaultSettings);
           }}
-          role="button"
-          className="inline-link-button"
           aria-label="Reset settings to defaults"
+          className="text-foreground underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none"
         >
           <svg
-            className="w-4 h-4 text-muted-foreground"
+            className="w-4 h-4 text-muted-foreground mr-2 inline"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -712,14 +712,64 @@ function GameSettings({ settings, onUpdate }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             xmlns="http://www.w3.org/2000/svg"
-            aria-hidden
+            aria-hidden="true"
           >
             <path d="M21 12a9 9 0 1 1-3-6.708" />
             <path d="M21 3v6h-6" />
           </svg>
           Reset
-        </a>
+        </button>
       </div>
+
+      {/* Debug Panel Link (inline text action) */}
+      <div className="flex justify-center">
+        <button
+          onClick={() => setShowDebugPanel(true)}
+          aria-label="Open debug panel"
+          className="text-foreground underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none"
+        >
+          <svg
+            className="w-4 h-4 text-muted-foreground mr-2 inline"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path d="M12 2v20" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          Debug Panel
+        </button>
+      </div>
+
+      {/* Show Song List Toggle */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-xl font-semibold text-foreground">Show Song List</Label>
+            <p className="text-sm text-muted-foreground mt-1">Display song list during gameplay</p>
+          </div>
+          <Switch
+            checked={showSongsButton}
+            onCheckedChange={(checked) => {
+              setShowSongsButton(checked);
+              localStorage.setItem('showSongsButton', checked.toString());
+            }}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+      </div>
+
+      {/* Song Debug Panel */}
+      <SongDebugPanel
+        roomCode={null}
+        isVisible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+      />
     </div>
   );
 }

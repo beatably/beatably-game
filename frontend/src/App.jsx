@@ -2615,10 +2615,10 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           {showDebugButton && (
             <button
               onClick={() => setShowDebugPanel(!showDebugPanel)}
-              className="fixed bottom-4 right-4 bg-yellow-600 hover:bg-yellow-500 text-white p-2 rounded-full shadow-lg z-40 text-xs font-medium"
+              className="fixed top-20 right-4 bg-gray-600 hover:bg-gray-500 text-white p-1 rounded-full shadow-lg z-40 text-xl font-medium"
               title="Toggle Song Debug Panel (Ctrl+D / Cmd+D)"
             >
-              🐛
+              🎸
             </button>
           )}
 
