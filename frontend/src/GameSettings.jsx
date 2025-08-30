@@ -523,7 +523,7 @@ function GameSettings({ settings, onUpdate }) {
                     }
                   `}>
                     <img 
-                      src="/img/spotify-mode.jpg" 
+                      src="/img/billboard-mode.jpg" 
                       alt="Billboard Mode"
                       className="w-full h-full object-cover"
                     />
@@ -555,7 +555,7 @@ function GameSettings({ settings, onUpdate }) {
                     }
                   `}>
                     <img 
-                      src="/img/billboard-mode.jpg" 
+                      src="/img/spotify-mode.jpg" 
                       alt="Spotify Mode"
                       className="w-full h-full object-cover"
                     />

@@ -137,7 +137,7 @@ Primary CTA (use only green). Guidance to avoid text wrapping and ensure parity 
 
 Secondary (outline). Match height and padding to primary so buttons appear consistent across screens:
 ```jsx
-<Button variant="outline" className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2">
+<Button variant="outline" className="w-full h-12 px-4 border border-border bg-transparent hover:bg-input font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2">
   Secondary Action
 </Button>
 ```

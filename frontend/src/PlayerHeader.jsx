@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import beatablyLogo from "./assets/beatably_logo.png";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 const CoinIcon = ({ className = "" }) => (
   <span className={`inline-block w-3 h-3 align-middle ${className}`}>
@@ -28,9 +31,10 @@ function TokenStack({ count }) {
   );
 }
 
-function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
+function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreator, onRestart, onExit }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [animatingTokens, setAnimatingTokens] = useState({});
+  const [isRestarting, setIsRestarting] = useState(false);
 
   // Handle token animations
   useEffect(() => {
@@ -50,14 +54,25 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
     });
   }, [tokenAnimations, animatingTokens]);
 
-  const handleRestart = () => {
-    alert("Game restarted.");
-    window.location.reload();
+  const handleRestart = async () => {
+    setMenuOpen(false);
+    if (onRestart) {
+      setIsRestarting(true);
+      try {
+        await onRestart();
+      } catch (error) {
+        console.error('Error restarting game:', error);
+      } finally {
+        setIsRestarting(false);
+      }
+    }
   };
 
   const handleExit = () => {
-    alert("Exiting to lobby.");
-    window.location.href = "/lobby";
+    setMenuOpen(false);
+    if (onExit) {
+      onExit();
+    }
   };
 
   return (
@@ -101,42 +116,82 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {} }) {
             </svg>
           </button>
           
-          {/* Modal overlay */}
-          {menuOpen && (
+          {/* Modal overlay - rendered via portal */}
+          {menuOpen && createPortal(
             <>
               {/* Background overlay */}
               <div 
-                className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                className="fixed inset-0 bg-black bg-opacity-50"
+                style={{ zIndex: 9999 }}
                 onClick={() => setMenuOpen(false)}
               />
               
               {/* Modal content */}
-              <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-                <div className="bg-card rounded-lg mobile-shadow p-6 w-full max-w-sm">
-                  <div className="space-y-3">
-                    <button 
-                      onClick={players.length > 0 && players[0].id === currentPlayerId ? handleRestart : undefined} 
-                      className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${players.length > 0 && players[0].id === currentPlayerId ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground' : 'border border-border text-muted-foreground cursor-not-allowed bg-transparent'}`}
-                      disabled={!(players.length > 0 && players[0].id === currentPlayerId)}
+              <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+                <Card className="bg-card border-border mobile-shadow container-card w-full max-w-sm">
+                  <CardContent className="p-6">
+                    <div className="space-y-3">
+                      <Button
+                        onClick={isCreator ? handleRestart : undefined}
+                        disabled={!isCreator}
+                        className={`w-full h-12 px-4 font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button ${
+                          isCreator 
+                            ? 'bg-primary hover:bg-primary/90 text-primary-foreground' 
+                            : 'border border-border text-muted-foreground cursor-not-allowed bg-transparent'
+                        }`}
+                        variant={isCreator ? "default" : "outline"}
+                      >
+                        Restart Game
+                      </Button>
+                      <Button
+                        onClick={handleExit}
+                        variant="outline"
+                        className="w-full h-12 px-4 border border-border bg-transparent hover:bg-input font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                      >
+                        Exit to Lobby
+                      </Button>
+                    </div>
+                    <Button
+                      onClick={() => setMenuOpen(false)}
+                      variant="outline"
+                      className="w-full h-12 px-4 mt-6 border border-border bg-transparent hover:bg-input font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
                     >
-                      Restart Game
-                    </button>
-                    <button 
-                      onClick={handleExit} 
-                      className="w-full border border-border bg-background hover:bg-input text-foreground py-3 px-4 rounded-lg font-medium transition-colors"
-                    >
-                      Exit to Lobby
-                    </button>
-                  </div>
-                  <button 
-                    onClick={() => setMenuOpen(false)}
-                    className="w-full mt-6 bg-transparent border border-border hover:bg-input text-foreground py-3 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                      Cancel
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
-            </>
+            </>,
+            document.body
+          )}
+          
+          {/* Restart loading overlay - rendered via portal */}
+          {isRestarting && createPortal(
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center" style={{ zIndex: 10001 }}>
+              <Card className="bg-card border-border mobile-shadow container-card w-full max-w-sm">
+                <CardContent className="p-6 text-center">
+                  <div className="mb-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">Restarting Game</h3>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                        <span>Fetching fresh songs...</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                        <span>Resetting game state...</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                        <span>Starting new game...</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>,
+            document.body
           )}
         </div>
       )}

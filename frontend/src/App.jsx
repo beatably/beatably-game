@@ -997,11 +997,64 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       // Handle being kicked
       socketRef.current.on("kicked", () => {
         alert("You have been kicked from the lobby.");
+        
+        // Clear session data to prevent restore dialogue
+        sessionManager.clearSession();
+        try { 
+          sessionStorage.removeItem(PENDING_RESTORE_KEY); 
+        } catch {}
+        
+        // Reset all state and return to landing
         setView("landing");
         setPlayers([]);
         setRoomCode("");
         setPlayerName("");
         setIsCreator(false);
+        setCurrentPlayerIdx(0);
+        setTimeline([]);
+        setDeck([]);
+        setCurrentCard(null);
+        setFeedback(null);
+        setShowFeedback(false);
+        setPhase('player-turn');
+        setLastPlaced(null);
+        setRemovingId(null);
+        setGameRound(1);
+        setWinner(null);
+        setShowWinnerView(false);
+        joinedRef.current = false;
+      });
+
+      // Handle host leaving
+      socketRef.current.on("host_left", (data) => {
+        console.log("[Socket] Host left:", data);
+        // Clean up session data
+        sessionManager.clearSession();
+        try { 
+          sessionStorage.removeItem(PENDING_RESTORE_KEY); 
+        } catch {}
+        
+        // Show notification to user
+        alert(data.message || "The host has left the game. You will be returned to the lobby.");
+        
+        // Reset state and return to landing
+        setPlayerName("");
+        setRoomCode("");
+        setIsCreator(false);
+        setPlayers([]);
+        setCurrentPlayerIdx(0);
+        setTimeline([]);
+        setDeck([]);
+        setCurrentCard(null);
+        setFeedback(null);
+        setShowFeedback(false);
+        setPhase('player-turn');
+        setLastPlaced(null);
+        setRemovingId(null);
+        setGameRound(1);
+        setWinner(null);
+        setShowWinnerView(false);
+        setView("landing");
         joinedRef.current = false;
       });
       socketRef.current.on("connect_error", (err) => {
@@ -1551,14 +1604,32 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Leave game handler
   const handleLeave = () => {
+    // Clean up session data first (same as handleExitToLobby)
+    sessionManager.clearSession();
+    try { 
+      sessionStorage.removeItem(PENDING_RESTORE_KEY); 
+    } catch {}
+    
     socketRef.current.emit("leave_lobby", { code: roomCode }, () => {
+      // Reset all state and return to landing
       setPlayerName("");
       setRoomCode("");
       setIsCreator(false);
       setPlayers([]);
+      setCurrentPlayerIdx(0);
+      setTimeline([]);
+      setDeck([]);
+      setCurrentCard(null);
+      setFeedback(null);
+      setShowFeedback(false);
+      setPhase('player-turn');
+      setLastPlaced(null);
+      setRemovingId(null);
+      setGameRound(1);
+      setWinner(null);
+      setShowWinnerView(false);
       setView("landing");
       joinedRef.current = false;
-      try { sessionStorage.removeItem(PENDING_RESTORE_KEY); } catch {}
     });
   };
 
@@ -1833,6 +1904,89 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     setLastPlaced(null);
     setRemovingId(null);
     setGameRound(1);
+  };
+
+  // Restart game handler (creator only)
+  const handleRestartGame = async () => {
+    if (!isCreator) return;
+    
+    try {
+      // Reset local game state
+      setShowWinnerView(false);
+      setWinner(null);
+      setTimeline([]);
+      setDeck([]);
+      setCurrentCard(null);
+      setFeedback(null);
+      setShowFeedback(false);
+      setPhase('player-turn');
+      setLastPlaced(null);
+      setRemovingId(null);
+      setGameRound(1);
+      setCurrentPlayerIdx(0);
+      
+      // Start a new game with fresh songs
+      await handleStart();
+    } catch (error) {
+      console.error('[App] Error restarting game:', error);
+      // If restart fails, go back to waiting room
+      setView('waiting');
+      throw error; // Re-throw so PlayerHeader can handle the loading state properly
+    }
+  };
+
+  // Exit to lobby handler
+  const handleExitToLobby = () => {
+    // Clean up game state
+    sessionManager.clearSession();
+    try { 
+      sessionStorage.removeItem(PENDING_RESTORE_KEY); 
+    } catch {}
+    
+    // Leave the current lobby/game
+    if (socketRef.current && roomCode) {
+      socketRef.current.emit("leave_lobby", { code: roomCode }, () => {
+        // Reset all state and return to landing
+        setPlayerName("");
+        setRoomCode("");
+        setIsCreator(false);
+        setPlayers([]);
+        setCurrentPlayerIdx(0);
+        setTimeline([]);
+        setDeck([]);
+        setCurrentCard(null);
+        setFeedback(null);
+        setShowFeedback(false);
+        setPhase('player-turn');
+        setLastPlaced(null);
+        setRemovingId(null);
+        setGameRound(1);
+        setWinner(null);
+        setShowWinnerView(false);
+        setView("landing");
+        joinedRef.current = false;
+      });
+    } else {
+      // If no socket connection, just reset state locally
+      setPlayerName("");
+      setRoomCode("");
+      setIsCreator(false);
+      setPlayers([]);
+      setCurrentPlayerIdx(0);
+      setTimeline([]);
+      setDeck([]);
+      setCurrentCard(null);
+      setFeedback(null);
+      setShowFeedback(false);
+      setPhase('player-turn');
+      setLastPlaced(null);
+      setRemovingId(null);
+      setGameRound(1);
+      setWinner(null);
+      setShowWinnerView(false);
+      setView("landing");
+      joinedRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -2349,6 +2503,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             players={players} 
             currentPlayerId={currentPlayerId} 
             tokenAnimations={tokenAnimations}
+            isCreator={isCreator}
+            onRestart={handleRestartGame}
+            onExit={handleExitToLobby}
           />
           <div className="sticky hidden top-0 z-20 bg-background bg-opacity-95  py-3 md:py-4 px-1">
             <h1 className="text-lg md:text-xl font-semibold text-center">

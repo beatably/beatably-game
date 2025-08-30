@@ -1533,14 +1533,38 @@ io.on('connection', (socket) => {
   socket.on('leave_lobby', ({ code }, callback) => {
     const lobby = lobbies[code];
     if (!lobby) return;
+    
+    // Find the leaving player to check if they're the creator
+    const leavingPlayer = lobby.players.find(p => p.id === socket.id);
+    const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
+    
+    // Remove the leaving player
     lobby.players = lobby.players.filter(p => p.id !== socket.id);
     socket.leave(code);
-    // If creator left or no players left, delete lobby
-    if (lobby.players.length === 0 || lobby.players.every(p => !p.isCreator)) {
+    
+    // If creator left, notify remaining players and clean up
+    if (isCreatorLeaving && lobby.players.length > 0) {
+      // Notify remaining players that host has left
+      io.to(code).emit('host_left', {
+        message: 'The host has left the game. You will be returned to the lobby.',
+        hostName: leavingPlayer.name
+      });
+      
+      // Clean up the lobby after a short delay to allow notification to be received
+      setTimeout(() => {
+        delete lobbies[code];
+        schedulePersist();
+      }, 1000);
+    } else if (lobby.players.length === 0) {
+      // No players left, delete lobby
       delete lobbies[code];
+      schedulePersist();
     } else {
+      // Normal leave, update remaining players
       io.to(code).emit('lobby_update', lobby);
+      schedulePersist();
     }
+    
     callback && callback();
   });
 
@@ -3018,14 +3042,65 @@ io.on('connection', (socket) => {
       const lobby = lobbies[code];
       const wasInLobby = lobby.players.some(p => p.id === socket.id);
       if (wasInLobby) {
+        const leavingPlayer = lobby.players.find(p => p.id === socket.id);
+        const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
+        
         lobby.players = lobby.players.filter(p => p.id !== socket.id);
-        if (lobby.players.length === 0 || lobby.players.every(p => !p.isCreator)) {
+        
+        if (isCreatorLeaving && lobby.players.length > 0) {
+          // Notify remaining players that host has left
+          io.to(code).emit('host_left', {
+            message: 'The host has disconnected. You will be returned to the lobby.',
+            hostName: leavingPlayer.name
+          });
+          
+          // Clean up the lobby after a short delay
+          setTimeout(() => {
+            delete lobbies[code];
+            schedulePersist();
+          }, 1000);
+        } else if (lobby.players.length === 0) {
           delete lobbies[code];
+          schedulePersist();
         } else {
           io.to(code).emit('lobby_update', lobby);
+          schedulePersist();
         }
       }
     }
+    
+    // Also handle games - if host disconnects from an active game
+    for (const code in games) {
+      const game = games[code];
+      const wasInGame = game.players.some(p => p.id === socket.id);
+      if (wasInGame) {
+        const leavingPlayer = game.players.find(p => p.id === socket.id);
+        const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
+        
+        if (isCreatorLeaving && game.players.length > 1) {
+          // Notify remaining players that host has left the game
+          io.to(code).emit('host_left', {
+            message: 'The host has disconnected from the game. You will be returned to the lobby.',
+            hostName: leavingPlayer.name
+          });
+          
+          // Clean up the game after a short delay
+          setTimeout(() => {
+            delete games[code];
+            delete lobbies[code]; // Also clean up associated lobby
+            schedulePersist();
+          }, 1000);
+        } else if (game.players.length === 1) {
+          // Last player left, clean up
+          delete games[code];
+          delete lobbies[code];
+          schedulePersist();
+        }
+        // Note: We don't remove individual players from games like we do lobbies
+        // because games need all players to continue properly
+      }
+    }
+    
     console.log('User disconnected:', socket.id);
   });
 });

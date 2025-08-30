@@ -141,7 +141,7 @@ function WaitingRoom({
             )}
             {!isCreator && (guestSeesLoading || isLoadingExternally || loadingStage > 0) && (
               <div className="mt-4 text-sm text-foreground text-center">
-                Game is preparing…
+                Host is preparing the game…
               </div>
             )}
           </CardContent>

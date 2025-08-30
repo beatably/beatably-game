@@ -250,15 +250,15 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
           </div>
         )}
 
-        <div className="mt-4 pt-6">
+        <div className="mt-4 pt-4">
           <div className="flex justify-center">
             <a
               href="#refresh"
               onClick={(e) => { e.preventDefault(); fetchDevices(); }}
               role="button"
-              className="inline-link-button flex items-center text-foreground text-sm font-semibold p-2 -m-2 hover:text-foreground/80 focus:outline-none"
+              className="inline-link-button flex items-center text-foreground text-sm font-semibold pb-8 -m-2 hover:text-foreground/80 focus:outline-none"
             >
-              <svg className="w-4 h-4 text-muted-foreground mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M21 12a9 9 0 1 1-3-6.708"/>
                 <path d="M21 3v6h-6"/>
               </svg>
