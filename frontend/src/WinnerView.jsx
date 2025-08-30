@@ -33,7 +33,7 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-950 to-black overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black via-[#001F0B] to-black overflow-hidden"
       style={{
         // subtle animated gradient background
         backgroundSize: '400% 400%',
@@ -100,14 +100,14 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
           {winnerData?.name ? `${winnerData.name} wins!` : 'Victory Achieved!'}
         </h1>
 
-        <p className="mt-3 text-base md:text-lg text-gray-300">
+        <p className="mt-3 text-base md:text-lg text-muted-foreground">
           and shows amazing knowledge in music.
         </p>
 
         {players.length > 1 && (
           <div className="mt-6 w-full max-w-xl mx-auto">
-            <h3 className="text-gray-200 font-semibold mb-2">Final Scores</h3>
-            <div className="divide-y divide-gray-700/60 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10">
+            <h3 className="text-foreground font-semibold mb-2">Final Scores</h3>
+            <div className="divide-y divide-border rounded-lg bg-card/20 backdrop-blur-sm border border-border">
               {players
                 .slice()
                 .sort((a, b) => (b.score || 0) - (a.score || 0))
@@ -119,10 +119,10 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
                       className={`flex items-center justify-between px-4 py-3 ${isWinner ? 'bg-yellow-400/10' : ''}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`text-sm font-bold ${index === 0 ? 'text-yellow-300' : 'text-gray-300'}`}>#{index + 1}</span>
-                        <span className={`text-white ${isWinner ? 'font-semibold' : ''}`}>{player.name}</span>
+                        <span className={`text-sm font-bold ${index === 0 ? 'text-yellow-300' : 'text-muted-foreground'}`}>#{index + 1}</span>
+                        <span className={`text-foreground ${isWinner ? 'font-semibold' : ''}`}>{player.name}</span>
                       </div>
-                      <span className="text-gray-300 text-sm">{player.score || 0} cards</span>
+                      <span className="text-muted-foreground text-sm">{player.score || 0} cards</span>
                     </div>
                   );
                 })}
@@ -132,13 +132,13 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
 
         <div className="mt-8 flex items-center gap-3">
           <button
-            className="inline-flex items-center justify-center rounded-md bg-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-400 active:bg-green-700 transition-colors"
+            className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold whitespace-nowrap flex items-center justify-center gap-2 rounded-md focus:ring-primary transition-all duration-200 ease-out active:scale-95"
             onClick={onPlayAgain}
           >
-            Play Again
+            <span>Play Again</span>
           </button>
           <button
-            className="inline-flex items-center justify-center rounded-md bg-gray-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 active:bg-gray-800 transition-colors"
+            className="w-full h-12 px-4 bg-transparent border border-border font-semibold whitespace-nowrap flex items-center justify-center gap-2 rounded-md hover:bg-input hover:text-foreground text-foreground focus:ring-primary transition-all duration-200 ease-out active:scale-95"
             onClick={onReturnToLobby}
           >
             Return to Lobby

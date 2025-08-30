@@ -2369,6 +2369,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               onDragStateChange={setIsDragging}
               pendingDropIndex={pendingDropIndex}
               onPendingDrop={handlePendingDrop}
+              currentPlayerName={currentPlayerName}
             />
           </div>
           <GameFooter

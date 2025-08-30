@@ -3,15 +3,17 @@ import { useDrop } from "react-dnd";
 import DraggableCard from "./DraggableCard";
 import DragArrow from "./DragArrow";
 import CardPlaceholder from "./CardPlaceholder";
+import CurvedTimeline from "./CurvedTimeline";
 import { playClickSound } from "./utils/soundUtils";
 
 const CARD_TYPE = "SONG_CARD";
 
-function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop }) {
+function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
   const [challengePendingIndex, setChallengePendingIndex] = useState(null);
+  const [selectedNodeIndex, setSelectedNodeIndex] = useState(null);
 
   // Notify parent component when drag state changes
   useEffect(() => {
@@ -182,40 +184,56 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     ? "flex flex-col items-center justify-start w-24 order-2 mt-8"
     : "flex flex-col items-center justify-center w-full md:flex-1 order-1 md:order-2 m-6 md:mb-0";
 
+  // Handle node selection
+  const handleNodeSelect = (nodeIndex) => {
+    if (!isMyTurn || (phase !== 'player-turn' && phase !== 'challenge')) return;
+    
+    playClickSound();
+    
+    // Use the existing pending drop system for confirmation
+    onPendingDrop(nodeIndex);
+    setSelectedNodeIndex(nodeIndex);
+  };
+
+  // Reset selected node when it's not the player's turn
+  useEffect(() => {
+    if (!isMyTurn) {
+      setSelectedNodeIndex(null);
+    }
+  }, [isMyTurn]);
+
   // Determine if we should show the draggable card
   const showDraggableCard = isMyTurn && currentCard && !showFeedback && (phase === 'player-turn' || phase === 'challenge') && pendingDropIndex === null;
   
   return (
-    <div className={containerClasses}>
-      {/* Timeline - Always visible regardless of whose turn it is */}
-      <div className={`${timelineClasses} bg-background border-border`}>
-        <div className="text-xs text-muted-foreground mb-1">↑ Older songs</div>
-        {dropZones}
-        <div className="text-xs text-muted-foreground mt-1">↓ Newer songs</div>
+    <div className="w-full h-full flex flex-col">
+      {/* New Curved Timeline */}
+      <div className="flex-1 relative">
+        <CurvedTimeline
+          timeline={timeline}
+          currentCard={currentCard}
+          onNodeSelect={handleNodeSelect}
+          selectedNodeIndex={pendingDropIndex}
+          phase={phase}
+          isMyTurn={isMyTurn}
+          lastPlaced={lastPlaced}
+          challenge={challenge}
+          feedback={feedback}
+          showFeedback={showFeedback}
+          pendingDropIndex={pendingDropIndex}
+          currentPlayerName={currentPlayerName}
+        />
       </div>
       
-      
-      {/* Card container - shows either draggable card or placeholder */}
-      <div className={cardContainerClasses}>
-
-      {/* Arrow - Always visible on mobile, positioned so tip points just right of timeline */}
-      {isMobile && (
-        <DragArrow className="-ml-16 z-10" />
+      {/* Card display area - show current card info */}
+      {currentCard && (
+        <div className="absolute bottom-4 right-4 bg-gray-800 text-white p-3 rounded-lg shadow-lg max-w-xs">
+          <div className="text-sm font-medium">Current Card</div>
+          <div className="text-xs opacity-75 mt-1">
+            {isMyTurn ? 'Select a node on the timeline to place this card' : 'Waiting for other player...'}
+          </div>
+        </div>
       )}
-
-        {showDraggableCard ? (
-          <DraggableCard 
-            card={currentCard} 
-            type={CARD_TYPE} 
-            outline={cardOutline} 
-            setIsDragging={setIsDragging}
-            isNewCard={isLoadingNewSong}
-          />
-        ) : (
-          // Show placeholder when card is not present
-          <CardPlaceholder />
-        )}
-      </div>
     </div>
   );
 }
