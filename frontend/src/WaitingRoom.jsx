@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import GameSettings from "./GameSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ function WaitingRoom({
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0); // 0: idle, 1: fetching, 2: filtering, 3: preparing, 4: done
   const [guestSeesLoading, setGuestSeesLoading] = useState(false); // guests should also see loading while host starts
+  const settingsButtonRef = useRef(null);
   const isCreator = currentPlayer?.isCreator;
   const enoughPlayers = players.length >= 2; // Minimum 2 players, max 4 players
   const tooManyPlayers = players.length > 4;
@@ -160,9 +161,30 @@ function WaitingRoom({
         <div className="space-y-3">
           {isCreator && (
             <Button
+              ref={settingsButtonRef}
               variant="outline"
-              className="w-full h-12 font-semibold touch-button"
-              onClick={() => setShowSettings((s) => !s)}
+              className="w-full h-12 font-semibold touch-button no-focus-outline"
+              onClick={() => {
+                setShowSettings((s) => !s);
+                // Immediately blur after click to prevent focus ring
+                if (settingsButtonRef.current) {
+                  setTimeout(() => {
+                    settingsButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (settingsButtonRef.current) {
+                  settingsButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (settingsButtonRef.current) {
+                  settingsButtonRef.current.blur();
+                }
+              }}
             >
               {showSettings ? "Hide Settings" : "Game Settings"}
             </Button>

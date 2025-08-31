@@ -358,6 +358,46 @@ audio {
   .warning-card {
     @apply rounded-lg border-l-4; /* Left border accent for warnings */
   }
+
+  /* Completely disable focus/outline for touch buttons to prevent persistent highlights */
+  .no-focus-outline {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  .no-focus-outline:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: hsl(var(--border)) !important;
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  .no-focus-outline:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: hsl(var(--border)) !important;
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  .no-focus-outline:active {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: hsl(var(--border)) !important;
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Override hover state that gets stuck on mobile */
+  .no-focus-outline:hover {
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Target mobile devices specifically to prevent stuck hover states */
+  @media (hover: none) and (pointer: coarse) {
+    .no-focus-outline:hover {
+      background-color: hsl(var(--background)) !important;
+    }
+  }
 }
 
 @layer base {
