@@ -12,6 +12,7 @@ import SessionRestore from "./SessionRestore";
 import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
+import viewportManager from "./utils/viewportUtils";
 import './App.css';
 import WinnerView from "./WinnerView";
 import { DndProvider } from 'react-dnd';
@@ -193,6 +194,33 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Spotify authorization renewal state
   const [showSpotifyAuthRenewal, setShowSpotifyAuthRenewal] = useState(false);
   const [authRenewalGameState, setAuthRenewalGameState] = useState(null);
+
+  // Initialize viewport manager for mobile Safari optimizations
+  useEffect(() => {
+    console.log('[App] Initializing viewport manager for mobile Safari optimizations');
+    
+    // Initialize viewport manager
+    viewportManager.init();
+    
+    // Listen for viewport changes to handle toolbar show/hide
+    const cleanup = viewportManager.onViewportChange(({ height, width }) => {
+      console.log('[App] Viewport changed:', { height, width });
+      
+      // Trigger toolbar hide on significant height increases (toolbar hiding)
+      if (viewportManager.isMobileSafari()) {
+        // Small delay to ensure DOM is updated
+        setTimeout(() => {
+          viewportManager.triggerToolbarHide();
+        }, 100);
+      }
+    });
+    
+    // Cleanup on unmount
+    return () => {
+      cleanup();
+      viewportManager.destroy();
+    };
+  }, []);
 
   // Load showDebugButton state from localStorage
   useEffect(() => {
@@ -2441,7 +2469,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="min-h-screen bg- text-white flex flex-col">
+        <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col">
           <PlayerHeader 
             players={players} 
             currentPlayerId={currentPlayerId} 
