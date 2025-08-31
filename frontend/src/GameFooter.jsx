@@ -604,7 +604,10 @@ function GameFooter({
   // Render compact footer during drag operations, but show full interface when pending drop
   if (isDragging && pendingDropIndex === null) {
     return (
-      <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 border-t border-border">
+      <footer 
+      className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 border-t border-border"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 15px)" }}
+    >
         {/* Compact player during drag */}
         <div className="w-full max-w-md flex items-center justify-center py-1">
           {/* Essential controls only */}
@@ -641,7 +644,10 @@ function GameFooter({
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl">
+    <footer 
+      className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 15px)" }}
+    >
       {/* Spotify-style player */}
       <div className="w-full max-w-md flex flex-col items-center">
         <div className="w-full bg-none rounded-2xl shadow-2xl shadow-background p-3 md:p-2 flex flex-col items-center mb-3">
