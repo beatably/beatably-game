@@ -4,11 +4,10 @@ import { API_BASE_URL } from '../config';
 const SpotifyAuthRenewal = ({ 
   isVisible, 
   onRenew, 
-  onDismiss, 
   gameState = null,
   autoRedirect = false 
 }) => {
-  const handleRenewClick = () => {
+  const handleAutoRedirect = () => {
     if (gameState) {
       // Save game state for restoration after auth
       localStorage.setItem('game_state_backup', JSON.stringify({
@@ -31,7 +30,7 @@ const SpotifyAuthRenewal = ({
   React.useEffect(() => {
     if (isVisible && autoRedirect) {
       const timer = setTimeout(() => {
-        handleRenewClick();
+        handleAutoRedirect();
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -40,59 +39,45 @@ const SpotifyAuthRenewal = ({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-600">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 px-6">
+      <div className="bg-card border-border mobile-shadow container-card p-6 w-full max-w-sm">
+        <div className="text-center space-y-6">
+          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
+            <svg className="w-8 h-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">
-            Spotify Authorization Renewed
-          </h2>
-          <p className="text-gray-300 text-sm mb-4">
-            Your Spotify connection has been refreshed and you can continue playing.
-          </p>
+          
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold text-foreground">
+              Spotify Authorization Renewed
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              Your Spotify connection has been refreshed and you can continue playing.
+            </p>
+          </div>
           
           {gameState && (
-            <div className="bg-gray-700 rounded-lg p-3 mb-4">
-              <p className="text-sm text-gray-300">
-                <strong>Room:</strong> {gameState.roomCode}
+            <div className="bg-input rounded-lg p-3 space-y-2">
+              <p className="text-sm text-foreground">
+                <span className="font-semibold">Room:</span> {gameState.roomCode}
               </p>
-              <p className="text-sm text-gray-300">
-                <strong>Player:</strong> {gameState.playerName}
+              <p className="text-sm text-foreground">
+                <span className="font-semibold">Player:</span> {gameState.playerName}
               </p>
               {gameState.view === 'game' && (
-                <p className="text-sm text-gray-300">
-                  <strong>Status:</strong> Game in progress
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Status:</span> Game in progress
                 </p>
               )}
             </div>
           )}
 
           {autoRedirect && (
-            <div className="text-sm text-blue-400 mb-4">
+            <div className="text-sm text-foreground">
               Automatically rejoining game in a few seconds...
             </div>
           )}
-        </div>
-
-        <div className="flex space-x-3">
-          {onDismiss && (
-            <button
-              onClick={onDismiss}
-              className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors"
-            >
-              Continue Without Spotify
-            </button>
-          )}
-          <button
-            onClick={handleRenewClick}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-semibold"
-          >
-            {gameState ? 'Rejoin Game' : 'Continue'}
-          </button>
         </div>
       </div>
     </div>
