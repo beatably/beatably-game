@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import spotifyAuth from './utils/spotifyAuth';
 import deviceDiscoveryService from './utils/deviceDiscovery';
 
-function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
+function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch, currentDeviceId }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -47,10 +47,30 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
           if (resp.ok) {
             const data = await resp.json();
             spotifyApiDevices = data.devices || [];
+          } else {
+            console.warn('[DeviceSwitchModal] Spotify API devices returned:', resp.status, resp.statusText);
           }
         }
+        console.log('[DeviceSwitchModal] Found Spotify API devices:', spotifyApiDevices.length, spotifyApiDevices);
       } catch (e) {
         console.warn('[DeviceSwitchModal] Spotify API devices fetch failed, continuing with other discovery methods', e);
+      }
+
+      // 2) Always include the current web player device if available
+      const currentWebDeviceId = currentDeviceId || localStorage.getItem('spotify_device_id');
+      if (currentWebDeviceId) {
+        const existingWebDevice = spotifyApiDevices.find(d => d.id === currentWebDeviceId);
+        if (!existingWebDevice) {
+          console.log('[DeviceSwitchModal] Adding current web player device:', currentWebDeviceId);
+          spotifyApiDevices.push({
+            id: currentWebDeviceId,
+            name: 'Beatably Game Player (Web)',
+            type: 'Computer',
+            is_active: true, // Assume active since we're using it
+            volume_percent: 50,
+            source: 'current_web_player'
+          });
+        }
       }
 
       // 2) Run local/network discovery (placeholder OR backend-assisted)
@@ -109,6 +129,29 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
 
     const transferPlayback = async (deviceId) => {
     try {
+      // Check if PlayerSync v2 is available
+      if (window.beatablyPlayerSync) {
+        console.log('[DeviceSwitchModal] Using PlayerSync v2 for device transfer');
+        
+        // Check if there's a current song that should continue playing
+        const shouldContinuePlayback = window.__beatablyPendingAutoplay || 
+          (window.currentGameCard && window.currentGameCard.uri);
+        
+        await window.beatablyPlayerSync.transferTo(deviceId, shouldContinuePlayback);
+        
+        // Clear pending autoplay intent since PlayerSync handled it
+        if (window.__beatablyPendingAutoplay) {
+          window.__beatablyPendingAutoplay = false;
+        }
+        
+        onDeviceSwitch(deviceId);
+        onClose();
+        return;
+      }
+
+      // Fallback to legacy transfer logic with enhanced pause-before-transfer
+      console.log('[DeviceSwitchModal] Using legacy transfer logic with pause-before-transfer');
+      
       const tokenValidation = await spotifyAuth.ensureValidToken();
       if (!tokenValidation.valid) {
         // Auto-trigger Spotify re-authentication (no manual button)
@@ -116,42 +159,44 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
         return;
       }
 
-      // Check if there's a current song that should continue playing after device switch
-      const shouldContinuePlayback = window.__beatablyPendingAutoplay || 
-        (window.currentGameCard && window.currentGameCard.uri);
+      // CRITICAL FIX: Always pause before transferring to prevent device switching issues
+      let wasPlayingBeforeTransfer = false;
+      try {
+        // Check current playback state
+        const currentState = await fetch('https://api.spotify.com/v1/me/player', {
+          headers: { 'Authorization': `Bearer ${spotifyAuth.getToken()}` }
+        });
+        
+        if (currentState.ok) {
+          const stateData = await currentState.json();
+          wasPlayingBeforeTransfer = stateData?.is_playing || false;
+          
+          if (wasPlayingBeforeTransfer) {
+            console.log('[DeviceSwitchModal] Music is playing, pausing before transfer...');
+            await fetch('https://api.spotify.com/v1/me/player/pause', {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${spotifyAuth.getToken()}` }
+            });
+            
+            // Wait for pause to take effect
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      } catch (pauseErr) {
+        console.warn('[DeviceSwitchModal] Failed to pause before transfer:', pauseErr);
+        // Continue with transfer anyway
+      }
 
       let success = false;
       try {
-        if (spotifyAuth.verifiedTransferAndPlay && shouldContinuePlayback && window.currentGameCard?.uri) {
-          // Use verified transfer and play with the current song
-          console.log('[DeviceSwitchModal] Using verified transfer+play for current song:', window.currentGameCard.uri);
-          success = await spotifyAuth.verifiedTransferAndPlay(
-            deviceId, 
-            window.currentGameCard.uri, 
-            0,
-            { attempts: 3, delayMs: 350, verifyDelayMs: 250 }
-          );
-        } else {
-          // Standard transfer without forcing playback
-          success = await spotifyAuth.transferPlayback(deviceId, false);
-          
-          // If we should continue playback and have a current song, start it
-          if (success && shouldContinuePlayback && window.currentGameCard?.uri) {
-            setTimeout(async () => {
-              try {
-                await spotifyAuth.verifiedStartPlayback(
-                  deviceId,
-                  window.currentGameCard.uri,
-                  0,
-                  { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 4, verifyDelayMs: 250 }
-                );
-                console.log('[DeviceSwitchModal] Started playback on new device after transfer');
-              } catch (e) {
-                console.warn('[DeviceSwitchModal] Failed to start playback after transfer:', e);
-              }
-            }, 300);
-          }
-        }
+        // SIMPLIFIED: Always use standard transfer without autoplay
+        // Users can manually press play after switching devices
+        console.log('[DeviceSwitchModal] Performing standard transfer to device:', deviceId);
+        success = await spotifyAuth.transferPlayback(deviceId, false);
+        
+        // Don't attempt to resume playback - let users manually start playback
+        console.log('[DeviceSwitchModal] Transfer completed, user can manually start playback');
+        
       } catch (flowErr) {
         console.warn('[DeviceSwitchModal] transfer flow error, falling back to simple transfer:', flowErr);
         try {
@@ -208,7 +253,12 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch }) {
         {!loading && !error && devices.length === 0 && (
           <div className="text-center py-8">
             <p className="text-muted-foreground">No devices found</p>
-            <p className="text-muted-foreground text-sm mt-2">Make sure Spotify is open on your devices</p>
+            <div className="text-muted-foreground text-sm mt-2 space-y-1">
+              <p>To make devices discoverable:</p>
+              <p>• Open Spotify on your phone/computer</p>
+              <p>• Start playing any song briefly</p>
+              <p>• Then refresh this list</p>
+            </div>
           </div>
         )}
 

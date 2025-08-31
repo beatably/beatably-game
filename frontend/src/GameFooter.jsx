@@ -139,17 +139,28 @@ function GameFooter({
         return false;
       }
 
-      // Use ONLY the current spotifyDeviceId reported by the SDK.
-      // Do not attempt transfer unless explicitly switching devices via UI.
-      const success = await spotifyAuth.verifiedStartPlayback(spotifyDeviceId, currentCard.uri, 0, {
-        pauseFirst: true,
-        transferFirst: false,
+      // CRITICAL FIX: Always transfer to the current SDK device first to ensure it's active
+      console.log('[GameFooter] Transferring to current SDK device:', spotifyDeviceId);
+      const transferSuccess = await spotifyAuth.transferPlayback(spotifyDeviceId, false);
+      if (!transferSuccess) {
+        console.warn('[GameFooter] Transfer to SDK device failed, continuing anyway');
+      }
+
+      // Small delay to let transfer take effect
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Now start playback on the active device (without device_id to avoid 404)
+      const success = await spotifyAuth.verifiedStartPlayback(null, currentCard.uri, 0, {
+        pauseFirst: false, // Don't pause since we just transferred
+        transferFirst: false, // Already transferred above
         maxVerifyAttempts: 4,
         verifyDelayMs: 250
       });
 
       if (success) {
         console.log('[GameFooter] Successfully started Spotify playback');
+        // Update stored device to current SDK device
+        spotifyAuth.storeDeviceId(spotifyDeviceId);
         return true;
       } else {
         console.log('[GameFooter] Spotify playback failed, trying fallback');
@@ -174,14 +185,17 @@ function GameFooter({
     if (!isCreator) return false;
 
     try {
-      const locked = localStorage.getItem('spotify_device_id');
-      const target = locked || spotifyDeviceId;
-      console.log('[GameFooter] Pausing Spotify playback on target:', target || 'active');
-      // Ensure selected device is active before control requests (prevents switching)
-      if (locked) {
-        await spotifyAuth.transferPlayback(locked, false);
+      console.log('[GameFooter] Pausing Spotify playback on current SDK device:', spotifyDeviceId);
+      
+      // Always ensure the current SDK device is active first
+      if (spotifyDeviceId) {
+        await spotifyAuth.transferPlayback(spotifyDeviceId, false);
+        // Small delay to let transfer take effect
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
-      return await spotifyAuth.pausePlayback(); // pause active device (prevents 404/query issues)
+      
+      // Pause the active device (without device_id to avoid 404)
+      return await spotifyAuth.pausePlayback();
     } catch (error) {
       console.error('[GameFooter] Error pausing Spotify playback:', error);
       if (error.message?.includes?.('Token expired')) {
@@ -836,8 +850,19 @@ function GameFooter({
         <DeviceSwitchModal
           isOpen={showDeviceModal}
           onClose={() => setShowDeviceModal(false)}
+          currentDeviceId={spotifyDeviceId}
           onDeviceSwitch={(newDeviceId) => {
             console.log('[GameFooter] Device switched to:', newDeviceId);
+            
+            // CRITICAL FIX: If switching back to web player, sync current song
+            const webDeviceId = localStorage.getItem('spotify_device_id');
+            if (newDeviceId === webDeviceId && window.beatablyPlayerSync && currentCard?.uri) {
+              console.log('[GameFooter] Switching back to web player - syncing current song');
+              // Sync current song at current position to fix sync issues
+              const currentPosition = progress * 1000; // Convert to milliseconds
+              window.beatablyPlayerSync.syncCurrentSong(currentCard.uri, currentPosition);
+            }
+            
             // Notify parent component about device change
             if (window.parent && window.parent.handleDeviceSwitch) {
               window.parent.handleDeviceSwitch(newDeviceId);

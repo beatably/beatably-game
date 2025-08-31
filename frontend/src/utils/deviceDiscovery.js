@@ -46,23 +46,40 @@ class DeviceDiscoveryService {
    */
   async getSpotifyDevices() {
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        console.log('[DeviceDiscovery] No access token available');
+        return [];
+      }
+
       const response = await fetch('https://api.spotify.com/v1/me/player/devices', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Authorization': `Bearer ${token}`
         }
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch Spotify devices');
+        if (response.status === 401) {
+          console.log('[DeviceDiscovery] Token expired, clearing token');
+          localStorage.removeItem('access_token');
+        } else if (response.status === 404) {
+          console.log('[DeviceDiscovery] No active Spotify session (404 is normal)');
+        } else {
+          console.warn('[DeviceDiscovery] Spotify API returned:', response.status, response.statusText);
+        }
+        return [];
       }
 
       const data = await response.json();
-      return (data.devices || []).map(device => ({
+      const devices = (data.devices || []).map(device => ({
         ...device,
         source: 'spotify_api',
         discoveryMethod: 'spotify_web_api',
         lastSeen: new Date().toISOString()
       }));
+
+      console.log('[DeviceDiscovery] Found Spotify devices:', devices.length);
+      return devices;
     } catch (error) {
       console.error('[DeviceDiscovery] Error fetching Spotify devices:', error);
       return [];

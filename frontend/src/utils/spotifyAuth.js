@@ -151,6 +151,11 @@ class SpotifyAuthManager {
       }
 
       if (!response.ok) {
+        // Handle 404 specifically for player endpoints - this is normal when no active session
+        if (response.status === 404 && url.includes('/me/player')) {
+          console.log('[SpotifyAuth] No active Spotify session (404 is normal)');
+          return null; // Return null instead of throwing error
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
