@@ -74,8 +74,8 @@ function persistState() {
     const payload = {
       lobbies,
       games,
+      playerSessions,
       savedAt: new Date().toISOString()
-      // Note: playerSessions deliberately NOT persisted (socket ids are transient)
     };
     const serializable = sanitizeForSave(payload);
     if (!serializable) return;
@@ -101,9 +101,19 @@ function loadStateFromDisk() {
     // Populate existing containers
     Object.keys(revived.lobbies).forEach(code => { lobbies[code] = revived.lobbies[code]; });
     Object.keys(revived.games).forEach(code => { games[code] = revived.games[code]; });
+    
+    // Restore playerSessions if they exist
+    if (revived.playerSessions && typeof revived.playerSessions === 'object') {
+      Object.keys(revived.playerSessions).forEach(sessionId => { 
+        playerSessions[sessionId] = revived.playerSessions[sessionId]; 
+      });
+      console.log('[State] Loaded playerSessions from disk. Sessions:', Object.keys(playerSessions).length);
+    }
+    
     console.log('[State] Loaded lobbies/games from disk. Rooms:', {
       lobbies: Object.keys(lobbies),
-      games: Object.keys(games)
+      games: Object.keys(games),
+      sessions: Object.keys(playerSessions).length
     });
     return true;
   } catch (e) {
@@ -922,155 +932,201 @@ io.on('connection', (socket) => {
   socket.on('reconnect_session', ({ sessionId, roomCode, playerName }, callback) => {
     console.log('[Sessions] Reconnection attempt:', { sessionId, roomCode, playerName, socketId: socket.id });
     
-    // Check if session exists and is valid
+    // Check if we have a valid session
     const session = playerSessions[sessionId];
-    if (!session) {
-      // Fallback path: backend likely restarted and lost in-memory sessions.
-      // Attempt stateless rejoin by roomCode + playerName matching in active game/lobby.
-      console.log('[Sessions] Session not found, attempting stateless rejoin:', { sessionId, roomCode, playerName, socketId: socket.id });
+    const hasValidSession = session && 
+      session.roomCode === roomCode && 
+      session.playerName === playerName;
 
-      const lobby = lobbies[roomCode];
-      const game = games[roomCode];
+    if (hasValidSession) {
+      // Update session with new socket ID
+      session.playerId = socket.id;
+      session.timestamp = Date.now();
+      console.log('[Sessions] Valid session found, updating socket ID');
+    }
 
-      if (game) {
-        const existingPlayerIndex = game.players.findIndex(p => p.name === playerName);
-        if (existingPlayerIndex !== -1) {
-          const oldPlayerId = game.players[existingPlayerIndex].id;
-
-          socket.join(roomCode);
-          console.log('[Sessions] Stateless rejoin matched game by name:', { roomCode, playerName, oldPlayerId, newSocketId: socket.id });
-
-          // Current pointers
-          const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-          const currentCard = game.sharedDeck[game.currentCardIndex];
-
-          // Player's timeline with old id
-          const playerTimeline = game.timelines[oldPlayerId] || [];
-
-          // Update player's socket id
-          game.players[existingPlayerIndex].id = socket.id;
-
-          // Update playerOrder mapping
-          for (let i = 0; i < game.playerOrder.length; i++) {
-            if (game.playerOrder[i] === oldPlayerId) {
-              game.playerOrder[i] = socket.id;
-              console.log('[Sessions] Updated player order (stateless):', { index: i, from: oldPlayerId, to: socket.id });
+    // CRITICAL FIX: Check both memory and persisted state
+    let lobby = lobbies[roomCode];
+    let game = games[roomCode];
+    
+    // If no active room found in memory, this might be after a server restart
+    // The state should have been loaded from disk, but let's verify the room exists
+    if (!lobby && !game) {
+      console.log('[Sessions] No active room found in memory, checking if this is a valid room code');
+      
+      // For now, we'll create a minimal lobby structure to allow reconnection
+      // This handles the case where the server restarted and state loading didn't work perfectly
+      if (hasValidSession) {
+        console.log('[Sessions] Creating minimal lobby structure for valid session');
+        lobby = {
+          players: [{
+            id: socket.id,
+            name: playerName,
+            isCreator: session.isCreator,
+            isReady: true
+          }],
+          settings: {
+            difficulty: "normal",
+            winCondition: 10,
+            musicPreferences: {
+              genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+              yearRange: { min: 1960, max: 2025 },
+              markets: ['US']
             }
-          }
+          },
+          status: "waiting"
+        };
+        lobbies[roomCode] = lobby;
+        schedulePersist();
+      } else {
+        console.log('[Sessions] No valid session and no room found:', roomCode);
+        return callback({ error: "Game no longer exists" });
+      }
+    }
 
-          // Update timeline mapping
-          if (game.timelines[oldPlayerId]) {
-            if (oldPlayerId !== socket.id) {
-              game.timelines[socket.id] = game.timelines[oldPlayerId];
-              delete game.timelines[oldPlayerId];
-              console.log('[Sessions] Moved timeline mapping (stateless):', {
-                from: oldPlayerId,
-                to: socket.id,
-                timelineLength: (game.timelines[socket.id] ? game.timelines[socket.id].length : 0)
-              });
-            } else {
-              game.timelines[socket.id] = game.timelines[socket.id] || [];
-              console.log('[Sessions] Timeline mapping unchanged (same id) on stateless rejoin');
-            }
-          } else {
-            console.warn('[Sessions] No existing timeline for old id on stateless rejoin:', { oldPlayerId, newId: socket.id });
-            game.timelines[socket.id] = game.timelines[socket.id] || [];
-          }
+    // Helper function to handle game reconnection
+    const reconnectToGame = (game, isStateless = false) => {
+      const existingPlayerIndex = game.players.findIndex(p => p.name === playerName);
+      if (existingPlayerIndex === -1) {
+        console.log('[Sessions] Player not found in game:', { roomCode, playerName });
+        return callback({ error: "Player not found in game" });
+      }
 
-          // Validate/fix current player pointer
-          if (!game.playerOrder[game.currentPlayerIdx] ||
-              !game.players.find(p => p.id === game.playerOrder[game.currentPlayerIdx])) {
-            console.error('[Sessions] Invalid current player after stateless rejoin; repairing');
-            const valid = game.players.find(p => game.playerOrder.includes(p.id));
-            if (valid) {
-              game.currentPlayerIdx = game.playerOrder.indexOf(valid.id);
-              console.log('[Sessions] Repaired currentPlayerIdx:', game.currentPlayerIdx);
-            }
-          }
+      const oldPlayerId = game.players[existingPlayerIndex].id;
+      socket.join(roomCode);
+      console.log('[Sessions] Reconnected to game:', { roomCode, isStateless, oldPlayerId, newSocketId: socket.id });
 
-          const finalCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
+      // Get current game state
+      const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+      const currentCard = game.sharedDeck[game.currentCardIndex];
 
-          // Recreate session entry so further reconnects work
-          try {
-            playerSessions[sessionId] = {
-              sessionId,
-              playerId: socket.id,
-              roomCode,
-              playerName,
-              isCreator: !!game.players[existingPlayerIndex].isCreator,
-              timestamp: Date.now()
-            };
-            console.log('[Sessions] Recreated session after stateless rejoin:', sessionId);
-          } catch (e) {
-            console.warn('[Sessions] Failed to recreate session on stateless rejoin:', e && e.message);
-          }
+      // Update player's socket ID without affecting other players
+      game.players[existingPlayerIndex].id = socket.id;
 
-          callback({
-            success: true,
-            view: 'game',
-            gameState: {
-              timeline: playerTimeline,
-              deck: [currentCard],
-              players: game.players,
-              phase: game.phase,
-              feedback: game.feedback,
-              lastPlaced: game.lastPlaced,
-              removingId: game.removingId,
-              currentPlayerIdx: game.currentPlayerIdx,
-              currentPlayerId: finalCurrentPlayerId,
-              challenge: game.challenge
-            }
-          });
-
-          // Sync everyone with validated current player/timeline
-          setTimeout(() => {
-            game.players.forEach((p) => {
-              io.to(p.id).emit('game_update', {
-                timeline: game.timelines[finalCurrentPlayerId] || [],
-                deck: [game.sharedDeck[game.currentCardIndex]],
-                players: game.players,
-                phase: game.phase,
-                feedback: game.feedback,
-                lastPlaced: game.lastPlaced,
-                removingId: game.removingId,
-                currentPlayerIdx: game.currentPlayerIdx,
-                currentPlayerId: finalCurrentPlayerId,
-                challenge: game.challenge
-              });
-            });
-          }, 100);
-
-          socket.to(roomCode).emit('player_reconnected', {
-            playerName,
-            playerId: socket.id
-          });
-          return;
-        } else {
-          console.log('[Sessions] Stateless rejoin: player name not found in game:', { roomCode, playerName });
+      // Update playerOrder mapping
+      for (let i = 0; i < game.playerOrder.length; i++) {
+        if (game.playerOrder[i] === oldPlayerId) {
+          game.playerOrder[i] = socket.id;
+          console.log('[Sessions] Updated player order:', { index: i, from: oldPlayerId, to: socket.id });
         }
       }
 
-      if (lobby) {
-        const existingPlayerIndex = lobby.players.findIndex(p => p.name === playerName);
-        let isCreator = false;
-        if (existingPlayerIndex !== -1) {
-          isCreator = !!lobby.players[existingPlayerIndex].isCreator;
-          lobby.players[existingPlayerIndex].id = socket.id;
-        } else {
-          // Infer creator by checking if a creator already exists
-          isCreator = !!lobby.players.find(p => p.isCreator && p.name === playerName);
-          lobby.players.push({
-            id: socket.id,
-            name: playerName,
-            isCreator,
-            isReady: true
+      // Update timeline mapping
+      if (game.timelines[oldPlayerId]) {
+        if (oldPlayerId !== socket.id) {
+          game.timelines[socket.id] = game.timelines[oldPlayerId];
+          delete game.timelines[oldPlayerId];
+          console.log('[Sessions] Moved timeline mapping:', {
+            from: oldPlayerId,
+            to: socket.id,
+            timelineLength: game.timelines[socket.id].length
           });
         }
+      } else {
+        console.warn('[Sessions] No existing timeline found, creating empty one');
+        game.timelines[socket.id] = [];
+      }
 
-        socket.join(roomCode);
-        console.log('[Sessions] Stateless rejoin matched lobby by name:', { roomCode, playerName, isCreator });
+      // Validate current player pointer
+      const finalCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
+      if (!finalCurrentPlayerId || !game.players.find(p => p.id === finalCurrentPlayerId)) {
+        console.error('[Sessions] Invalid current player, attempting repair');
+        const validPlayer = game.players.find(p => game.playerOrder.includes(p.id));
+        if (validPlayer) {
+          game.currentPlayerIdx = game.playerOrder.indexOf(validPlayer.id);
+        }
+      }
 
-        // Recreate session entry
+      // Recreate session if this was stateless
+      if (isStateless) {
+        try {
+          playerSessions[sessionId] = {
+            sessionId,
+            playerId: socket.id,
+            roomCode,
+            playerName,
+            isCreator: !!game.players[existingPlayerIndex].isCreator,
+            timestamp: Date.now()
+          };
+          console.log('[Sessions] Recreated session after stateless rejoin:', sessionId);
+        } catch (e) {
+          console.warn('[Sessions] Failed to recreate session:', e?.message);
+        }
+      }
+
+      // Send the current player's timeline (the one whose turn it is)
+      const currentPlayerTimeline = game.timelines[currentPlayerId] || [];
+
+      callback({
+        success: true,
+        view: 'game',
+        gameState: {
+          timeline: currentPlayerTimeline, // Send current player's timeline
+          deck: [currentCard],
+          players: game.players,
+          phase: game.phase,
+          feedback: game.feedback,
+          lastPlaced: game.lastPlaced,
+          removingId: game.removingId,
+          currentPlayerIdx: game.currentPlayerIdx,
+          currentPlayerId: game.playerOrder[game.currentPlayerIdx],
+          challenge: game.challenge
+        }
+      });
+
+      // Broadcast updated state to all players
+      setTimeout(() => {
+        const broadcastCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
+        game.players.forEach((p) => {
+          io.to(p.id).emit('game_update', {
+            timeline: game.timelines[broadcastCurrentPlayerId] || [],
+            deck: [currentCard],
+            players: game.players,
+            phase: game.phase,
+            feedback: game.feedback,
+            lastPlaced: game.lastPlaced,
+            removingId: game.removingId,
+            currentPlayerIdx: game.currentPlayerIdx,
+            currentPlayerId: broadcastCurrentPlayerId,
+            challenge: game.challenge
+          });
+        });
+      }, 100);
+
+      // Notify other players of reconnection
+      socket.to(roomCode).emit('player_reconnected', {
+        playerName,
+        playerId: socket.id
+      });
+    };
+
+    // Helper function to handle lobby reconnection
+    const reconnectToLobby = (lobby, isStateless = false) => {
+      const existingPlayerIndex = lobby.players.findIndex(p => p.name === playerName);
+      let isCreator = false;
+      
+      if (existingPlayerIndex !== -1) {
+        isCreator = !!lobby.players[existingPlayerIndex].isCreator;
+        lobby.players[existingPlayerIndex].id = socket.id;
+        console.log('[Sessions] Updated existing player in lobby:', { playerName, isCreator });
+      } else {
+        // Check if this should be the creator
+        const shouldBeCreator = lobby.players.length === 0 || (hasValidSession && session.isCreator);
+        isCreator = shouldBeCreator;
+        
+        lobby.players.push({
+          id: socket.id,
+          name: playerName,
+          isCreator,
+          isReady: true
+        });
+        console.log('[Sessions] Added new player to lobby:', { playerName, isCreator });
+      }
+
+      socket.join(roomCode);
+
+      // Recreate session if this was stateless
+      if (isStateless) {
         try {
           playerSessions[sessionId] = {
             sessionId,
@@ -1080,373 +1136,30 @@ io.on('connection', (socket) => {
             isCreator,
             timestamp: Date.now()
           };
-          console.log('[Sessions] Recreated session for lobby after stateless rejoin:', sessionId);
+          console.log('[Sessions] Recreated session for lobby:', sessionId);
         } catch (e) {
-          console.warn('[Sessions] Failed to recreate session for lobby on stateless rejoin:', e && e.message);
+          console.warn('[Sessions] Failed to recreate session for lobby:', e?.message);
         }
-
-        callback({
-          success: true,
-          view: 'waiting',
-          lobby,
-          player: lobby.players.find(p => p.id === socket.id)
-        });
-        io.to(roomCode).emit('lobby_update', lobby);
-        return;
       }
 
-      console.log('[Sessions] Stateless rejoin failed; room not found:', roomCode);
-
-      // EXTRA FALLBACK: search by playerName across existing games/lobbies (room code may be missing after restart)
-      try {
-        // Search games
-        let foundCode = null;
-        for (const code of Object.keys(games)) {
-          const g = games[code];
-          if (g && Array.isArray(g.players) && g.players.some(p => p && p.name === playerName)) {
-            foundCode = code;
-            break;
-          }
-        }
-        // If not in games, search lobbies
-        if (!foundCode) {
-          for (const code of Object.keys(lobbies)) {
-            const lb = lobbies[code];
-            if (lb && Array.isArray(lb.players) && lb.players.some(p => p && p.name === playerName)) {
-              foundCode = code;
-              break;
-            }
-          }
-        }
-
-        if (foundCode) {
-          console.log('[Sessions] Name-based fallback matched code:', foundCode, 'for player:', playerName);
-          const fallbackGame = games[foundCode];
-          const fallbackLobby = lobbies[foundCode];
-
-          if (fallbackGame) {
-            const idx = fallbackGame.players.findIndex(p => p.name === playerName);
-            if (idx !== -1) {
-              const oldId = fallbackGame.players[idx].id;
-              socket.join(foundCode);
-
-              const currentPlayerId = fallbackGame.playerOrder[fallbackGame.currentPlayerIdx];
-              const currentCard = fallbackGame.sharedDeck[fallbackGame.currentCardIndex];
-              const playerTimeline = fallbackGame.timelines[oldId] || [];
-
-              // Remap ids
-              fallbackGame.players[idx].id = socket.id;
-              for (let i = 0; i < fallbackGame.playerOrder.length; i++) {
-                if (fallbackGame.playerOrder[i] === oldId) {
-                  fallbackGame.playerOrder[i] = socket.id;
-                }
-              }
-              if (fallbackGame.timelines[oldId] && oldId !== socket.id) {
-                fallbackGame.timelines[socket.id] = fallbackGame.timelines[oldId];
-                delete fallbackGame.timelines[oldId];
-              } else {
-                fallbackGame.timelines[socket.id] = fallbackGame.timelines[socket.id] || [];
-              }
-
-              const finalCurrentPlayerId = fallbackGame.playerOrder[fallbackGame.currentPlayerIdx];
-
-              // Recreate session entry
-              playerSessions[sessionId] = {
-                sessionId,
-                playerId: socket.id,
-                roomCode: foundCode,
-                playerName,
-                isCreator: !!fallbackGame.players[idx].isCreator,
-                timestamp: Date.now()
-              };
-
-              callback({
-                success: true,
-                view: 'game',
-                gameState: {
-                  timeline: playerTimeline,
-                  deck: [currentCard],
-                  players: fallbackGame.players,
-                  phase: fallbackGame.phase,
-                  feedback: fallbackGame.feedback,
-                  lastPlaced: fallbackGame.lastPlaced,
-                  removingId: fallbackGame.removingId,
-                  currentPlayerIdx: fallbackGame.currentPlayerIdx,
-                  currentPlayerId: finalCurrentPlayerId,
-                  challenge: fallbackGame.challenge
-                }
-              });
-
-              setTimeout(() => {
-                fallbackGame.players.forEach((p) => {
-                  io.to(p.id).emit('game_update', {
-                    timeline: fallbackGame.timelines[finalCurrentPlayerId] || [],
-                    deck: [fallbackGame.sharedDeck[fallbackGame.currentCardIndex]],
-                    players: fallbackGame.players,
-                    phase: fallbackGame.phase,
-                    feedback: fallbackGame.feedback,
-                    lastPlaced: fallbackGame.lastPlaced,
-                    removingId: fallbackGame.removingId,
-                    currentPlayerIdx: fallbackGame.currentPlayerIdx,
-                    currentPlayerId: finalCurrentPlayerId,
-                    challenge: fallbackGame.challenge
-                  });
-                });
-              }, 100);
-
-              socket.to(foundCode).emit('player_reconnected', {
-                playerName,
-                playerId: socket.id
-              });
-
-              schedulePersist();
-              return;
-            }
-          }
-
-          if (fallbackLobby) {
-            const existingPlayerIndex = fallbackLobby.players.findIndex(p => p.name === playerName);
-            let isCreator = false;
-            if (existingPlayerIndex !== -1) {
-              isCreator = !!fallbackLobby.players[existingPlayerIndex].isCreator;
-              fallbackLobby.players[existingPlayerIndex].id = socket.id;
-            } else {
-              isCreator = !!fallbackLobby.players.find(p => p.isCreator && p.name === playerName);
-              fallbackLobby.players.push({
-                id: socket.id,
-                name: playerName,
-                isCreator,
-                isReady: true
-              });
-            }
-            socket.join(foundCode);
-
-            playerSessions[sessionId] = {
-              sessionId,
-              playerId: socket.id,
-              roomCode: foundCode,
-              playerName,
-              isCreator,
-              timestamp: Date.now()
-            };
-
-            callback({
-              success: true,
-              view: 'waiting',
-              lobby: fallbackLobby,
-              player: fallbackLobby.players.find(p => p.id === socket.id)
-            });
-            io.to(foundCode).emit('lobby_update', fallbackLobby);
-            schedulePersist();
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('[Sessions] Name-based fallback error:', e && e.message);
-      }
-
-      callback({ error: "Session not found or expired" });
-      return;
-    }
-    
-    // Check if session matches the request
-    if (session.roomCode !== roomCode || session.playerName !== playerName) {
-      console.log('[Sessions] Session mismatch:', { 
-        sessionRoomCode: session.roomCode, 
-        requestRoomCode: roomCode,
-        sessionPlayerName: session.playerName,
-        requestPlayerName: playerName
-      });
-      callback({ error: "Session data mismatch" });
-      return;
-    }
-    
-    // Update session with new socket ID
-    session.playerId = socket.id;
-    session.timestamp = Date.now();
-    
-    // Check if lobby/game still exists
-    const lobby = lobbies[roomCode];
-    const game = games[roomCode];
-    
-    // CRITICAL FIX: Prioritize game over lobby - if game exists, reconnect to game
-    if (game) {
-      // Reconnect to game
-      const existingPlayerIndex = game.players.findIndex(p => p.name === playerName);
-      if (existingPlayerIndex !== -1) {
-        // CRITICAL FIX: Get the old socket ID BEFORE updating it
-        const oldPlayerId = game.players[existingPlayerIndex].id;
-        
-        socket.join(roomCode);
-        console.log('[Sessions] Reconnected to game:', roomCode);
-        
-        // Send current game state
-        const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-        const currentCard = game.sharedDeck[game.currentCardIndex];
-        
-        // CRITICAL DEBUG: Log all timeline data before processing
-        console.log('[Sessions] FULL DEBUG - Before reconnection processing:', {
-          playerName,
-          currentPlayerId,
-          allPlayers: game.players.map(p => ({ id: p.id, name: p.name })),
-          allTimelineKeys: Object.keys(game.timelines),
-          timelineLengths: Object.fromEntries(Object.entries(game.timelines).map(([id, timeline]) => [id, timeline.length])),
-          phase: game.phase,
-          currentPlayerIdx: game.currentPlayerIdx,
-          oldPlayerId: oldPlayerId,
-          newSocketId: socket.id
-        });
-        
-        // Get the player's timeline using their old player ID (before socket ID update)
-        const playerTimeline = game.timelines[oldPlayerId] || [];
-        
-        console.log('[Sessions] Timeline lookup result:', {
-          oldPlayerId,
-          timelineFound: !!game.timelines[oldPlayerId],
-          timelineLength: playerTimeline.length,
-          timelineCards: playerTimeline.map(c => ({ id: c.id, title: c.title, year: c.year }))
-        });
-        
-        // Now update the player's socket ID
-        game.players[existingPlayerIndex].id = socket.id;
-        
-        // CRITICAL FIX: Update ALL references to the old player ID in playerOrder
-        for (let i = 0; i < game.playerOrder.length; i++) {
-          if (game.playerOrder[i] === oldPlayerId) {
-            game.playerOrder[i] = socket.id;
-            console.log('[Sessions] Updated player order at index', i, ':', {
-              from: oldPlayerId,
-              to: socket.id
-            });
-          }
-        }
-        
-        // Update the timeline mapping to use the new socket ID (guard same-id case)
-        if (game.timelines[oldPlayerId]) {
-          if (oldPlayerId !== socket.id) {
-            game.timelines[socket.id] = game.timelines[oldPlayerId];
-            delete game.timelines[oldPlayerId]; // Clean up old mapping
-            console.log('[Sessions] Timeline mapping updated:', {
-              from: oldPlayerId,
-              to: socket.id,
-              timelineLength: (game.timelines[socket.id] ? game.timelines[socket.id].length : 0)
-            });
-          } else {
-            // If the socket id didn't actually change, do not delete the mapping
-            console.log('[Sessions] Timeline mapping unchanged (same socket id):', {
-              id: socket.id,
-              timelineLength: (game.timelines[socket.id] ? game.timelines[socket.id].length : 0)
-            });
-            // Ensure mapping exists
-            game.timelines[socket.id] = game.timelines[socket.id] || [];
-          }
-        } else {
-          console.warn('[Sessions] No existing timeline found for oldPlayerId during reconnection:', { oldPlayerId, newId: socket.id });
-          // Ensure we at least have an empty timeline mapping to avoid crashes
-          game.timelines[socket.id] = game.timelines[socket.id] || [];
-        }
-        
-        // CRITICAL FIX: Get the updated current player ID after player order update
-        const updatedCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
-        
-        // CRITICAL FIX: Validate that the current player ID is valid
-        if (!updatedCurrentPlayerId || !game.players.find(p => p.id === updatedCurrentPlayerId)) {
-          console.error('[Sessions] CRITICAL ERROR: Invalid current player ID after reconnection:', {
-            updatedCurrentPlayerId,
-            currentPlayerIdx: game.currentPlayerIdx,
-            playerOrder: game.playerOrder,
-            players: game.players.map(p => ({ id: p.id, name: p.name }))
-          });
-          
-          // Attempt to fix by finding a valid player
-          const validPlayer = game.players.find(p => game.playerOrder.includes(p.id));
-          if (validPlayer) {
-            const validIndex = game.playerOrder.indexOf(validPlayer.id);
-            game.currentPlayerIdx = validIndex;
-            console.log('[Sessions] Fixed current player to valid player:', {
-              playerId: validPlayer.id,
-              playerName: validPlayer.name,
-              newCurrentPlayerIdx: validIndex
-            });
-          }
-        }
-        
-        const finalCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
-        
-        callback({
-          success: true,
-          view: 'game',
-          gameState: {
-            timeline: playerTimeline, // Send the reconnecting player's timeline
-            deck: [currentCard],
-            players: game.players,
-            phase: game.phase,
-            feedback: game.feedback,
-            lastPlaced: game.lastPlaced,
-            removingId: game.removingId,
-            currentPlayerIdx: game.currentPlayerIdx,
-            currentPlayerId: finalCurrentPlayerId, // Use final validated ID
-            challenge: game.challenge
-          }
-        });
-        
-        // CRITICAL FIX: Broadcast updated game state to all players to sync the reconnected player
-        setTimeout(() => {
-          game.players.forEach((p) => {
-            io.to(p.id).emit('game_update', {
-              timeline: game.timelines[finalCurrentPlayerId] || [],
-              deck: [currentCard],
-              players: game.players,
-              phase: game.phase,
-              feedback: game.feedback,
-              lastPlaced: game.lastPlaced,
-              removingId: game.removingId,
-              currentPlayerIdx: game.currentPlayerIdx,
-              currentPlayerId: finalCurrentPlayerId, // Use final validated ID
-              challenge: game.challenge
-            });
-          });
-        }, 100);
-        
-        // Notify other players of reconnection
-        socket.to(roomCode).emit('player_reconnected', {
-          playerName: playerName,
-          playerId: socket.id
-        });
-        
-      } else {
-        console.log('[Sessions] Player not found in game:', playerName);
-        callback({ error: "Player not found in game" });
-      }
-      
-    } else if (lobby) {
-      // Reconnect to lobby (fallback if no game exists)
-      const existingPlayerIndex = lobby.players.findIndex(p => p.name === playerName);
-      if (existingPlayerIndex !== -1) {
-        // Update existing player's socket ID
-        lobby.players[existingPlayerIndex].id = socket.id;
-      } else {
-        // Add player back to lobby
-        lobby.players.push({
-          id: socket.id,
-          name: playerName,
-          isCreator: session.isCreator,
-          isReady: true
-        });
-      }
-      
-      socket.join(roomCode);
-      console.log('[Sessions] Reconnected to lobby:', roomCode);
-      callback({ 
-        success: true, 
+      callback({
+        success: true,
         view: 'waiting',
-        lobby: lobby,
+        lobby,
         player: lobby.players.find(p => p.id === socket.id)
       });
       io.to(roomCode).emit('lobby_update', lobby);
-      
+    };
+
+    // CRITICAL FIX: Always prioritize game over lobby
+    if (game) {
+      console.log('[Sessions] Active game found, reconnecting to game');
+      reconnectToGame(game, !hasValidSession);
+    } else if (lobby) {
+      console.log('[Sessions] Lobby found, reconnecting to lobby');
+      reconnectToLobby(lobby, !hasValidSession);
     } else {
-      console.log('[Sessions] Room no longer exists:', roomCode);
+      console.log('[Sessions] No room found after all checks:', roomCode);
       callback({ error: "Game no longer exists" });
     }
   });
@@ -3037,6 +2750,8 @@ io.on('connection', (socket) => {
   console.log('[Backend] Socket connected:', socket.id, 'rooms:', Array.from(socket.rooms));
 
   socket.on('disconnect', () => {
+    console.log('[Disconnect] User disconnected:', socket.id);
+    
     // Remove player from any lobbies they were in
     for (const code in lobbies) {
       const lobby = lobbies[code];
@@ -3045,31 +2760,69 @@ io.on('connection', (socket) => {
         const leavingPlayer = lobby.players.find(p => p.id === socket.id);
         const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
         
-        lobby.players = lobby.players.filter(p => p.id !== socket.id);
+        // Check if there's an active game for this lobby
+        const hasActiveGame = games[code];
         
-        if (isCreatorLeaving && lobby.players.length > 0) {
-          // Notify remaining players that host has left
-          io.to(code).emit('host_left', {
-            message: 'The host has disconnected. You will be returned to the lobby.',
-            hostName: leavingPlayer.name
-          });
+        if (hasActiveGame && isCreatorLeaving) {
+          // CRITICAL FIX: Don't immediately clean up games when host disconnects
+          // Instead, give them time to reconnect (e.g., during page refresh)
+          console.log('[Disconnect] Host disconnected from active game, allowing reconnection window');
           
-          // Clean up the lobby after a short delay
+          // Set a longer timeout for game cleanup to allow for reconnection
           setTimeout(() => {
+            // Check if the host has reconnected by looking for a session with the same name
+            const hostSession = Object.values(playerSessions).find(session => 
+              session.roomCode === code && 
+              session.playerName === leavingPlayer.name && 
+              session.isCreator
+            );
+            
+            if (!hostSession) {
+              // Host hasn't reconnected, clean up
+              console.log('[Disconnect] Host did not reconnect, cleaning up game:', code);
+              if (games[code]) {
+                io.to(code).emit('host_left', {
+                  message: 'The host has left the game. You will be returned to the lobby.',
+                  hostName: leavingPlayer.name
+                });
+                delete games[code];
+              }
+              if (lobbies[code]) {
+                delete lobbies[code];
+              }
+              schedulePersist();
+            } else {
+              console.log('[Disconnect] Host reconnected, keeping game alive:', code);
+            }
+          }, 600000); // 10 minute window for reconnection
+        } else {
+          // Handle normal lobby disconnections (no active game)
+          lobby.players = lobby.players.filter(p => p.id !== socket.id);
+          
+          if (isCreatorLeaving && lobby.players.length > 0) {
+            // Notify remaining players that host has left
+            io.to(code).emit('host_left', {
+              message: 'The host has left the game. You will be returned to the lobby.',
+              hostName: leavingPlayer.name
+            });
+            
+            // Clean up the lobby after a short delay
+            setTimeout(() => {
+              delete lobbies[code];
+              schedulePersist();
+            }, 1000);
+          } else if (lobby.players.length === 0) {
             delete lobbies[code];
             schedulePersist();
-          }, 1000);
-        } else if (lobby.players.length === 0) {
-          delete lobbies[code];
-          schedulePersist();
-        } else {
-          io.to(code).emit('lobby_update', lobby);
-          schedulePersist();
+          } else {
+            io.to(code).emit('lobby_update', lobby);
+            schedulePersist();
+          }
         }
       }
     }
     
-    // Also handle games - if host disconnects from an active game
+    // Handle game disconnections for non-host players
     for (const code in games) {
       const game = games[code];
       const wasInGame = game.players.some(p => p.id === socket.id);
@@ -3077,31 +2830,20 @@ io.on('connection', (socket) => {
         const leavingPlayer = game.players.find(p => p.id === socket.id);
         const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
         
-        if (isCreatorLeaving && game.players.length > 1) {
-          // Notify remaining players that host has left the game
-          io.to(code).emit('host_left', {
-            message: 'The host has disconnected from the game. You will be returned to the lobby.',
-            hostName: leavingPlayer.name
-          });
-          
-          // Clean up the game after a short delay
-          setTimeout(() => {
-            delete games[code];
-            delete lobbies[code]; // Also clean up associated lobby
-            schedulePersist();
-          }, 1000);
+        if (!isCreatorLeaving) {
+          // Non-host player disconnected from game
+          console.log('[Disconnect] Non-host player disconnected from game:', leavingPlayer.name);
+          // Don't clean up the game, just log it - they can reconnect
         } else if (game.players.length === 1) {
-          // Last player left, clean up
+          // Last player left, clean up immediately
+          console.log('[Disconnect] Last player left game, cleaning up:', code);
           delete games[code];
           delete lobbies[code];
           schedulePersist();
         }
-        // Note: We don't remove individual players from games like we do lobbies
-        // because games need all players to continue properly
+        // Note: Host disconnections are handled above in the lobby section
       }
     }
-    
-    console.log('User disconnected:', socket.id);
   });
 });
 
