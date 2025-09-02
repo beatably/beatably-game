@@ -2469,7 +2469,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col">
+        <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col h-full">
           <PlayerHeader 
             players={players} 
             currentPlayerId={currentPlayerId} 
@@ -2478,14 +2478,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             onRestart={handleRestartGame}
             onExit={handleExitToLobby}
           />
-          <div className="sticky hidden top-0 z-20 bg-background bg-opacity-95  py-3 md:py-4 px-1">
-            <h1 className="text-lg md:text-xl font-semibold text-center">
-              {isMyTurn
-                ? "Your turn"
-                : `${currentPlayerName}'s turn`}
-            </h1>
-          </div>
-          <div className="fixed top-16 left-0 right-0 bottom-0 flex flex-col items-center justify-center p-1 md:p-2 z-10 bg-background">
+          <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 z-10 bg-background overflow-hidden min-h-0">
             {/* Hidden Spotify Player for initialization only */}
             {isCreator && spotifyToken && (
               <div style={{ display: 'none' }}>

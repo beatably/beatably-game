@@ -85,7 +85,7 @@ function Landing({ onCreate, onJoin }) {
   return (
     <div
       className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground px-6 py-4"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}
+      style={{ paddingBottom: "15px" }}
     >
       {/* Minimal Header */}
       <div className="text-center mb-8">

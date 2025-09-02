@@ -225,15 +225,6 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
         />
       </div>
       
-      {/* Card display area - show current card info */}
-      {currentCard && (
-        <div className="absolute bottom-4 right-4 bg-gray-800 text-white p-3 rounded-lg shadow-lg max-w-xs">
-          <div className="text-sm font-medium">Current Card</div>
-          <div className="text-xs opacity-75 mt-1">
-            {isMyTurn ? 'Select a node on the timeline to place this card' : 'Waiting for other player...'}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

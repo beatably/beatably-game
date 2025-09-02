@@ -605,7 +605,7 @@ function GameFooter({
   if (isDragging && pendingDropIndex === null) {
     return (
       <footer 
-      className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 border-t border-border"
+      className="w-full bg-card shadow flex flex-col items-center px-1 py-1 border-t border-border"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 15px)" }}
     >
         {/* Compact player during drag */}
@@ -645,7 +645,7 @@ function GameFooter({
 
   return (
     <footer 
-      className="fixed bottom-0 left-0 right-0 z-30 w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl"
+      className="w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 15px)" }}
     >
       {/* Spotify-style player */}

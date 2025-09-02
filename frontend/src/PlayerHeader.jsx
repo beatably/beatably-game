@@ -76,7 +76,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
   };
 
   return (
-    <header className="relative sticky top-0 z-30 w-full bg-card mobile-shadow flex items-center justify-end p-2 md:px-2 md:py-1 ">
+    <header className="w-full bg-card mobile-shadow flex items-center justify-end p-2 md:px-2 md:py-1">
       <div className="absolute left-16 top-5">
         <img className="w-0" src={beatablyLogo} alt="Beatably Logo"></img>
       </div>

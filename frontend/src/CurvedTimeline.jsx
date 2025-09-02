@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 const CurvedTimeline = ({ 
   timeline, 
@@ -15,6 +15,41 @@ const CurvedTimeline = ({
   currentPlayerName 
 }) => {
   const [hoveredNodeIndex, setHoveredNodeIndex] = useState(null);
+  const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
+  const containerRef = useRef(null);
+
+  // Effect to measure container dimensions and handle resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerDimensions({
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    };
+
+    // Initial measurement
+    updateDimensions();
+
+    // Add resize listener
+    window.addEventListener('resize', updateDimensions);
+    
+    // Use ResizeObserver if available for more accurate container size tracking
+    let resizeObserver;
+    if (window.ResizeObserver && containerRef.current) {
+      resizeObserver = new ResizeObserver(updateDimensions);
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, []);
 
   // Calculate timeline layout with year-centric architecture
   const timelineLayout = useMemo(() => {
@@ -25,9 +60,11 @@ const CurvedTimeline = ({
     const normalSpacing = 100; // Normal spacing between years
     const curveSpacing = 100; // No extended spacing - curves start directly from years
     const rowHeight = 80; // Height between timeline rows
-    const startX = 100; // Starting X position
-    const startY = 300; // Starting Y position
     const curveRadius = 50; // Radius for curve transitions
+    
+    // Dynamic positioning based on container dimensions
+    const centerX = containerDimensions.width / 2;
+    const centerY = containerDimensions.height / 2;
     
     // Only show confirmed years (not pending guesses)
     const confirmedItems = items.filter(item => 
@@ -36,51 +73,93 @@ const CurvedTimeline = ({
     );
     
     const totalYears = confirmedItems.length;
-    let yearPositions = [];
-    let sections = [];
     
     if (totalYears === 0) {
-      // No years - create a single starting node
+      // No years - create a single starting node at center
       layout.push({
         type: 'node',
         index: 0,
-        x: startX,
-        y: startY,
+        x: centerX,
+        y: centerY,
         isSelectable: isMyTurn && (phase === 'player-turn' || phase === 'challenge')
       });
       return layout;
     }
+
+    // PHASE 1: Calculate timeline positions using temporary coordinates
+    let tempYearPositions = [];
+    let tempSections = [];
     
-    // PHASE 1: Position years as the foundation
+    // Calculate positions relative to origin (0,0) first
     for (let yearIndex = 0; yearIndex < totalYears; yearIndex++) {
       const sectionIndex = Math.floor(yearIndex / 3);
       const posInSection = yearIndex % 3;
-      const sectionY = startY - (sectionIndex * rowHeight);
+      const sectionY = -(sectionIndex * rowHeight); // Negative because timeline grows upward
       const isEvenSection = sectionIndex % 2 === 0;
       
       let x, y = sectionY;
       
       if (isEvenSection) {
         // Even sections: left to right
-        x = startX + posInSection * normalSpacing;
+        x = posInSection * normalSpacing;
       } else {
         // Odd sections: right to left
-        x = startX + (2 - posInSection) * normalSpacing;
+        x = (2 - posInSection) * normalSpacing;
       }
       
-      yearPositions.push({ x, y, yearIndex, sectionIndex, posInSection });
-      
-      // Add year to layout
+      tempYearPositions.push({ x, y, yearIndex, sectionIndex, posInSection });
+    }
+
+    // PHASE 2: Calculate bounding box of the timeline
+    let minX = Math.min(...tempYearPositions.map(pos => pos.x));
+    let maxX = Math.max(...tempYearPositions.map(pos => pos.x));
+    let minY = Math.min(...tempYearPositions.map(pos => pos.y));
+    let maxY = Math.max(...tempYearPositions.map(pos => pos.y));
+    
+    // Extend bounds to include nodes (which extend beyond years)
+    minX -= normalSpacing / 2; // First node extends left
+    maxX += normalSpacing / 2; // Last node extends right
+    
+    // Calculate timeline dimensions
+    const timelineWidth = maxX - minX;
+    const timelineHeight = maxY - minY;
+    
+    // PHASE 3: Calculate centering offsets with responsive margins
+    const minMargin = 50; // Minimum margin from container edges
+    const availableWidth = containerDimensions.width - (2 * minMargin);
+    const availableHeight = containerDimensions.height - (2 * minMargin);
+    
+    // Calculate scale factor if timeline is too large
+    const scaleX = timelineWidth > availableWidth ? availableWidth / timelineWidth : 1;
+    const scaleY = timelineHeight > availableHeight ? availableHeight / timelineHeight : 1;
+    const scale = Math.min(scaleX, scaleY, 1); // Never scale up, only down
+    
+    // Calculate final centering offsets
+    const scaledWidth = timelineWidth * scale;
+    const scaledHeight = timelineHeight * scale;
+    const offsetX = centerX - (scaledWidth / 2) - (minX * scale);
+    const offsetY = centerY - (scaledHeight / 2) - (minY * scale);
+    
+    // PHASE 4: Apply centering and scaling to create final positions
+    let yearPositions = tempYearPositions.map(pos => ({
+      ...pos,
+      x: (pos.x * scale) + offsetX,
+      y: (pos.y * scale) + offsetY
+    }));
+    
+    // Add years to layout with final positions
+    yearPositions.forEach((pos, index) => {
       layout.push({
         type: 'year',
-        index: yearIndex,
-        card: confirmedItems[yearIndex],
-        x,
-        y,
+        index: pos.yearIndex,
+        card: confirmedItems[pos.yearIndex],
+        x: pos.x,
+        y: pos.y,
       });
-    }
+    });
     
-    // PHASE 2: Create sections between years and apply curve spacing
+    // PHASE 5: Create sections between years and apply curve spacing (with scaled positions)
+    let sections = [];
     for (let i = 0; i < yearPositions.length - 1; i++) {
       const currentYear = yearPositions[i];
       const nextYear = yearPositions[i + 1];
@@ -100,7 +179,7 @@ const CurvedTimeline = ({
       });
     }
     
-    // PHASE 2.5: Apply curve spacing - extend the final segment of complete sections
+    // PHASE 6: Apply curve spacing - extend the final segment of complete sections (scaled)
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
       
@@ -114,28 +193,30 @@ const CurvedTimeline = ({
         if (endYear.posInSection === 2 && i < sections.length - 1) {
           const nextSection = sections[i + 1];
           if (nextSection.type === 'curve') {
-            // Extend this segment from the end year position
+            // Extend this segment from the end year position (scaled)
             const isEvenSection = endYear.sectionIndex % 2 === 0;
+            const scaledCurveSpacing = (curveSpacing - normalSpacing) * scale;
             
             if (isEvenSection) {
               // Even section going left to right - extend rightward from end year
-              section.endX = endYear.x + (curveSpacing - normalSpacing);
+              section.endX = endYear.x + scaledCurveSpacing;
             } else {
               // Odd section going right to left - extend leftward from end year
-              section.endX = endYear.x - (curveSpacing - normalSpacing);
+              section.endX = endYear.x - scaledCurveSpacing;
             }
           }
         }
       }
     }
     
-    // PHASE 3: Place nodes as interactive layer on sections
+    // PHASE 7: Place nodes as interactive layer on sections (with scaled positions)
     let nodeIndex = 0;
     
     // Add starting node before first year
     if (yearPositions.length > 0) {
       const firstYear = yearPositions[0];
-      const nodeX = firstYear.x - normalSpacing / 2;
+      const scaledNodeSpacing = (normalSpacing / 2) * scale;
+      const nodeX = firstYear.x - scaledNodeSpacing;
       layout.push({
         type: 'node',
         index: nodeIndex++,
@@ -160,7 +241,7 @@ const CurvedTimeline = ({
           isSelectable: isMyTurn && (phase === 'player-turn' || phase === 'challenge')
         });
       } else {
-        // Curve section - place node at midpoint with CSS shift
+        // Curve section - place node at midpoint with CSS shift (scaled)
         const startYear = section.startYear;
         const endYear = section.endYear;
         
@@ -168,12 +249,9 @@ const CurvedTimeline = ({
         const nodeX = (startYear.x + endYear.x) / 2;
         const nodeY = (startYear.y + endYear.y) / 2;
         
-        // Determine curve direction for CSS shift
-        const goingUp = endYear.y < startYear.y;
-        const goingLeft = endYear.x < startYear.x;
-        
-        // Determine which way this specific curve bends to position node correctly
+        // Determine which way this specific curve bends to position node correctly (scaled)
         let curveShift = 0;
+        const scaledRowHeight = rowHeight * scale;
         
         // Check the section indices to understand the curve direction
         const fromSectionIndex = startYear.sectionIndex;
@@ -184,14 +262,15 @@ const CurvedTimeline = ({
         if (fromEvenSection && !toEvenSection) {
           // From even (left-to-right) to odd (right-to-left) section
           // Upper curve bends leftward - shift right to follow the curve
-          curveShift = rowHeight / 2; // 50px right
+          curveShift = scaledRowHeight / 2;
         } else if (!fromEvenSection && toEvenSection) {
           // From odd (right-to-left) to even (left-to-right) section  
           // Lower curve bends rightward - shift left to follow the curve
-          curveShift = -rowHeight / 2; // 50px left
+          curveShift = -scaledRowHeight / 2;
         } else {
           // Fallback for other curve types
-          curveShift = goingLeft ? rowHeight / 2 : -rowHeight / 2;
+          const goingLeft = endYear.x < startYear.x;
+          curveShift = goingLeft ? scaledRowHeight / 2 : -scaledRowHeight / 2;
         }
         
         layout.push({
@@ -205,18 +284,19 @@ const CurvedTimeline = ({
       }
     });
     
-    // Add final node after last year - consider section direction
+    // Add final node after last year - consider section direction (scaled)
     if (yearPositions.length > 0) {
       const lastYear = yearPositions[yearPositions.length - 1];
       const isEvenSection = lastYear.sectionIndex % 2 === 0;
+      const scaledNodeSpacing = (normalSpacing / 2) * scale;
       
       let nodeX;
       if (isEvenSection) {
         // Even section goes left to right - node goes to the right
-        nodeX = lastYear.x + normalSpacing / 2;
+        nodeX = lastYear.x + scaledNodeSpacing;
       } else {
         // Odd section goes right to left - node goes to the left
-        nodeX = lastYear.x - normalSpacing / 2;
+        nodeX = lastYear.x - scaledNodeSpacing;
       }
       
       layout.push({
@@ -229,15 +309,63 @@ const CurvedTimeline = ({
     }
     
     return layout;
-  }, [timeline, isMyTurn, phase, lastPlaced]);
+  }, [timeline, isMyTurn, phase, lastPlaced, containerDimensions]);
 
   // Generate SVG path based on years and sections, not nodes
   const generateCurvePath = useMemo(() => {
     const years = timelineLayout.filter(item => item.type === 'year');
     const nodes = timelineLayout.filter(item => item.type === 'node');
     
-    // Define curveRadius in this scope
-    const curveRadius = 40; // Radius for curve transitions
+    // Calculate the same scale factor used in timeline layout for consistent scaling
+    const items = [...timeline];
+    const confirmedItems = items.filter(item => 
+      !lastPlaced || item.id !== lastPlaced.id || 
+      (phase !== 'song-guess' && phase !== 'challenge-window' && phase !== 'challenge')
+    );
+    
+    // Calculate scale factor (same logic as in timelineLayout)
+    const normalSpacing = 100;
+    const rowHeight = 80;
+    const minMargin = 50;
+    const availableWidth = containerDimensions.width - (2 * minMargin);
+    const availableHeight = containerDimensions.height - (2 * minMargin);
+    
+    let scale = 1;
+    if (confirmedItems.length > 0) {
+      // Calculate timeline dimensions to determine scale
+      const totalYears = confirmedItems.length;
+      let tempYearPositions = [];
+      
+      for (let yearIndex = 0; yearIndex < totalYears; yearIndex++) {
+        const sectionIndex = Math.floor(yearIndex / 3);
+        const posInSection = yearIndex % 3;
+        const sectionY = -(sectionIndex * rowHeight);
+        const isEvenSection = sectionIndex % 2 === 0;
+        
+        let x, y = sectionY;
+        if (isEvenSection) {
+          x = posInSection * normalSpacing;
+        } else {
+          x = (2 - posInSection) * normalSpacing;
+        }
+        tempYearPositions.push({ x, y });
+      }
+      
+      const minX = Math.min(...tempYearPositions.map(pos => pos.x)) - normalSpacing / 2;
+      const maxX = Math.max(...tempYearPositions.map(pos => pos.x)) + normalSpacing / 2;
+      const minY = Math.min(...tempYearPositions.map(pos => pos.y));
+      const maxY = Math.max(...tempYearPositions.map(pos => pos.y));
+      
+      const timelineWidth = maxX - minX;
+      const timelineHeight = maxY - minY;
+      
+      const scaleX = timelineWidth > availableWidth ? availableWidth / timelineWidth : 1;
+      const scaleY = timelineHeight > availableHeight ? availableHeight / timelineHeight : 1;
+      scale = Math.min(scaleX, scaleY, 1);
+    }
+    
+    // Scale the curve radius proportionally with timeline compression
+    const curveRadius = 40 * scale; // Radius scales with timeline compression
     
     if (years.length === 0) {
       // No years, just draw a simple line through nodes
@@ -408,7 +536,7 @@ const CurvedTimeline = ({
   };
 
   return (
-    <div className="curved-timeline-container w-full h-full relative bg-background">
+    <div ref={containerRef} className="curved-timeline-container w-full h-full relative bg-background">
       
       {/* Timeline Title */}
       {currentPlayerName && (
@@ -573,13 +701,6 @@ const CurvedTimeline = ({
         })}
       </div>
       
-      {/* Current card indicator */}
-      {currentCard && pendingDropIndex !== null && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-yellow-600 text-white px-4 py-2 rounded-lg shadow-lg">
-          <div className="text-sm font-medium">Ready to place card</div>
-          <div className="text-xs opacity-75">Check footer to confirm placement</div>
-        </div>
-      )}
     </div>
   );
 };
