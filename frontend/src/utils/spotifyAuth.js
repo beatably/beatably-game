@@ -510,7 +510,8 @@ class SpotifyAuthManager {
       pauseFirst = true,
       transferFirst = false,
       maxVerifyAttempts = 3,
-      verifyDelayMs = 250
+      verifyDelayMs = 250,
+      forcePositionReset = true // NEW: Force position reset to prevent ~30s start bug
     } = opts || {};
 
     const tokenStatus = await this.ensureValidToken();
@@ -528,13 +529,27 @@ class SpotifyAuthManager {
       if (pauseFirst) {
         // Pause active device to ensure a clean cut; avoid device_id query to minimize 404
         await this.pausePlayback().catch(() => {});
+        
+        // CRITICAL FIX: Force seek to position 0 after pause to clear any cached position
+        if (forcePositionReset) {
+          await sleep(100); // Brief pause to ensure pause command is processed
+          try {
+            await this.seekToPosition(deviceId, 0);
+            console.log('[SpotifyAuth] Forced position reset to 0 to prevent ~30s start bug');
+          } catch (seekErr) {
+            console.warn('[SpotifyAuth] Position reset failed (continuing):', seekErr?.message || seekErr);
+          }
+        }
       }
+
+      // Ensure position is explicitly 0 for new round starts
+      const finalPositionMs = forcePositionReset ? 0 : positionMs;
 
       // First attempt: play WITHOUT device_id (active device)
       let playUrl = `https://api.spotify.com/v1/me/player/play`;
       let body = {
         uris: [trackUri],
-        position_ms: positionMs
+        position_ms: finalPositionMs
       };
       try {
         await this.makeSpotifyRequest(playUrl, {
@@ -551,14 +566,26 @@ class SpotifyAuthManager {
         });
       }
 
-      // Verify
+      // Enhanced verification: check both URI and position
       for (let i = 0; i < maxVerifyAttempts; i++) {
         await sleep(verifyDelayMs);
         try {
           const state = await this.getPlaybackState(deviceId); // may try with device_id query
           const itemUri = state?.item?.uri;
+          const currentPosition = state?.progress_ms || 0;
+          
           if (itemUri === trackUri) {
-            console.log('[SpotifyAuth] Verified playback on correct target:', itemUri);
+            // Additional check: if we forced position reset, verify we're near the beginning
+            if (forcePositionReset && currentPosition > 5000) { // More than 5 seconds in
+              console.warn('[SpotifyAuth] Song started but not from beginning (position:', currentPosition, 'ms). Attempting position correction...');
+              try {
+                await this.seekToPosition(deviceId, 0);
+                await sleep(100);
+              } catch (correctErr) {
+                console.warn('[SpotifyAuth] Position correction failed:', correctErr?.message || correctErr);
+              }
+            }
+            console.log('[SpotifyAuth] Verified playback on correct target:', itemUri, 'at position:', currentPosition, 'ms');
             return true;
           }
         } catch (vErr) {

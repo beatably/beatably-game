@@ -300,6 +300,21 @@ export class PlayerSync {
       console.log('[PlayerSync] Syncing current song:', uri, 'at position:', position_ms);
       
       try {
+        // CRITICAL FIX: Always pause first and seek to 0 to prevent ~30s start bug
+        try {
+          await this.opts.fetchJson('PUT', '/me/player/pause');
+          await this.delay(100);
+          
+          // Force position reset to 0 for new round starts
+          if (position_ms === 0) {
+            await this.opts.fetchJson('PUT', `/me/player/seek?position_ms=0`);
+            console.log('[PlayerSync] Forced position reset to 0 to prevent ~30s start bug');
+            await this.delay(100);
+          }
+        } catch (pauseErr) {
+          console.warn('[PlayerSync] Pause/seek before sync failed (continuing):', pauseErr);
+        }
+        
         // Start playback of the specific song at the specified position
         const playBody = {
           uris: [uri],

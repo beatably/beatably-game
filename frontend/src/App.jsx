@@ -935,7 +935,13 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               targetDevice,
               payloadUri,
               0,
-              { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 4, verifyDelayMs: 250 }
+              { 
+                pauseFirst: true, 
+                transferFirst: false, 
+                maxVerifyAttempts: 4, 
+                verifyDelayMs: 250,
+                forcePositionReset: true // CRITICAL FIX: Force position reset for new rounds
+              }
             );
             if (ok) setIsPlayingMusic(true);
           } else {
@@ -2057,7 +2063,13 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           deviceId,
           currentCard.uri,
           0,
-          { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 4, verifyDelayMs: 250 }
+          { 
+            pauseFirst: true, 
+            transferFirst: false, 
+            maxVerifyAttempts: 4, 
+            verifyDelayMs: 250,
+            forcePositionReset: true // CRITICAL FIX: Force position reset for new rounds
+          }
         );
         if (ok) {
           lastPlayedUriRef.current = currentCard.uri;
