@@ -84,11 +84,27 @@ function Landing({ onCreate, onJoin }) {
 
   return (
     <div
-      className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground px-6 py-4"
-      style={{ paddingBottom: "15px" }}
+      className="flex flex-col items-center justify-end min-h-screen text-foreground px-6 relative"
+      style={{
+        backgroundColor: "#000000",
+        backgroundImage: "url('/img/bg-image.jpg')",
+        backgroundSize: "100% auto",
+        backgroundPosition: "top center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
+        paddingTop: "max(2rem, env(safe-area-inset-top))",
+        paddingBottom: "max(8vh, calc(2rem + env(safe-area-inset-bottom)))"
+      }}
     >
+      {/* Gradient overlay for better readability */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 100%)"
+        }}
+      />
       {/* Minimal Header */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-8 relative z-10">
         <img
           src={beatablyLogo}
           alt="Beatably Logo"
@@ -96,7 +112,7 @@ function Landing({ onCreate, onJoin }) {
         />
       </div>
 
-      <div className="w-full max-w-sm space-y-4">
+      <div className="w-full max-w-sm space-y-4 relative z-10">
         {!joining ? (
           <>
             {/* Name Input */}
