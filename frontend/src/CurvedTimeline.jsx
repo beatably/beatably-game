@@ -23,9 +23,24 @@ const CurvedTimeline = ({
     const updateDimensions = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
+        
+        // Get viewport dimensions for better centering calculations
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        
+        // Calculate the actual available space by accounting for header and footer
+        // The container represents the space between header and footer
+        const availableHeight = rect.height;
+        const availableWidth = rect.width;
+        
         setContainerDimensions({
-          width: rect.width,
-          height: rect.height
+          width: availableWidth,
+          height: availableHeight,
+          // Store additional context for better positioning
+          containerTop: rect.top,
+          containerLeft: rect.left,
+          viewportHeight,
+          viewportWidth
         });
       }
     };
