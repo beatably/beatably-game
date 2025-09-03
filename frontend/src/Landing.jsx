@@ -98,17 +98,21 @@ function Landing({ onCreate, onJoin }) {
 
   return (
     <div
-      className="flex flex-col items-center justify-end relative overflow-hidden text-foreground px-6"
+      className="flex flex-col items-center justify-end relative overflow-hidden text-foreground px-6 landing-container"
       style={{
         backgroundColor: "#000000",
         backgroundImage: "url('/img/bg-image-2.jpg')",
         backgroundSize: "cover",
-        backgroundPosition: "center calc(-1 * env(safe-area-inset-top))",
+        backgroundPosition: "center top",
         backgroundRepeat: "no-repeat",
-        height: "100vh",
-        minHeight: "100dvh", // Dynamic viewport height for iOS
-        paddingTop: "max(2rem, env(safe-area-inset-top))",
-        paddingBottom: "max(8vh, calc(2rem + env(safe-area-inset-bottom)))"
+        // Use viewport manager custom properties for better iOS handling
+        minHeight: "calc(var(--vh, 1vh) * 100)",
+        maxHeight: "calc(var(--vh, 1vh) * 100)",
+        paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+        // Additional iOS Safari optimizations
+        WebkitOverflowScrolling: "touch",
+        overscrollBehavior: "contain"
       }}
     >
       {/* Gradient overlay for better readability */}
@@ -119,15 +123,15 @@ function Landing({ onCreate, onJoin }) {
         }}
       />
       {/* Minimal Header */}
-      <div className="text-center mb-8 relative z-10">
+      <div className="text-center mb-6 sm:mb-8 relative z-10">
         <img
           src={beatablyLogo}
           alt="Beatably Logo"
-          className="h-12 w-auto mx-auto"
+          className="h-10 sm:h-12 w-auto mx-auto"
         />
       </div>
 
-      <div className="w-full max-w-sm space-y-4 relative z-10">
+      <div className="w-full max-w-sm space-y-3 sm:space-y-4 relative z-10">
         {!joining ? (
           <>
             {/* Name Input */}
