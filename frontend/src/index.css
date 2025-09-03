@@ -255,8 +255,9 @@ html, body {
   /* Specific fixes for iPhone 13 mini and similar small devices */
   @media screen and (max-width: 390px) and (max-height: 844px) {
     .landing-container {
-      padding-top: max(1rem, env(safe-area-inset-top)) !important;
-      padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+      /* Remove extra padding since global CSS already handles safe areas */
+      padding-top: 0.5rem !important;
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
     }
   }
 }

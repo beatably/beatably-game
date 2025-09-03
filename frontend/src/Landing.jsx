@@ -108,8 +108,9 @@ function Landing({ onCreate, onJoin }) {
         // Use viewport manager custom properties for better iOS handling
         minHeight: "calc(var(--vh, 1vh) * 100)",
         maxHeight: "calc(var(--vh, 1vh) * 100)",
-        paddingTop: "max(1.5rem, env(safe-area-inset-top))",
-        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+        // Reduced padding since global CSS already handles safe areas
+        paddingTop: "1rem",
+        paddingBottom: "1rem",
         // Additional iOS Safari optimizations
         WebkitOverflowScrolling: "touch",
         overscrollBehavior: "contain"
