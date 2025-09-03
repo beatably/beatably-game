@@ -84,16 +84,19 @@ function Landing({ onCreate, onJoin }) {
 
   return (
     <div
-      className="flex flex-col items-center justify-end min-h-screen text-foreground px-6 relative"
+      className="flex flex-col items-center justify-end relative overflow-hidden text-foreground px-6"
       style={{
         backgroundColor: "#000000",
         backgroundImage: "url('/img/bg-image-2.jpg')",
-        backgroundSize: "100% auto",
-        backgroundPosition: "top center",
+        backgroundSize: "cover",
+        backgroundPosition: "center top",
         backgroundRepeat: "no-repeat",
-        backgroundAttachment: "fixed",
-        paddingTop: "max(2rem, env(safe-area-inset-top))",
-        paddingBottom: "max(8vh, calc(2rem + env(safe-area-inset-bottom)))"
+        height: "100vh",
+        minHeight: "100dvh", // Dynamic viewport height for iOS
+        paddingBottom: "max(8vh, calc(2rem + env(safe-area-inset-bottom)))",
+        // Ensure background extends behind status bar on iOS
+        marginTop: "calc(-1 * env(safe-area-inset-top))",
+        paddingTop: "calc(2rem + env(safe-area-inset-top))"
       }}
     >
       {/* Gradient overlay for better readability */}
