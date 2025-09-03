@@ -20,6 +20,7 @@ function WaitingRoom({
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0); // 0: idle, 1: fetching, 2: filtering, 3: preparing, 4: done
   const [guestSeesLoading, setGuestSeesLoading] = useState(false); // guests should also see loading while host starts
+  const [isLeaving, setIsLeaving] = useState(false);
   const settingsButtonRef = useRef(null);
   const isCreator = currentPlayer?.isCreator;
   const enoughPlayers = players.length >= 2; // Minimum 2 players, max 4 players
@@ -64,6 +65,16 @@ function WaitingRoom({
       setIsStartingGame(false);
       setGuestSeesLoading(false);
       setLoadingStage(0);
+    }
+  };
+
+  const handleLeave = async () => {
+    setIsLeaving(true);
+    try {
+      await onLeave();
+    } catch (error) {
+      console.error('Error leaving game:', error);
+      setIsLeaving(false);
     }
   };
 
@@ -192,10 +203,29 @@ function WaitingRoom({
 
           <Button
             variant="outline"
-            className="w-full h-12 font-semibold touch-button border-border hover:bg-card"
-            onClick={onLeave}
+            className="w-full h-12 font-semibold touch-button border-border hover:bg-card flex items-center justify-center"
+            disabled={isLeaving}
+            onClick={handleLeave}
           >
-            Leave Game
+            {isLeaving && (
+              <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            )}
+            {isLeaving ? "Leaving..." : "Leave Game"}
           </Button>
 
           {isCreator && (

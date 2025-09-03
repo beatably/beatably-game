@@ -2435,7 +2435,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         {showSpotifyAuthRenewal && (
           <SpotifyAuthRenewal
             isVisible={showSpotifyAuthRenewal}
-            onRenew={handleSpotifyAuthRenewal}
+r            onRenew={handleSpotifyAuthRenewal}
             onDismiss={handleSpotifyAuthRenewalDismiss}
             gameState={authRenewalGameState}
             autoRedirect={false}
@@ -2481,7 +2481,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col h-full">
+        <div className="mobile-fullscreen mobile-safe-area bg-card text-white flex flex-col h-full">
           <PlayerHeader 
             players={players} 
             currentPlayerId={currentPlayerId} 

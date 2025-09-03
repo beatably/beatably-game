@@ -76,12 +76,27 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
   };
 
   return (
-    <header className="w-full bg-card mobile-shadow flex items-center justify-end p-2 md:px-2 md:py-1">
+    <header className="w-full bg-card mobile-shadow flex items-center justify-between p-2 md:px-2 md:py-1">
       <div className="absolute left-16 top-5">
         <img className="w-0" src={beatablyLogo} alt="Beatably Logo"></img>
       </div>
+      
+      {/* Menu button - aligned with header content */}
+      {players.length > 0 && (
+        <div className="flex items-center">
+          <button 
+            onClick={() => setMenuOpen(!menuOpen)} 
+            className="bg-input text-foreground p-2 rounded hover:bg-card flex items-center justify-center"
+            aria-label="Menu"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" className="text-foreground">
+              <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
+      
       <div className="flex flex-wrap gap-4 md:gap-6 text-[10px] md:text-xs">
-
         {players.map((p) => (
           <div
             key={p.id}
@@ -104,18 +119,9 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
           </div>
         ))}
       </div>
+      
       {players.length > 0 && (
-          <div className="absolute left-2 top-2">
-          <button 
-            onClick={() => setMenuOpen(!menuOpen)} 
-            className="bg-input text-foreground p-2 rounded hover:bg-card flex items-center justify-center"
-            aria-label="Menu"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" className="text-foreground">
-              <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-          
+        <>
           {/* Modal overlay - rendered via portal */}
           {menuOpen && createPortal(
             <>
@@ -193,7 +199,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
             </div>,
             document.body
           )}
-        </div>
+        </>
       )}
     </header>
   );

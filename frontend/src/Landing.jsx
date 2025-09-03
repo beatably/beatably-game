@@ -9,6 +9,8 @@ function Landing({ onCreate, onJoin }) {
   const [joinCode, setJoinCode] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoiningGame, setIsJoiningGame] = useState(false);
 
   const firstCodeRef = useRef(null);
 
@@ -19,13 +21,19 @@ function Landing({ onCreate, onJoin }) {
     }
   }, [joining]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim()) {
       setError("Please enter your name");
       return;
     }
     setError("");
-    onCreate(name);
+    setIsCreating(true);
+    try {
+      await onCreate(name);
+    } catch (error) {
+      console.error('Error creating game:', error);
+      setIsCreating(false);
+    }
   };
 
   const handleStartJoin = () => {
@@ -43,7 +51,7 @@ function Landing({ onCreate, onJoin }) {
     setJoinCode(["", "", "", ""]);
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     // Name should already be set from first step, but validate defensively
     if (!name.trim()) {
       setError("Please enter your name");
@@ -56,7 +64,13 @@ function Landing({ onCreate, onJoin }) {
       return;
     }
     setError("");
-    onJoin(name, code);
+    setIsJoiningGame(true);
+    try {
+      await onJoin(name, code);
+    } catch (error) {
+      console.error('Error joining game:', error);
+      setIsJoiningGame(false);
+    }
   };
 
   const handleCodeChange = (index, value) => {
@@ -89,14 +103,12 @@ function Landing({ onCreate, onJoin }) {
         backgroundColor: "#000000",
         backgroundImage: "url('/img/bg-image-2.jpg')",
         backgroundSize: "cover",
-        backgroundPosition: "center top",
+        backgroundPosition: "center calc(-1 * env(safe-area-inset-top))",
         backgroundRepeat: "no-repeat",
         height: "100vh",
         minHeight: "100dvh", // Dynamic viewport height for iOS
-        paddingBottom: "max(8vh, calc(2rem + env(safe-area-inset-bottom)))",
-        // Ensure background extends behind status bar on iOS
-        marginTop: "calc(-1 * env(safe-area-inset-top))",
-        paddingTop: "calc(2rem + env(safe-area-inset-top))"
+        paddingTop: "max(2rem, env(safe-area-inset-top))",
+        paddingBottom: "max(8vh, calc(2rem + env(safe-area-inset-bottom)))"
       }}
     >
       {/* Gradient overlay for better readability */}
@@ -135,11 +147,29 @@ function Landing({ onCreate, onJoin }) {
 
             {/* Primary CTA: Create a new game */}
             <Button
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button"
-              disabled={!name.trim()}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button flex items-center justify-center"
+              disabled={!name.trim() || isCreating}
               onClick={handleCreate}
             >
-              Create new game
+              {isCreating && (
+                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+              )}
+              {isCreating ? "Creating..." : "Create new game"}
             </Button>
 
             {/* Secondary: Reveal join with code */}
@@ -176,11 +206,29 @@ function Landing({ onCreate, onJoin }) {
 
             {/* Primary CTA in join view */}
             <Button
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button"
-              disabled={!name.trim() || joinCode.some((d) => !d)}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button flex items-center justify-center"
+              disabled={!name.trim() || joinCode.some((d) => !d) || isJoiningGame}
               onClick={handleJoin}
             >
-              Join Game
+              {isJoiningGame && (
+                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+              )}
+              {isJoiningGame ? "Joining..." : "Join Game"}
             </Button>
 
             {/* Secondary: Cancel back to name input */}
