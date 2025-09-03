@@ -87,7 +87,7 @@ function Landing({ onCreate, onJoin }) {
       className="flex flex-col items-center justify-end min-h-screen text-foreground px-6 relative"
       style={{
         backgroundColor: "#000000",
-        backgroundImage: "url('/img/bg-image.jpg')",
+        backgroundImage: "url('/img/bg-image-2.jpg')",
         backgroundSize: "100% auto",
         backgroundPosition: "top center",
         backgroundRepeat: "no-repeat",
