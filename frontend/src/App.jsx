@@ -2481,7 +2481,7 @@ r            onRenew={handleSpotifyAuthRenewal}
     
     return (
       <DndProvider backend={HTML5Backend}>
-        <div className="mobile-fullscreen mobile-safe-area bg-card text-white flex flex-col h-full">
+        <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col h-full">
           <PlayerHeader 
             players={players} 
             currentPlayerId={currentPlayerId} 
