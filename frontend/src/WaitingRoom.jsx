@@ -38,6 +38,14 @@ function WaitingRoom({
     }
   }, [externalLoadingStage]);
 
+  // Add body class for waiting room safe area styling
+  useEffect(() => {
+    document.body.classList.add('waiting-room-active');
+    return () => {
+      document.body.classList.remove('waiting-room-active');
+    };
+  }, []);
+
   const handleStartGame = async () => {
     setIsStartingGame(true);
     setGuestSeesLoading(true); // make guests see loading immediately
@@ -80,8 +88,20 @@ function WaitingRoom({
 
   return (
     <div
-      className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground px-6 py-4"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}
+      className="waiting-room-container flex flex-col items-center justify-center text-foreground px-6"
+      style={{
+        backgroundColor: "hsl(var(--background))",
+        // Use min-height instead of fixed height to allow scrolling
+        minHeight: "100dvh",
+        // Allow scrolling when content exceeds viewport
+        overflow: "auto",
+        // iOS optimizations
+        WebkitOverflowScrolling: "touch",
+        overscrollBehavior: "contain",
+        // Ensure proper safe area handling
+        paddingTop: "max(1rem, env(safe-area-inset-top))",
+        paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
+      }}
     >
       <div className="w-full max-w-sm space-y-6">
         {/* Header */}

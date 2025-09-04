@@ -21,6 +21,40 @@ function Landing({ onCreate, onJoin }) {
     }
   }, [joining]);
 
+  // Handle input focus to ensure visibility when virtual keyboard appears
+  useEffect(() => {
+    const handleInputFocus = (e) => {
+      // Only handle for input elements
+      if (e.target.tagName !== 'INPUT') return;
+      
+      // Small delay to let keyboard animation start
+      setTimeout(() => {
+        // Scroll the focused input into view
+        e.target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'nearest'
+        });
+      }, 300);
+    };
+
+    const handleInputBlur = () => {
+      // Reset scroll position when keyboard disappears
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    };
+
+    // Add event listeners
+    document.addEventListener('focusin', handleInputFocus);
+    document.addEventListener('focusout', handleInputBlur);
+
+    return () => {
+      document.removeEventListener('focusin', handleInputFocus);
+      document.removeEventListener('focusout', handleInputBlur);
+    };
+  }, []);
+
   const handleCreate = async () => {
     if (!name.trim()) {
       setError("Please enter your name");
@@ -98,22 +132,23 @@ function Landing({ onCreate, onJoin }) {
 
   return (
     <div
-      className="flex flex-col items-center justify-end relative overflow-hidden text-foreground px-6 landing-container"
+      className="flex flex-col items-center justify-end relative text-foreground px-6 landing-container"
       style={{
         backgroundColor: "#000000",
         backgroundImage: "url('/img/bg-image-2.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center top",
         backgroundRepeat: "no-repeat",
-        // Use viewport manager custom properties for better iOS handling
-        minHeight: "calc(var(--vh, 1vh) * 100)",
-        maxHeight: "calc(var(--vh, 1vh) * 100)",
-        // Reduced padding since global CSS already handles safe areas
-        paddingTop: "1rem",
-        paddingBottom: "1rem",
-        // Additional iOS Safari optimizations
+        // Use single height declaration to avoid conflicts
+        height: "100dvh",
+        // Prevent any overflow
+        overflow: "hidden",
+        // iOS optimizations
         WebkitOverflowScrolling: "touch",
-        overscrollBehavior: "contain"
+        overscrollBehavior: "contain",
+        // Ensure proper safe area handling
+        paddingTop: "max(1rem, env(safe-area-inset-top))",
+        paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
       }}
     >
       {/* Gradient overlay for better readability */}

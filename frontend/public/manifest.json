@@ -1,16 +1,19 @@
 {
   "name": "Beatably",
   "short_name": "Beatably",
+  "description": "Music timeline guessing game",
   "icons": [
     {
       "src": "/img/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/img/icon-192.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/img/icon-192.png",
@@ -30,6 +33,11 @@
   ],
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827"
+  "orientation": "portrait-primary",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "scope": "/",
+  "categories": ["games", "music", "entertainment"],
+  "lang": "en",
+  "dir": "ltr"
 }

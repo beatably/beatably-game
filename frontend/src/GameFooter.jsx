@@ -646,7 +646,7 @@ function GameFooter({
   return (
     <footer 
       className="w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 15px)" }}
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0px)" }}
     >
       {/* Spotify-style player */}
       <div className="w-full max-w-md flex flex-col items-center">
