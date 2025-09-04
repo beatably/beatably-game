@@ -463,44 +463,76 @@ audio {
     @apply rounded-lg border-l-4; /* Left border accent for warnings */
   }
 
-  /* Completely disable focus/outline for touch buttons to prevent persistent highlights */
+  /* COMPREHENSIVE BUTTON FOCUS AND STYLE OVERRIDE */
+  
+  /* Target all buttons globally */
+  button,
+  button:focus,
+  button:focus-visible,
+  button:active,
+  [role="button"],
+  [role="button"]:focus,
+  [role="button"]:focus-visible,
+  [role="button"]:active {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-focus-ring-color: transparent !important;
+  }
+  
+  /* Remove persistent focus outline after mobile tap for all buttons */
+  button:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible) {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* SHADCN/UI BUTTON COMPONENT OVERRIDES */
+  
+  /* Remove the focus ring completely from all button variants */
+  button:focus-visible,
+  button.focus-visible\:ring-2:focus-visible,
+  [role="button"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    ring: none !important;
+    --tw-ring-shadow: none !important;
+    --tw-ring-offset-shadow: none !important;
+  }
+  
+  /* Override outline variant background to be transparent */
+  button[class*="border"][class*="bg-background"],
+  .outline-button-override {
+    background-color: transparent !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  /* Ensure hover states work properly for outline buttons */
+  button[class*="border"][class*="bg-background"]:hover,
+  .outline-button-override:hover {
+    background-color: hsl(var(--input)) !important;
+  }
+  
+  /* Targeted focus outline removal for specific buttons that have persistent purple outline issues */
   .no-focus-outline {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-focus-ring-color: transparent !important;
+  }
+  
+  /* Only remove focus outline on touch end to prevent persistent highlights after mobile tap */
+  .no-focus-outline:focus:not(:focus-visible) {
     outline: none !important;
     box-shadow: none !important;
-    border-color: hsl(var(--border)) !important;
   }
   
-  .no-focus-outline:focus {
+  /* For buttons that specifically need all focus styles removed (play/pause/restart buttons) */
+  .no-focus-outline.force-no-outline,
+  .no-focus-outline.force-no-outline:focus,
+  .no-focus-outline.force-no-outline:focus-visible,
+  .no-focus-outline.force-no-outline:active {
     outline: none !important;
     box-shadow: none !important;
-    border-color: hsl(var(--border)) !important;
-    background-color: hsl(var(--background)) !important;
-  }
-  
-  .no-focus-outline:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
-    border-color: hsl(var(--border)) !important;
-    background-color: hsl(var(--background)) !important;
-  }
-  
-  .no-focus-outline:active {
-    outline: none !important;
-    box-shadow: none !important;
-    border-color: hsl(var(--border)) !important;
-    background-color: hsl(var(--background)) !important;
-  }
-  
-  /* Override hover state that gets stuck on mobile */
-  .no-focus-outline:hover {
-    background-color: hsl(var(--background)) !important;
-  }
-  
-  /* Target mobile devices specifically to prevent stuck hover states */
-  @media (hover: none) and (pointer: coarse) {
-    .no-focus-outline:hover {
-      background-color: hsl(var(--background)) !important;
-    }
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
   }
 }
 

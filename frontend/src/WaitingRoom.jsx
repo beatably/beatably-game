@@ -22,6 +22,8 @@ function WaitingRoom({
   const [guestSeesLoading, setGuestSeesLoading] = useState(false); // guests should also see loading while host starts
   const [isLeaving, setIsLeaving] = useState(false);
   const settingsButtonRef = useRef(null);
+  const leaveButtonRef = useRef(null);
+  const startGameButtonRef = useRef(null);
   const isCreator = currentPlayer?.isCreator;
   const enoughPlayers = players.length >= 2; // Minimum 2 players, max 4 players
   const tooManyPlayers = players.length > 4;
@@ -222,10 +224,32 @@ function WaitingRoom({
           )}
 
           <Button
+            ref={leaveButtonRef}
             variant="outline"
-            className="w-full h-12 font-semibold touch-button border-border hover:bg-card flex items-center justify-center"
+            className="w-full h-12 font-semibold touch-button border-border hover:bg-card flex items-center justify-center no-focus-outline"
             disabled={isLeaving}
-            onClick={handleLeave}
+            onClick={() => {
+              handleLeave();
+              // Immediately blur after click to prevent focus ring
+              if (leaveButtonRef.current) {
+                setTimeout(() => {
+                  leaveButtonRef.current.blur();
+                }, 0);
+              }
+            }}
+            onTouchStart={() => {
+              // Prevent focus on touch start
+              if (leaveButtonRef.current) {
+                leaveButtonRef.current.blur();
+              }
+            }}
+            onTouchEnd={() => {
+              // Blur the button after touch to remove persistent focus highlight
+              if (leaveButtonRef.current) {
+                leaveButtonRef.current.blur();
+              }
+            }}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {isLeaving && (
               <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
@@ -250,9 +274,31 @@ function WaitingRoom({
 
           {isCreator && (
             <Button
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button flex items-center justify-center"
+              ref={startGameButtonRef}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button flex items-center justify-center no-focus-outline"
               disabled={!canStart || isStartingGame}
-              onClick={handleStartGame}
+              onClick={() => {
+                handleStartGame();
+                // Immediately blur after click to prevent focus ring
+                if (startGameButtonRef.current) {
+                  setTimeout(() => {
+                    startGameButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (startGameButtonRef.current) {
+                  startGameButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (startGameButtonRef.current) {
+                  startGameButtonRef.current.blur();
+                }
+              }}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               {(isStartingGame || isLoadingExternally) && (
                 <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">

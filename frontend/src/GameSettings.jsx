@@ -28,6 +28,15 @@ function GameSettings({ settings, onUpdate }) {
   // Keep a ref to the active handle so pointer events can be coordinated
   const activeHandleRef = React.useRef(null);
 
+  // Button refs for focus management
+  const difficultyButtonRefs = React.useRef({});
+  const winConditionButtonRefs = React.useRef({});
+  const decadeButtonRefs = React.useRef({});
+  const genreButtonRefs = React.useRef({});
+  const marketButtonRefs = React.useRef({});
+  const resetButtonRef = React.useRef(null);
+  const debugButtonRef = React.useRef(null);
+
   // Enhanced carousel state management
   const carouselRef = React.useRef(null);
   const carouselStartXRef = React.useRef(null);

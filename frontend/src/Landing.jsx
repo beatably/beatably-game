@@ -13,6 +13,10 @@ function Landing({ onCreate, onJoin }) {
   const [isJoiningGame, setIsJoiningGame] = useState(false);
 
   const firstCodeRef = useRef(null);
+  const createButtonRef = useRef(null);
+  const joinWithCodeButtonRef = useRef(null);
+  const joinGameButtonRef = useRef(null);
+  const cancelButtonRef = useRef(null);
 
   useEffect(() => {
     if (joining) {
@@ -187,9 +191,30 @@ function Landing({ onCreate, onJoin }) {
 
             {/* Primary CTA: Create a new game */}
             <Button
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button flex items-center justify-center"
+              ref={createButtonRef}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button no-focus-outline flex items-center justify-center"
               disabled={!name.trim() || isCreating}
-              onClick={handleCreate}
+              onClick={() => {
+                handleCreate();
+                // Immediately blur after click to prevent focus ring
+                if (createButtonRef.current) {
+                  setTimeout(() => {
+                    createButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (createButtonRef.current) {
+                  createButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (createButtonRef.current) {
+                  createButtonRef.current.blur();
+                }
+              }}
             >
               {isCreating && (
                 <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
@@ -214,10 +239,31 @@ function Landing({ onCreate, onJoin }) {
 
             {/* Secondary: Reveal join with code */}
             <Button
+              ref={joinWithCodeButtonRef}
               variant="outline"
-              className="w-full h-12 font-semibold touch-button"
+              className="w-full h-12 font-semibold touch-button no-focus-outline outline-button-override"
               disabled={!name.trim()}
-              onClick={handleStartJoin}
+              onClick={() => {
+                handleStartJoin();
+                // Immediately blur after click to prevent focus ring
+                if (joinWithCodeButtonRef.current) {
+                  setTimeout(() => {
+                    joinWithCodeButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (joinWithCodeButtonRef.current) {
+                  joinWithCodeButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (joinWithCodeButtonRef.current) {
+                  joinWithCodeButtonRef.current.blur();
+                }
+              }}
             >
               Join game with code
             </Button>
@@ -246,9 +292,30 @@ function Landing({ onCreate, onJoin }) {
 
             {/* Primary CTA in join view */}
             <Button
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button flex items-center justify-center"
+              ref={joinGameButtonRef}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button no-focus-outline flex items-center justify-center"
               disabled={!name.trim() || joinCode.some((d) => !d) || isJoiningGame}
-              onClick={handleJoin}
+              onClick={() => {
+                handleJoin();
+                // Immediately blur after click to prevent focus ring
+                if (joinGameButtonRef.current) {
+                  setTimeout(() => {
+                    joinGameButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (joinGameButtonRef.current) {
+                  joinGameButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (joinGameButtonRef.current) {
+                  joinGameButtonRef.current.blur();
+                }
+              }}
             >
               {isJoiningGame && (
                 <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
@@ -273,9 +340,30 @@ function Landing({ onCreate, onJoin }) {
 
             {/* Secondary: Cancel back to name input */}
             <Button
+              ref={cancelButtonRef}
               variant="outline"
-              className="w-full h-12 font-semibold touch-button"
-              onClick={handleCancelJoin}
+              className="w-full h-12 font-semibold touch-button no-focus-outline outline-button-override"
+              onClick={() => {
+                handleCancelJoin();
+                // Immediately blur after click to prevent focus ring
+                if (cancelButtonRef.current) {
+                  setTimeout(() => {
+                    cancelButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (cancelButtonRef.current) {
+                  cancelButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (cancelButtonRef.current) {
+                  cancelButtonRef.current.blur();
+                }
+              }}
             >
               Cancel
             </Button>

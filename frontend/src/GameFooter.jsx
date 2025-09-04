@@ -455,6 +455,26 @@ function GameFooter({
   // Prevent spamming skip_song while backend reconnects or processes the request
   const skipInFlightRef = React.useRef(false);
 
+  // Button refs for focus management
+  const compactPlayButtonRef = React.useRef(null);
+  const restartButtonRef = React.useRef(null);
+  const mainPlayButtonRef = React.useRef(null);
+  const deviceSwitchButtonRef = React.useRef(null);
+  const challengeRejectButtonRef = React.useRef(null);
+  const challengeAcceptButtonRef = React.useRef(null);
+  const songGuessSkipButtonRef = React.useRef(null);
+  const songGuessSubmitButtonRef = React.useRef(null);
+  const songGuessModalGuessButtonRef = React.useRef(null);
+  const songGuessModalSkipButtonRef = React.useRef(null);
+  const challengeWindowChallengeButtonRef = React.useRef(null);
+  const challengeWindowSkipButtonRef = React.useRef(null);
+  const challengeWindowOkButtonRef = React.useRef(null);
+  const challengeResolvedContinueButtonRef = React.useRef(null);
+  const dropCancelButtonRef = React.useRef(null);
+  const dropConfirmButtonRef = React.useRef(null);
+  const feedbackContinueButtonRef = React.useRef(null);
+  const newSongButtonRef = React.useRef(null);
+
   // Format time mm:ss
   const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
 
@@ -613,8 +633,29 @@ function GameFooter({
           {/* Essential controls only */}
           {isCreator && (
             <button
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 mr-2"
-              onClick={handlePlayPauseClick}
+              ref={compactPlayButtonRef}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 active:bg-green-700 mr-2 no-focus-outline force-no-outline"
+              onClick={() => {
+                handlePlayPauseClick();
+                // Immediately blur after click to prevent focus ring
+                if (compactPlayButtonRef.current) {
+                  setTimeout(() => {
+                    compactPlayButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (compactPlayButtonRef.current) {
+                  compactPlayButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (compactPlayButtonRef.current) {
+                  compactPlayButtonRef.current.blur();
+                }
+              }}
               aria-label={actualIsPlaying ? "Pause" : "Play"}
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
@@ -691,12 +732,35 @@ function GameFooter({
               <>
                 {/* Restart button - moved to left */}
                 <button
-                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-input hover:bg-input/90 active:bg-input/90 flex-shrink-0"
-                  onClick={handleRestartClick}
+                  ref={restartButtonRef}
+                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-input hover:bg-input/90 active:bg-input/90 flex-shrink-0 no-focus-outline force-no-outline"
+                  onClick={() => {
+                    handleRestartClick();
+                    // Immediately blur after click to prevent focus ring
+                    if (restartButtonRef.current) {
+                      setTimeout(() => {
+                        restartButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (restartButtonRef.current) {
+                      restartButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (restartButtonRef.current) {
+                      restartButtonRef.current.blur();
+                    }
+                  }}
                   aria-label="Restart track"
                   style={{ 
                     WebkitTapHighlightColor: 'transparent',
-                    outline: 'none'
+                    outline: 'none',
+                    border: 'none',
+                    boxShadow: 'none'
                   }}
                   onFocus={(e) => e.target.blur()}
                 >
@@ -709,11 +773,38 @@ function GameFooter({
                 </button>
                 
                 <button
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-primary hover:bg-primary/90 active:bg-primary/90 shadow-[0_10px_15px_-3px_theme(colors.primary.300)/50] border-4 border-primary/20 flex-shrink-0"
-                  onClick={handlePlayPauseClick}
+                  ref={mainPlayButtonRef}
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-primary hover:bg-primary/90 active:bg-primary/90 shadow-[0_10px_15px_-3px_theme(colors.primary.300)/50] border-4 border-primary/20 flex-shrink-0 no-focus-outline force-no-outline"
+                  onClick={() => {
+                    handlePlayPauseClick();
+                    // Immediately blur after click to prevent focus ring
+                    if (mainPlayButtonRef.current) {
+                      setTimeout(() => {
+                        mainPlayButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (mainPlayButtonRef.current) {
+                      mainPlayButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (mainPlayButtonRef.current) {
+                      mainPlayButtonRef.current.blur();
+                    }
+                  }}
                   aria-label={actualIsPlaying ? "Pause" : "Play"}
                   style={{ 
-                    WebkitTapHighlightColor: 'transparent'
+                    WebkitTapHighlightColor: 'transparent',
+                    outline: 'none !important',
+                    border: 'none !important',
+                    boxShadow: 'none !important',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    appearance: 'none'
                   }}
                 >
                   {actualIsPlaying ? (
@@ -745,10 +836,40 @@ function GameFooter({
                 <span>{formatTime(duration)}</span>
                 {isCreator && (
                   <button
-                  onClick={() => setShowDeviceModal(true)}
+                  ref={deviceSwitchButtonRef}
+                  onClick={() => {
+                    setShowDeviceModal(true);
+                    // Immediately blur after click to prevent focus ring
+                    if (deviceSwitchButtonRef.current) {
+                      setTimeout(() => {
+                        deviceSwitchButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (deviceSwitchButtonRef.current) {
+                      deviceSwitchButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (deviceSwitchButtonRef.current) {
+                      deviceSwitchButtonRef.current.blur();
+                    }
+                  }}
                   className="ml-2 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-input hover:bg-input/90 text-foreground text-xs"
                   title="Switch device"
                   aria-label="Switch Spotify device"
+                  style={{ 
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none !important',
+                border: 'none !important', 
+                boxShadow: 'none !important',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
+                appearance: 'none'
+              }}
                   >
                   <img
                     src="/img/speaker-icon.svg"
@@ -794,15 +915,58 @@ function GameFooter({
           </div>
           <div className="flex gap-2 justify-center">
             <button 
-              onClick={() => onChallengeResponse(false)}
-              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
-              style={{ background: 'transparent' }}
+              ref={challengeRejectButtonRef}
+              onClick={() => {
+                onChallengeResponse(false);
+                // Immediately blur after click to prevent focus ring
+                if (challengeRejectButtonRef.current) {
+                  setTimeout(() => {
+                    challengeRejectButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (challengeRejectButtonRef.current) {
+                  challengeRejectButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (challengeRejectButtonRef.current) {
+                  challengeRejectButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+              style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
             >
               Reject (Keep card)
             </button>
             <button 
-              onClick={() => onChallengeResponse(true)}
-              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+              ref={challengeAcceptButtonRef}
+              onClick={() => {
+                onChallengeResponse(true);
+                // Immediately blur after click to prevent focus ring
+                if (challengeAcceptButtonRef.current) {
+                  setTimeout(() => {
+                    challengeAcceptButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (challengeAcceptButtonRef.current) {
+                  challengeAcceptButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (challengeAcceptButtonRef.current) {
+                  challengeAcceptButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               Accept (Remove card)
             </button>
@@ -831,18 +995,59 @@ function GameFooter({
             />
             <div className="flex justify-center gap-2 pt-2">
               <button 
+                ref={songGuessSkipButtonRef}
                 onClick={() => {
                   setShowSongGuess(false);
                   onSkipSongGuess();
+                  // Immediately blur after click to prevent focus ring
+                  if (songGuessSkipButtonRef.current) {
+                    setTimeout(() => {
+                      songGuessSkipButtonRef.current.blur();
+                    }, 0);
+                  }
                 }}
-                className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
-                style={{ background: 'transparent' }}
+                onTouchStart={() => {
+                  // Prevent focus on touch start
+                  if (songGuessSkipButtonRef.current) {
+                    songGuessSkipButtonRef.current.blur();
+                  }
+                }}
+                onTouchEnd={() => {
+                  // Blur the button after touch to remove persistent focus highlight
+                  if (songGuessSkipButtonRef.current) {
+                    songGuessSkipButtonRef.current.blur();
+                  }
+                }}
+                className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+                style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
               >
                 Skip
               </button>
               <button 
-                onClick={handleSongGuess}
-                className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                ref={songGuessSubmitButtonRef}
+                onClick={() => {
+                  handleSongGuess();
+                  // Immediately blur after click to prevent focus ring
+                  if (songGuessSubmitButtonRef.current) {
+                    setTimeout(() => {
+                      songGuessSubmitButtonRef.current.blur();
+                    }, 0);
+                  }
+                }}
+                onTouchStart={() => {
+                  // Prevent focus on touch start
+                  if (songGuessSubmitButtonRef.current) {
+                    songGuessSubmitButtonRef.current.blur();
+                  }
+                }}
+                onTouchEnd={() => {
+                  // Blur the button after touch to remove persistent focus highlight
+                  if (songGuessSubmitButtonRef.current) {
+                    songGuessSubmitButtonRef.current.blur();
+                  }
+                }}
+                className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 Submit Guess
               </button>
@@ -893,15 +1098,58 @@ function GameFooter({
           </div>
           <div className="flex gap-2 justify-center">
             <button 
-              onClick={() => setShowSongGuess(true)}
-              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
-              style={{ background: 'transparent' }}
+              ref={songGuessModalGuessButtonRef}
+              onClick={() => {
+                setShowSongGuess(true);
+                // Immediately blur after click to prevent focus ring
+                if (songGuessModalGuessButtonRef.current) {
+                  setTimeout(() => {
+                    songGuessModalGuessButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (songGuessModalGuessButtonRef.current) {
+                  songGuessModalGuessButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (songGuessModalGuessButtonRef.current) {
+                  songGuessModalGuessButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+              style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
             >
               Guess Song
             </button>
             <button 
-              onClick={() => onSkipSongGuess()}
-              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+              ref={songGuessModalSkipButtonRef}
+              onClick={() => {
+                onSkipSongGuess();
+                // Immediately blur after click to prevent focus ring
+                if (songGuessModalSkipButtonRef.current) {
+                  setTimeout(() => {
+                    songGuessModalSkipButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (songGuessModalSkipButtonRef.current) {
+                  songGuessModalSkipButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (songGuessModalSkipButtonRef.current) {
+                  songGuessModalSkipButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               Skip
             </button>
@@ -940,15 +1188,58 @@ function GameFooter({
             {!isMyTurn && myPlayer && myPlayer.tokens > 0 && !hasResponded ? (
               <div className="flex gap-2 justify-center">
                 <button 
-                  onClick={() => onInitiateChallenge()}
-                  className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
-                  style={{ background: 'transparent' }}
+                  ref={challengeWindowChallengeButtonRef}
+                  onClick={() => {
+                    onInitiateChallenge();
+                    // Immediately blur after click to prevent focus ring
+                    if (challengeWindowChallengeButtonRef.current) {
+                      setTimeout(() => {
+                        challengeWindowChallengeButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (challengeWindowChallengeButtonRef.current) {
+                      challengeWindowChallengeButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (challengeWindowChallengeButtonRef.current) {
+                      challengeWindowChallengeButtonRef.current.blur();
+                    }
+                  }}
+                  className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+                  style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
                 >
                   Challenge (1 token)
                 </button>
                 <button 
-                  onClick={() => onSkipChallenge()}
-                  className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                  ref={challengeWindowSkipButtonRef}
+                  onClick={() => {
+                    onSkipChallenge();
+                    // Immediately blur after click to prevent focus ring
+                    if (challengeWindowSkipButtonRef.current) {
+                      setTimeout(() => {
+                        challengeWindowSkipButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (challengeWindowSkipButtonRef.current) {
+                      challengeWindowSkipButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (challengeWindowSkipButtonRef.current) {
+                      challengeWindowSkipButtonRef.current.blur();
+                    }
+                  }}
+                  className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   Skip
                 </button>
@@ -957,8 +1248,30 @@ function GameFooter({
               <div className="flex flex-col items-center gap-2">
                 <div className="text-white text-sm">No tokens to challenge</div>
                 <button 
-                  onClick={() => onSkipChallenge()}
-                  className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                  ref={challengeWindowOkButtonRef}
+                  onClick={() => {
+                    onSkipChallenge();
+                    // Immediately blur after click to prevent focus ring
+                    if (challengeWindowOkButtonRef.current) {
+                      setTimeout(() => {
+                        challengeWindowOkButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (challengeWindowOkButtonRef.current) {
+                      challengeWindowOkButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (challengeWindowOkButtonRef.current) {
+                      challengeWindowOkButtonRef.current.blur();
+                    }
+                  }}
+                  className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   OK
                 </button>
@@ -1011,8 +1324,30 @@ function GameFooter({
             }
           </div>
           <button 
-            onClick={onContinueAfterChallenge}
-            className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button mt-3"
+            ref={challengeResolvedContinueButtonRef}
+            onClick={() => {
+              onContinueAfterChallenge();
+              // Immediately blur after click to prevent focus ring
+              if (challengeResolvedContinueButtonRef.current) {
+                setTimeout(() => {
+                  challengeResolvedContinueButtonRef.current.blur();
+                }, 0);
+              }
+            }}
+            onTouchStart={() => {
+              // Prevent focus on touch start
+              if (challengeResolvedContinueButtonRef.current) {
+                challengeResolvedContinueButtonRef.current.blur();
+              }
+            }}
+            onTouchEnd={() => {
+              // Blur the button after touch to remove persistent focus highlight
+              if (challengeResolvedContinueButtonRef.current) {
+                challengeResolvedContinueButtonRef.current.blur();
+              }
+            }}
+            className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button mt-3 no-focus-outline"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             Continue to Next Turn
           </button>
@@ -1031,15 +1366,58 @@ function GameFooter({
           </div>
           <div className="flex gap-2 justify-center">
             <button 
-              onClick={onCancelDrop}
-              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
-              style={{ background: 'transparent' }}
+              ref={dropCancelButtonRef}
+              onClick={() => {
+                onCancelDrop();
+                // Immediately blur after click to prevent focus ring
+                if (dropCancelButtonRef.current) {
+                  setTimeout(() => {
+                    dropCancelButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (dropCancelButtonRef.current) {
+                  dropCancelButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (dropCancelButtonRef.current) {
+                  dropCancelButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+              style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
             >
               Cancel
             </button>
             <button 
-              onClick={onConfirmDrop}
-              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+              ref={dropConfirmButtonRef}
+              onClick={() => {
+                onConfirmDrop();
+                // Immediately blur after click to prevent focus ring
+                if (dropConfirmButtonRef.current) {
+                  setTimeout(() => {
+                    dropConfirmButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (dropConfirmButtonRef.current) {
+                  dropConfirmButtonRef.current.blur();
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (dropConfirmButtonRef.current) {
+                  dropConfirmButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               Confirm Placement
             </button>
@@ -1052,14 +1430,45 @@ function GameFooter({
         {showFeedback && feedback ? (
           <div className="w-full p-3 rounded text-center bg-none mb-2">
             <div className="font-bold mb-4">
-              {feedback.correct ? "Yay, your answer is correct!" : "Wrong answer!"}
+              {feedback.correct ? 
+                (myPlayerId === currentPlayerId ? 
+                  "Yay, your answer is correct!" : 
+                  `${currentPlayer?.name || 'The player'} was correct!`
+                ) : 
+                (myPlayerId === currentPlayerId ? 
+                  "Wrong answer!" : 
+                  `${currentPlayer?.name || 'The player'} was wrong!`
+                )
+              }
             </div>
             
             {/* Continue button - only creator can click */}
             {isCreator ? (
               <button 
-                className="mt-3 w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button" 
-                onClick={handleContinueClick}
+                ref={feedbackContinueButtonRef}
+                className="mt-3 w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline" 
+                onClick={() => {
+                  handleContinueClick();
+                  // Immediately blur after click to prevent focus ring
+                  if (feedbackContinueButtonRef.current) {
+                    setTimeout(() => {
+                      feedbackContinueButtonRef.current.blur();
+                    }, 0);
+                  }
+                }}
+                onTouchStart={() => {
+                  // Prevent focus on touch start
+                  if (feedbackContinueButtonRef.current) {
+                    feedbackContinueButtonRef.current.blur();
+                  }
+                }}
+                onTouchEnd={() => {
+                  // Blur the button after touch to remove persistent focus highlight
+                  if (feedbackContinueButtonRef.current) {
+                    feedbackContinueButtonRef.current.blur();
+                  }
+                }}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 Continue to Next Turn
               </button>
@@ -1080,8 +1489,30 @@ function GameFooter({
               <div className="flex flex-col items-center">
                 <div className="text-gray-300 text-sm mb-8">You can pay 1 token to get another song</div>
                 <button 
-                  onClick={() => handleTokenAction('skip_song')}
-                  className="h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                  ref={newSongButtonRef}
+                  onClick={() => {
+                    handleTokenAction('skip_song');
+                    // Immediately blur after click to prevent focus ring
+                    if (newSongButtonRef.current) {
+                      setTimeout(() => {
+                        newSongButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (newSongButtonRef.current) {
+                      newSongButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (newSongButtonRef.current) {
+                      newSongButtonRef.current.blur();
+                    }
+                  }}
+                  className="h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline force-no-outline"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   New Song (1 token)
                 </button>
