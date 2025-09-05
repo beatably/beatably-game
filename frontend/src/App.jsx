@@ -939,8 +939,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                 pauseFirst: true, 
                 transferFirst: false, 
                 maxVerifyAttempts: 4, 
-                verifyDelayMs: 250,
-                forcePositionReset: true // CRITICAL FIX: Force position reset for new rounds
+                verifyDelayMs: 250
               }
             );
             if (ok) setIsPlayingMusic(true);
@@ -2067,8 +2066,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             pauseFirst: true, 
             transferFirst: false, 
             maxVerifyAttempts: 4, 
-            verifyDelayMs: 250,
-            forcePositionReset: true // CRITICAL FIX: Force position reset for new rounds
+            verifyDelayMs: 250
           }
         );
         if (ok) {
