@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import spotifyAuth from "./utils/spotifyAuth";
 import DeviceSwitchModal from './DeviceSwitchModal';
+import SongGuessModal from './SongGuessModal';
 
 function GameFooter({ 
   currentCard, 
@@ -113,6 +114,23 @@ function GameFooter({
       setLocalIsPlaying(false);
     }
   }, [currentCard?.id, isCreator, spotifyDeviceId]);
+
+  // CRITICAL FIX: Reset progress when new turn/round starts (even if auto-play fails)
+  React.useEffect(() => {
+    console.log('[GameFooter] New turn/round detected, resetting progress:', {
+      currentPlayerId,
+      phase,
+      isMyTurn
+    });
+    
+    // Reset progress whenever a new turn starts or we enter player-turn phase
+    if (phase === 'player-turn') {
+      setProgress(0);
+      if (!isCreator || !spotifyDeviceId) {
+        setLocalIsPlaying(false);
+      }
+    }
+  }, [currentPlayerId, phase, isCreator, spotifyDeviceId]);
 
   // Function to trigger Spotify playback with enhanced error handling
   const triggerSpotifyPlayback = async () => {
@@ -324,6 +342,15 @@ function GameFooter({
       currentCardTitle: currentCard?.title
     });
 
+    // CRITICAL FIX: Reset progress when user manually presses play (fallback for failed auto-play)
+    if (!actualIsPlaying && phase === 'player-turn') {
+      console.log('[GameFooter] Manual play detected, resetting progress as fallback');
+      setProgress(0);
+      if (!isCreator || !spotifyDeviceId) {
+        setLocalIsPlaying(false);
+      }
+    }
+
     // Check if this is a creator who should have Spotify access
     const hasSpotifyToken = !!localStorage.getItem('access_token');
     
@@ -445,10 +472,8 @@ function GameFooter({
     }
   };
 
-// Song guessing state
-  const [showSongGuess, setShowSongGuess] = useState(false);
-  const [songTitle, setSongTitle] = useState('');
-  const [songArtist, setSongArtist] = useState('');
+// Song guessing state - now handled by modal
+  const [showSongGuessModal, setShowSongGuessModal] = useState(false);
   const [newSongRequest, setNewSongRequest] = useState(null); // For creator notifications
   // Removed tokenExpiredNotification UI: re-auth is mandatory; no local fallback
   const [showDeviceModal, setShowDeviceModal] = useState(false);
@@ -475,20 +500,13 @@ function GameFooter({
   const feedbackContinueButtonRef = React.useRef(null);
   const newSongButtonRef = React.useRef(null);
 
+
   // Format time mm:ss
   const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
 
   const myPlayer = players?.find(p => p.id === myPlayerId);
   const currentPlayer = players?.find(p => p.id === currentPlayerId);
 
-  const handleSongGuess = () => {
-    if (songTitle.trim() && songArtist.trim()) {
-      onGuessSong(songTitle.trim(), songArtist.trim());
-      setSongTitle('');
-      setSongArtist('');
-      setShowSongGuess(false);
-    }
-  };
 
   const handleTokenAction = (action, targetPlayerId = null) => {
     console.log('[GameFooter] handleTokenAction called:', { action, targetPlayerId, myPlayerId, isMyTurn });
@@ -974,87 +992,13 @@ function GameFooter({
         </div>
       )}
 
-      {/* Song guessing modal */}
-      {showSongGuess && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2">
-          <div className="text-white mb-4 text-center">Both title and artist must be correct for the bonus!</div>
-          <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="Song title"
-              value={songTitle}
-              onChange={(e) => setSongTitle(e.target.value)}
-              className="bg-input border-border text-foreground h-11 focus:ring-primary w-full rounded-md border px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="Artist"
-              value={songArtist}
-              onChange={(e) => setSongArtist(e.target.value)}
-              className="bg-input border-border text-foreground h-11 focus:ring-primary w-full rounded-md border px-3 py-2"
-            />
-            <div className="flex justify-center gap-2 pt-2">
-              <button 
-                ref={songGuessSkipButtonRef}
-                onClick={() => {
-                  setShowSongGuess(false);
-                  onSkipSongGuess();
-                  // Immediately blur after click to prevent focus ring
-                  if (songGuessSkipButtonRef.current) {
-                    setTimeout(() => {
-                      songGuessSkipButtonRef.current.blur();
-                    }, 0);
-                  }
-                }}
-                onTouchStart={() => {
-                  // Prevent focus on touch start
-                  if (songGuessSkipButtonRef.current) {
-                    songGuessSkipButtonRef.current.blur();
-                  }
-                }}
-                onTouchEnd={() => {
-                  // Blur the button after touch to remove persistent focus highlight
-                  if (songGuessSkipButtonRef.current) {
-                    songGuessSkipButtonRef.current.blur();
-                  }
-                }}
-                className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
-                style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
-              >
-                Skip
-              </button>
-              <button 
-                ref={songGuessSubmitButtonRef}
-                onClick={() => {
-                  handleSongGuess();
-                  // Immediately blur after click to prevent focus ring
-                  if (songGuessSubmitButtonRef.current) {
-                    setTimeout(() => {
-                      songGuessSubmitButtonRef.current.blur();
-                    }, 0);
-                  }
-                }}
-                onTouchStart={() => {
-                  // Prevent focus on touch start
-                  if (songGuessSubmitButtonRef.current) {
-                    songGuessSubmitButtonRef.current.blur();
-                  }
-                }}
-                onTouchEnd={() => {
-                  // Blur the button after touch to remove persistent focus highlight
-                  if (songGuessSubmitButtonRef.current) {
-                    songGuessSubmitButtonRef.current.blur();
-                  }
-                }}
-                className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
-                style={{ WebkitTapHighlightColor: 'transparent' }}
-              >
-                Submit Guess
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Song Guess Modal */}
+      <SongGuessModal
+        isOpen={showSongGuessModal}
+        onClose={() => setShowSongGuessModal(false)}
+        onGuessSong={onGuessSong}
+        onSkipSongGuess={onSkipSongGuess}
+      />
 
       {/* Device switch modal */}
       {showDeviceModal && (
@@ -1091,7 +1035,7 @@ function GameFooter({
 
 
       {/* Song guess section - only for current player */}
-      {phase === 'song-guess' && isMyTurn && !showSongGuess && (
+      {phase === 'song-guess' && isMyTurn && (
         <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
           <div className="text-white mb-8">
             Do you want to guess the song for bonus tokens?
@@ -1100,7 +1044,7 @@ function GameFooter({
             <button 
               ref={songGuessModalGuessButtonRef}
               onClick={() => {
-                setShowSongGuess(true);
+                setShowSongGuessModal(true);
                 // Immediately blur after click to prevent focus ring
                 if (songGuessModalGuessButtonRef.current) {
                   setTimeout(() => {
