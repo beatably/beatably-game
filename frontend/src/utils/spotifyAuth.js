@@ -575,16 +575,8 @@ class SpotifyAuthManager {
           const currentPosition = state?.progress_ms || 0;
           
           if (itemUri === trackUri) {
-            // Additional check: if we forced position reset, verify we're near the beginning
-            if (forcePositionReset && currentPosition > 5000) { // More than 5 seconds in
-              console.warn('[SpotifyAuth] Song started but not from beginning (position:', currentPosition, 'ms). Attempting position correction...');
-              try {
-                await this.seekToPosition(deviceId, 0);
-                await sleep(100);
-              } catch (correctErr) {
-                console.warn('[SpotifyAuth] Position correction failed:', correctErr?.message || correctErr);
-              }
-            }
+            // FIXED: Removed aggressive position correction that was causing audio cutoff at 8-15 seconds
+            // The original position reset during pause is sufficient for new round starts
             console.log('[SpotifyAuth] Verified playback on correct target:', itemUri, 'at position:', currentPosition, 'ms');
             return true;
           }

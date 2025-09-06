@@ -13,6 +13,7 @@ import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
 import viewportManager from "./utils/viewportUtils";
+import deviceAwarePlayback from "./utils/deviceAwarePlayback";
 import './App.css';
 import WinnerView from "./WinnerView";
 import { DndProvider } from 'react-dnd';
@@ -929,20 +930,29 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           }
 
           if (targetDevice) {
-            console.log("[App] Starting playback on target device:", targetDevice);
+            console.log("[App] Starting playback on target device using deviceAwarePlayback:", targetDevice);
             await pauseSpotifyPlayback().catch(() => {});
-            const ok = await spotifyAuth.verifiedStartPlayback(
-              targetDevice,
-              payloadUri,
-              0,
-              { 
-                pauseFirst: true, 
-                transferFirst: false, 
-                maxVerifyAttempts: 4, 
-                verifyDelayMs: 250
-              }
-            );
-            if (ok) setIsPlayingMusic(true);
+            
+            try {
+              await deviceAwarePlayback.startPlayback(targetDevice, [payloadUri], 0);
+              setIsPlayingMusic(true);
+              console.log("[App] Successfully started playback via deviceAwarePlayback");
+            } catch (error) {
+              console.warn("[App] deviceAwarePlayback failed, falling back to spotifyAuth:", error);
+              // Fallback to original method
+              const ok = await spotifyAuth.verifiedStartPlayback(
+                targetDevice,
+                payloadUri,
+                0,
+                { 
+                  pauseFirst: true, 
+                  transferFirst: false, 
+                  maxVerifyAttempts: 4, 
+                  verifyDelayMs: 250
+                }
+              );
+              if (ok) setIsPlayingMusic(true);
+            }
           } else {
             console.warn("[App] No suitable device found for autoplay");
           }
@@ -1335,30 +1345,46 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       );
 
       if (shouldAutoplay) {
-        console.log('[App] Transferring and starting playback on new device:', newDeviceId);
-        await spotifyAuth.transferPlayback(newDeviceId, false);
-        setTimeout(async () => {
-          try {
-            const success = await spotifyAuth.verifiedStartPlayback(
-              newDeviceId,
-              currentCard.uri,
-              0,
-              { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 4, verifyDelayMs: 250 }
-            );
-            if (success) {
-              console.log('[App] Successfully started playback on new device:', newDeviceId);
-              setIsPlayingMusic(true);
-              // Clear pending autoplay intent since we've fulfilled it
-              window.__beatablyPendingAutoplay = false;
+        console.log('[App] Transferring and starting playback on new device using deviceAwarePlayback:', newDeviceId);
+        try {
+          await deviceAwarePlayback.switchDevice(newDeviceId, currentCard.uri, true);
+          setIsPlayingMusic(true);
+          // Clear pending autoplay intent since we've fulfilled it
+          window.__beatablyPendingAutoplay = false;
+          console.log('[App] Successfully switched device and started playback via deviceAwarePlayback');
+        } catch (error) {
+          console.warn('[App] deviceAwarePlayback switch failed, falling back to spotifyAuth:', error);
+          // Fallback to original method
+          await spotifyAuth.transferPlayback(newDeviceId, false);
+          setTimeout(async () => {
+            try {
+              const success = await spotifyAuth.verifiedStartPlayback(
+                newDeviceId,
+                currentCard.uri,
+                0,
+                { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 4, verifyDelayMs: 250 }
+              );
+              if (success) {
+                console.log('[App] Successfully started playback on new device via fallback:', newDeviceId);
+                setIsPlayingMusic(true);
+                // Clear pending autoplay intent since we've fulfilled it
+                window.__beatablyPendingAutoplay = false;
+              }
+            } catch (error) {
+              console.error('[App] Error starting playback on new device:', error);
             }
-          } catch (error) {
-            console.error('[App] Error starting playback on new device:', error);
-          }
-        }, 300);
+          }, 300);
+        }
       } else {
         // Just transfer without starting playback
-        console.log('[App] Transferring device without autoplay:', newDeviceId);
-        await spotifyAuth.transferPlayback(newDeviceId, false);
+        console.log('[App] Transferring device without autoplay using deviceAwarePlayback:', newDeviceId);
+        try {
+          await deviceAwarePlayback.transferPlayback(newDeviceId);
+          console.log('[App] Successfully transferred device via deviceAwarePlayback');
+        } catch (error) {
+          console.warn('[App] deviceAwarePlayback transfer failed, falling back to spotifyAuth:', error);
+          await spotifyAuth.transferPlayback(newDeviceId, false);
+        }
       }
       
       console.log('[App] Device switch completed successfully');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import spotifyAuth from './utils/spotifyAuth';
 import { createPlayerSync, isPlayerSyncEnabled } from './lib/spotify';
+import deviceAwarePlayback from './utils/deviceAwarePlayback';
 
 // Default track object structure
 const track = {
@@ -172,6 +173,9 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
           setErrorMessage(null);
           setRetryCount(0);
 
+          // Initialize device-aware playback with SDK player
+          deviceAwarePlayback.initialize(spotifyPlayer, device_id);
+
           // IMPORTANT: Do NOT override a user-selected device with the SDK device.
           // Only persist the SDK device if no explicit selection exists yet.
           try {
@@ -179,8 +183,10 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
               const existing = window.localStorage.getItem('spotify_device_id');
               if (!existing) {
                 window.localStorage.setItem('spotify_device_id', device_id);
+                deviceAwarePlayback.setCurrentDevice(device_id);
               } else {
                 console.log('[SpotifyPlayer] Preserving existing selected device over SDK device:', { selected: existing, sdk: device_id });
+                deviceAwarePlayback.setCurrentDevice(existing);
               }
             }
           } catch (_) {}
@@ -417,7 +423,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
     }
   };
 
-  // Expose PlayerSync methods globally for other components
+  // Expose PlayerSync methods and device-aware playback globally for other components
   useEffect(() => {
     if (playerSync) {
       window.beatablyPlayerSync = {
@@ -428,10 +434,25 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         activateAutoplayGuard: () => playerSync.activateAutoplayGuard()
       };
     }
+
+    // Always expose device-aware playback methods
+    window.beatablyDeviceAware = {
+      startPlayback: (deviceId, trackUri, positionMs, options) => 
+        deviceAwarePlayback.startPlayback(deviceId, trackUri, positionMs, options),
+      pausePlayback: (deviceId) => deviceAwarePlayback.pausePlayback(deviceId),
+      resumePlayback: (deviceId) => deviceAwarePlayback.resumePlayback(deviceId),
+      switchDevice: (deviceId, trackUri, shouldPlay) => 
+        deviceAwarePlayback.switchDevice(deviceId, trackUri, shouldPlay),
+      isWebPlaybackDevice: (deviceId) => deviceAwarePlayback.isWebPlaybackDevice(deviceId),
+      recoverFromBufferIssue: () => deviceAwarePlayback.recoverFromBufferIssue()
+    };
     
     return () => {
       if (window.beatablyPlayerSync) {
         delete window.beatablyPlayerSync;
+      }
+      if (window.beatablyDeviceAware) {
+        delete window.beatablyDeviceAware;
       }
     };
   }, [playerSync]);
