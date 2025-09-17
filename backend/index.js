@@ -11,9 +11,21 @@ const querystring = require('querystring');
 const curatedDb = require('./curatedDb');
 
 // Initialize curated database at startup to trigger migration if needed
-console.log('[Startup] Initializing curated database...');
-curatedDb.load(); // This will trigger getCacheDir() and any migration logic
-console.log('[Startup] Curated database initialization complete');
+console.log('[Startup] ===== CURATED DATABASE INITIALIZATION START =====');
+console.log('[Startup] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Startup] Current working directory:', process.cwd());
+console.log('[Startup] __dirname:', __dirname);
+
+try {
+  console.log('[Startup] About to call curatedDb.load()...');
+  curatedDb.load(); // This will trigger getCacheDir() and any migration logic
+  console.log('[Startup] curatedDb.load() completed successfully');
+} catch (error) {
+  console.error('[Startup] ERROR during curatedDb.load():', error.message);
+  console.error('[Startup] Stack trace:', error.stack);
+}
+
+console.log('[Startup] ===== CURATED DATABASE INITIALIZATION COMPLETE =====');
 const { detectGeographyForArtist, detectGenresForArtist } = require('./geographyDetection');
 
 // --- Spotify API Rate Limiting Helpers (to avoid 429s during bulk import) ---
