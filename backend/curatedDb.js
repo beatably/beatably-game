@@ -7,13 +7,37 @@
 const fs = require('fs');
 const path = require('path');
 
-// Use persistent disk in production, local cache in development
-const CACHE_DIR = process.env.NODE_ENV === 'production' 
-  ? '/var/data/cache' 
-  : path.join(__dirname, 'cache');
-const DB_FILE = path.join(CACHE_DIR, 'curated-songs.json');
+// Use persistent disk in production if available, otherwise fall back to deployed cache
+function getCacheDir() {
+  if (process.env.NODE_ENV === 'production') {
+    const persistentPath = '/var/data/cache';
+    const deployedPath = path.join(__dirname, 'cache');
+    
+    // Check if persistent disk is available and has the database
+    if (fs.existsSync(persistentPath) && fs.existsSync(path.join(persistentPath, 'curated-songs.json'))) {
+      console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+      return persistentPath;
+    }
+    
+    // Check if deployed database exists
+    if (fs.existsSync(path.join(deployedPath, 'curated-songs.json'))) {
+      console.log('[CuratedDB] Using deployed cache directory:', deployedPath);
+      return deployedPath;
+    }
+    
+    // Default to persistent disk path for new files
+    console.log('[CuratedDB] Using persistent disk cache directory (creating new):', persistentPath);
+    return persistentPath;
+  }
+  
+  // Development: use local cache
+  const localPath = path.join(__dirname, 'cache');
+  console.log('[CuratedDB] Using local cache directory:', localPath);
+  return localPath;
+}
 
-console.log('[CuratedDB] Using cache directory:', CACHE_DIR);
+const CACHE_DIR = getCacheDir();
+const DB_FILE = path.join(CACHE_DIR, 'curated-songs.json');
 
 // In-memory cache
 let _songs = [];

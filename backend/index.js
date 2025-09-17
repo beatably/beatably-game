@@ -70,13 +70,31 @@ const discovery = require('./discovery');
 const fs = require('fs');
 const path = require('path');
 
-// Use persistent disk in production, local cache in development
-const STATE_DIR = process.env.NODE_ENV === 'production' 
-  ? '/var/data/cache' 
-  : path.join(__dirname, 'cache');
-const STATE_FILE = path.join(STATE_DIR, 'state.json');
+// Use persistent disk in production if available, otherwise fall back to deployed cache
+function getStateDir() {
+  if (process.env.NODE_ENV === 'production') {
+    const persistentPath = '/var/data/cache';
+    const deployedPath = path.join(__dirname, 'cache');
+    
+    // Check if persistent disk is available
+    if (fs.existsSync(persistentPath)) {
+      console.log('[State] Using persistent disk state directory:', persistentPath);
+      return persistentPath;
+    }
+    
+    // Fall back to deployed cache directory
+    console.log('[State] Using deployed state directory:', deployedPath);
+    return deployedPath;
+  }
+  
+  // Development: use local cache
+  const localPath = path.join(__dirname, 'cache');
+  console.log('[State] Using local state directory:', localPath);
+  return localPath;
+}
 
-console.log('[State] Using state directory:', STATE_DIR);
+const STATE_DIR = getStateDir();
+const STATE_FILE = path.join(STATE_DIR, 'state.json');
 
 function sanitizeForSave(obj) {
   // JSON-safe deep clone with Set support
