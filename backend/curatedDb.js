@@ -13,13 +13,45 @@ function getCacheDir() {
     const persistentPath = '/var/data/cache';
     const deployedPath = path.join(__dirname, 'cache');
     
-    // Check if persistent disk is available and has the database
-    if (fs.existsSync(persistentPath) && fs.existsSync(path.join(persistentPath, 'curated-songs.json'))) {
-      console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+    // Check if persistent disk is available
+    if (fs.existsSync(persistentPath)) {
+      const persistentDbFile = path.join(persistentPath, 'curated-songs.json');
+      const deployedDbFile = path.join(deployedPath, 'curated-songs.json');
+      
+      // If persistent disk has the database, use it
+      if (fs.existsSync(persistentDbFile)) {
+        console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+        return persistentPath;
+      }
+      
+      // If persistent disk is empty but deployed database exists, migrate it
+      if (fs.existsSync(deployedDbFile)) {
+        try {
+          console.log('[CuratedDB] Migrating database from deployed to persistent disk...');
+          
+          // Ensure persistent directory exists
+          if (!fs.existsSync(persistentPath)) {
+            fs.mkdirSync(persistentPath, { recursive: true });
+          }
+          
+          // Copy the database file
+          fs.copyFileSync(deployedDbFile, persistentDbFile);
+          console.log('[CuratedDB] Database migration successful:', deployedDbFile, '->', persistentDbFile);
+          console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+          return persistentPath;
+        } catch (error) {
+          console.error('[CuratedDB] Database migration failed:', error.message);
+          console.log('[CuratedDB] Falling back to deployed cache directory:', deployedPath);
+          return deployedPath;
+        }
+      }
+      
+      // Persistent disk exists but no database anywhere - use persistent for new files
+      console.log('[CuratedDB] Using persistent disk cache directory (creating new):', persistentPath);
       return persistentPath;
     }
     
-    // Check if deployed database exists
+    // No persistent disk - check if deployed database exists
     if (fs.existsSync(path.join(deployedPath, 'curated-songs.json'))) {
       console.log('[CuratedDB] Using deployed cache directory:', deployedPath);
       return deployedPath;
