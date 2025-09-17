@@ -31,6 +31,8 @@ pids
 
 # Backend cache files (runtime state)
 backend/cache/
+# Exception: Include curated songs database for production
+!backend/cache/curated-songs.json
 
 # Coverage directory used by tools like istanbul
 coverage/
