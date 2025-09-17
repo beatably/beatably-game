@@ -975,9 +975,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                 0,
                 { 
                   pauseFirst: true, 
-                  transferFirst: false, 
-                  maxVerifyAttempts: 4, 
-                  verifyDelayMs: 250,
+                  transferFirst: true, // PRODUCTION: Enable device transfer
+                  maxVerifyAttempts: 5, // PRODUCTION: More attempts
+                  verifyDelayMs: 500, // PRODUCTION: Longer delays
                   forcePositionReset: true
                 }
               );

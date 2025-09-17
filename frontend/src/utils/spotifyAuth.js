@@ -520,72 +520,139 @@ class SpotifyAuthManager {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     try {
-      // Optionally transfer first (not default); generally we prefer transfer+play path via verifiedTransferAndPlay
+      // PRODUCTION FIX: Enhanced device activation for production environments
       if (transferFirst && deviceId) {
+        console.log('[SpotifyAuth] PRODUCTION: Activating device before playback:', deviceId);
         await this.transferPlayback(deviceId, false);
-        await sleep(200);
+        await sleep(500); // Longer wait for production device activation
+        
+        // Verify device is actually active after transfer
+        const devices = await this.getDevices();
+        const targetDevice = devices.find(d => d.id === deviceId);
+        if (targetDevice && !targetDevice.is_active) {
+          console.warn('[SpotifyAuth] PRODUCTION: Device not active after transfer, retrying...');
+          await this.transferPlayback(deviceId, false);
+          await sleep(300);
+        }
       }
 
       if (pauseFirst) {
-        // Pause active device to ensure a clean cut; avoid device_id query to minimize 404
-        await this.pausePlayback().catch(() => {});
+        // PRODUCTION FIX: Clear stale playback state more aggressively
+        console.log('[SpotifyAuth] PRODUCTION: Clearing stale playback state...');
         
-        // REFINED: Only force position reset when explicitly requested (e.g., for new game rounds)
+        // Step 1: Pause any active playback
+        await this.pausePlayback().catch(() => {});
+        await sleep(200);
+        
+        // Step 2: Clear position if requested (for new rounds)
         if (forcePositionReset && positionMs === 0) {
-          await sleep(150); // Slightly longer pause to ensure pause command is processed
           try {
             await this.seekToPosition(deviceId, 0);
-            console.log('[SpotifyAuth] Forced position reset to 0 for new round start');
+            console.log('[SpotifyAuth] PRODUCTION: Position reset to 0');
+            await sleep(200);
           } catch (seekErr) {
-            console.warn('[SpotifyAuth] Position reset failed (continuing):', seekErr?.message || seekErr);
+            console.warn('[SpotifyAuth] PRODUCTION: Position reset failed:', seekErr?.message || seekErr);
           }
         }
+        
+        // Step 3: Additional pause to ensure clean state
+        await this.pausePlayback().catch(() => {});
+        await sleep(100);
       }
 
       // Use the requested position (don't override unless explicitly resetting)
       const finalPositionMs = (forcePositionReset && positionMs === 0) ? 0 : positionMs;
 
-      // First attempt: play WITHOUT device_id (active device)
-      let playUrl = `https://api.spotify.com/v1/me/player/play`;
-      let body = {
-        uris: [trackUri],
-        position_ms: finalPositionMs
-      };
-      try {
-        await this.makeSpotifyRequest(playUrl, {
-          method: 'PUT',
-          body: JSON.stringify(body)
-        });
-      } catch (e) {
-        // Fallback: try with device_id query if provided
-        if (!deviceId) throw e;
+      // PRODUCTION FIX: More robust playback start with device-specific targeting
+      console.log('[SpotifyAuth] PRODUCTION: Starting playback with enhanced targeting...');
+      
+      let playSuccess = false;
+      let playUrl, body;
+      
+      // Try device-specific play first if deviceId provided
+      if (deviceId) {
         playUrl = `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`;
-        await this.makeSpotifyRequest(playUrl, {
-          method: 'PUT',
-          body: JSON.stringify(body)
-        });
-      }
-
-      // Enhanced verification: check URI match (position verification removed to prevent cutoff)
-      for (let i = 0; i < maxVerifyAttempts; i++) {
-        await sleep(verifyDelayMs);
+        body = {
+          uris: [trackUri],
+          position_ms: finalPositionMs
+        };
+        
         try {
-          const state = await this.getPlaybackState(deviceId); // may try with device_id query
-          const itemUri = state?.item?.uri;
-          
-          if (itemUri === trackUri) {
-            console.log('[SpotifyAuth] Verified playback on correct target:', itemUri);
-            return true;
-          }
-        } catch (vErr) {
-          // If verification fails due to CORS/network, accept success (we already issued PLAY)
-          console.warn('[SpotifyAuth] Verification failed (continuing):', vErr?.message || vErr);
-          return true;
+          await this.makeSpotifyRequest(playUrl, {
+            method: 'PUT',
+            body: JSON.stringify(body)
+          });
+          playSuccess = true;
+          console.log('[SpotifyAuth] PRODUCTION: Device-specific play succeeded');
+        } catch (e) {
+          console.warn('[SpotifyAuth] PRODUCTION: Device-specific play failed, trying active device:', e.message);
         }
       }
+      
+      // Fallback to active device play if device-specific failed
+      if (!playSuccess) {
+        playUrl = `https://api.spotify.com/v1/me/player/play`;
+        body = {
+          uris: [trackUri],
+          position_ms: finalPositionMs
+        };
+        
+        await this.makeSpotifyRequest(playUrl, {
+          method: 'PUT',
+          body: JSON.stringify(body)
+        });
+        console.log('[SpotifyAuth] PRODUCTION: Active device play succeeded');
+      }
+
+      // PRODUCTION FIX: Enhanced verification with longer delays
+      console.log('[SpotifyAuth] PRODUCTION: Verifying playback with enhanced checks...');
+      
+      for (let i = 0; i < maxVerifyAttempts; i++) {
+        await sleep(Math.max(verifyDelayMs, 400)); // Minimum 400ms delay for production
+        
+        try {
+          const state = await this.getPlaybackState();
+          
+          if (state && state.item) {
+            const itemUri = state.item.uri;
+            const isPlaying = state.is_playing;
+            const progress = state.progress_ms || 0;
+            
+            console.log('[SpotifyAuth] PRODUCTION: Verification attempt', i + 1, {
+              expected_uri: trackUri,
+              actual_uri: itemUri,
+              is_playing: isPlaying,
+              progress_ms: progress,
+              device: state.device?.name
+            });
+            
+            // Success criteria: correct track AND actually playing
+            if (itemUri === trackUri && isPlaying) {
+              console.log('[SpotifyAuth] PRODUCTION: Verified successful playback');
+              return true;
+            }
+            
+            // If correct track but not playing, it might still be starting
+            if (itemUri === trackUri && !isPlaying && i < maxVerifyAttempts - 1) {
+              console.log('[SpotifyAuth] PRODUCTION: Correct track but not playing yet, waiting...');
+              continue;
+            }
+          }
+        } catch (vErr) {
+          console.warn('[SpotifyAuth] PRODUCTION: Verification failed:', vErr?.message || vErr);
+          // On last attempt, accept success if we got this far
+          if (i === maxVerifyAttempts - 1) {
+            console.log('[SpotifyAuth] PRODUCTION: Accepting success despite verification failure');
+            return true;
+          }
+        }
+      }
+      
+      console.warn('[SpotifyAuth] PRODUCTION: Verification failed after all attempts');
       return false;
+      
     } catch (error) {
-      console.error('[SpotifyAuth] verifiedStartPlayback error:', error.message);
+      console.error('[SpotifyAuth] PRODUCTION: verifiedStartPlayback error:', error.message);
       return false;
     }
   }
