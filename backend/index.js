@@ -8,6 +8,55 @@ if (process.env.NODE_ENV !== 'production') {
 }
 const axios = require('axios');
 const querystring = require('querystring');
+const curatedDb = require('./curatedDb');
+const { detectGeographyForArtist, detectGenresForArtist } = require('./geographyDetection');
+
+// --- Spotify API Rate Limiting Helpers (to avoid 429s during bulk import) ---
+const SPOTIFY_MIN_GAP_MS = Number(process.env.SPOTIFY_MIN_GAP_MS) || 650; // ~100 req/min default
+let __lastSpotifyCallAt = 0;
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/**
+ * Rate-limited wrapper for axios.get against Spotify APIs.
+ * - Enforces a minimum gap between calls
+ * - Retries on 429 and 5xx with exponential backoff or Retry-After
+ */
+async function spotifyGet(url, opts = {}, label = '') {
+  // Enforce minimum gap between any Spotify calls
+  const now = Date.now();
+  const gap = now - __lastSpotifyCallAt;
+  if (gap < SPOTIFY_MIN_GAP_MS) {
+    await sleep(SPOTIFY_MIN_GAP_MS - gap);
+  }
+
+  let attempt = 0;
+  while (attempt < 6) { // up to 6 attempts with backoff
+    try {
+      const res = await axios.get(url, opts);
+      __lastSpotifyCallAt = Date.now();
+      return res;
+    } catch (e) {
+      const status = e?.response?.status;
+      if (status === 429 || (status >= 500 && status < 600)) {
+        // Respect Retry-After if provided; otherwise exponential backoff capped at 30s
+        const retryAfterHeader = e?.response?.headers?.['retry-after'];
+        let delay = retryAfterHeader ? Number(retryAfterHeader) * 1000 : Math.min(30000, (2 ** attempt) * SPOTIFY_MIN_GAP_MS);
+        if (!Number.isFinite(delay) || delay <= 0) {
+          delay = Math.min(30000, (2 ** attempt) * SPOTIFY_MIN_GAP_MS);
+        }
+        attempt++;
+        try {
+          console.warn('[SpotifyLimiter]', { status, attempt, delay, label: label || url });
+        } catch (_) {}
+        await sleep(delay);
+        continue;
+      }
+      // Non-retriable errors bubble up
+      throw e;
+    }
+  }
+  throw new Error('Spotify API request failed after retries: ' + (label || url));
+}
 
 // Feature flags, thresholds, and providers
 const { config } = require('./config');
@@ -257,11 +306,653 @@ const corsOptions = {
     : ['http://127.0.0.1:5173', 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json()); // Add JSON body parser
+
+// --- Admin password middleware for curated DB ---
+function requireAdmin(req, res, next) {
+  try {
+    const secret =
+      req.headers['x-admin-secret'] || req.query.admin_secret || (req.body && req.body.admin_secret);
+    if (!process.env.ADMIN_PASSWORD) {
+      return res.status(500).json({ ok: false, error: 'ADMIN_PASSWORD not set on server' });
+    }
+    if (secret !== process.env.ADMIN_PASSWORD) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
+    next();
+  } catch (e) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
+}
+
+// --- Curated DB Admin Endpoints ---
+app.get('/api/admin/curated-songs', requireAdmin, (req, res) => {
+  try {
+    const { q, genre, geography, yearMin, yearMax, difficulty, limit, offset } = req.query || {};
+    const result = curatedDb.list({
+      q: q || '',
+      genre,
+      geography,
+      yearMin: Number.isFinite(Number(yearMin)) ? Number(yearMin) : undefined,
+      yearMax: Number.isFinite(Number(yearMax)) ? Number(yearMax) : undefined,
+      difficulty: Number.isFinite(Number(difficulty)) ? Number(difficulty) : undefined,
+      limit: Number.isFinite(Number(limit)) ? Number(limit) : 100,
+      offset: Number.isFinite(Number(offset)) ? Number(offset) : 0
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'List failed' });
+  }
+});
+
+app.post('/api/admin/curated-songs', requireAdmin, (req, res) => {
+  try {
+    const song = curatedDb.add(req.body || {});
+    res.json({ ok: true, song });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'Add failed' });
+  }
+});
+
+app.put('/api/admin/curated-songs/:id', requireAdmin, (req, res) => {
+  try {
+    const song = curatedDb.update(req.params.id, req.body || {});
+    if (!song) return res.status(404).json({ ok: false, error: 'Not found' });
+    res.json({ ok: true, song });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'Update failed' });
+  }
+});
+
+app.delete('/api/admin/curated-songs/:id', requireAdmin, (req, res) => {
+  try {
+    const removed = curatedDb.remove(req.params.id);
+    res.json({ ok: true, removed });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'Delete failed' });
+  }
+});
+
+// --- Curated DB Analytics (admin) ---
+app.get('/api/admin/analytics', requireAdmin, (req, res) => {
+  try {
+    // Get all curated songs
+    const first = curatedDb.list({ limit: 1, offset: 0 });
+    const total = Number(first.total || 0);
+    const all = total > 0 ? curatedDb.list({ limit: Math.max(1, total), offset: 0 }).items : [];
+
+    const toDecade = (y) => {
+      const n = Number(y);
+      if (!Number.isFinite(n)) return 'unknown';
+      return `${Math.floor(n / 10) * 10}s`;
+    };
+    const lc = (s, def = 'unknown') => {
+      if (!s || typeof s !== 'string') return def;
+      const val = s.trim().toLowerCase();
+      return val || def;
+    };
+
+    // Aggregations
+    const counts = {
+      byGenre: {},
+      byDecade: {},
+      byYear: {},
+      byDifficulty: {},
+      byMarket: {},
+      billboard: { billboard: 0, nonBillboard: 0 },
+      tags: {},
+    };
+    let withAlbumArt = 0;
+    let withPreview = 0;
+
+    // Crosstabs
+    const genreByDecade = {}; // { decade: { genre: count } }
+
+    // Allowed genres for game settings (used for gap analysis)
+    const allowedGenres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'chart'];
+
+    for (const s of all) {
+      const genreList = (Array.isArray(s.genres) && s.genres.length ? s.genres : [s.genre]).map((g) => lc(g));
+      const decade = toDecade(s.year);
+      const year = Number(s.year);
+      const diff = Number.isFinite(Number(s.difficultyLevel)) ? String(Number(s.difficultyLevel)) : 'unknown';
+      const marketsList = (Array.isArray(s.markets) && s.markets.length ? s.markets : [s.geography]).map((m) => lc(m));
+
+      for (const g of genreList) {
+        counts.byGenre[g] = (counts.byGenre[g] || 0) + 1;
+      }
+      counts.byDecade[decade] = (counts.byDecade[decade] || 0) + 1;
+      if (Number.isFinite(year)) counts.byYear[String(year)] = (counts.byYear[String(year)] || 0) + 1;
+      counts.byDifficulty[diff] = (counts.byDifficulty[diff] || 0) + 1;
+      for (const m of marketsList) {
+        counts.byMarket[m] = (counts.byMarket[m] || 0) + 1;
+      }
+
+      if (s && s.isBillboardChart) counts.billboard.billboard += 1;
+      else counts.billboard.nonBillboard += 1;
+
+      if (s && s.albumArt) withAlbumArt += 1;
+      if (s && s.previewUrl) withPreview += 1;
+
+      // Tags
+      if (Array.isArray(s.tags)) {
+        for (const t of s.tags) {
+          const tag = lc(String(t));
+          counts.tags[tag] = (counts.tags[tag] || 0) + 1;
+        }
+      }
+
+      // Crosstab
+      if (!genreByDecade[decade]) genreByDecade[decade] = {};
+      for (const g of genreList) {
+        genreByDecade[decade][g] = (genreByDecade[decade][g] || 0) + 1;
+      }
+    }
+
+    // Sort helpers
+    const sortEntriesDesc = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    const sortDecadesAsc = (obj) => {
+      return Object.entries(obj).sort((a, b) => {
+        if (a[0] === 'unknown') return 1;
+        if (b[0] === 'unknown') return -1;
+        return parseInt(a[0]) - parseInt(b[0]);
+      });
+    };
+
+    // Build arrays for charts
+    const decadesSorted = sortDecadesAsc(counts.byDecade);
+    const topGenres = sortEntriesDesc(counts.byGenre).slice(0, 12);
+    const difficultySorted = Object.keys(counts.byDifficulty)
+      .sort((a, b) => (a === 'unknown') ? 1 : (b === 'unknown') ? -1 : Number(a) - Number(b))
+      .map(k => [k, counts.byDifficulty[k]]);
+    const topMarkets = sortEntriesDesc(counts.byMarket).slice(0, 12);
+
+    // Gap analysis: default threshold (can override via query ?gapThreshold=30)
+    const gapThreshold = Math.max(1, Number(req.query.gapThreshold) || 30);
+    const gapSegments = [];
+    // Only consider allowed genres and "known" decades (not 'unknown')
+    const allDecades = decadesSorted.map(([d]) => d).filter(d => d !== 'unknown');
+    for (const d of allDecades) {
+      for (const g of allowedGenres) {
+        const n = (genreByDecade[d] && genreByDecade[d][g]) ? genreByDecade[d][g] : 0;
+        if (n < gapThreshold) {
+          gapSegments.push({ decade: d, genre: g, count: n, deficit: gapThreshold - n });
+        }
+      }
+    }
+    // Sort gap segments by lowest counts first
+    gapSegments.sort((a, b) => a.count - b.count || a.decade.localeCompare(b.decade) || a.genre.localeCompare(b.genre));
+
+    const result = {
+      ok: true,
+      totals: {
+        curatedCount: total,
+        withAlbumArt,
+        withPreview,
+        albumArtPct: total ? Math.round((withAlbumArt / total) * 100) : 0,
+        previewPct: total ? Math.round((withPreview / total) * 100) : 0,
+      },
+      counts: {
+        byDecade: decadesSorted,     // [ [decade, count], ... ]
+        byGenre: topGenres,          // [ [genre, count], ... ]
+        byDifficulty: difficultySorted, // [ [level, count], ... ]
+        byMarket: topMarkets,        // [ [market, count], ... ]
+        billboard: counts.billboard,
+        byYear: sortEntriesDesc(counts.byYear).sort((a, b) => Number(a[0]) - Number(b[0])), // chronological
+        tags: sortEntriesDesc(counts.tags).slice(0, 20),
+      },
+      crosstabs: {
+        genreByDecade, // { "1980s": { "pop": 10, ... }, ... }
+      },
+      gapAnalysis: {
+        threshold: gapThreshold,
+        allowedGenres,
+        segmentsNeedingAttention: gapSegments.slice(0, 50) // cap for UI
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'Analytics failed' });
+  }
+});
+
+/**
+ * Admin Bulk Import - Preview
+ * Body: {
+ *   mode: 'billboard' | 'search',
+ *   filters: {
+ *     yearMin?: number,
+ *     yearMax?: number,
+ *     genres?: string[] | string,   // comma-separated string allowed
+ *     markets?: string[] | string,  // comma-separated string allowed
+ *     market?: string               // single code allowed
+ *   },
+ *   limit?: number
+ * }
+ * Returns curated-like items without saving to DB.
+ */
+app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const mode = (body.mode || 'billboard').toLowerCase();
+    const filters = body.filters || {};
+    const cap = Math.max(1, Math.min(500, Number(body.limit) || 100));
+
+    const yearMin = Number.isFinite(Number(filters.yearMin)) ? Number(filters.yearMin)
+      : (Number.isFinite(Number(filters.yearRange?.min)) ? Number(filters.yearRange.min) : undefined);
+    const yearMax = Number.isFinite(Number(filters.yearMax)) ? Number(filters.yearMax)
+      : (Number.isFinite(Number(filters.yearRange?.max)) ? Number(filters.yearRange.max) : undefined);
+
+    let genres = [];
+    if (Array.isArray(filters.genres)) {
+      genres = filters.genres;
+    } else if (typeof filters.genres === 'string') {
+      genres = filters.genres.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (typeof filters.genre === 'string') {
+      genres = filters.genre.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    let markets = [];
+    if (Array.isArray(filters.markets)) {
+      markets = filters.markets;
+    } else if (typeof filters.markets === 'string') {
+      markets = filters.markets.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    } else if (typeof filters.market === 'string') {
+      markets = [filters.market.trim().toUpperCase()];
+    }
+    if (!markets.length) markets = ['US'];
+
+    const toDifficultyFromRankPop = (rank, pop) => {
+      // Map to curated difficultyLevel (1-5); we keep 2-4 range primary
+      if (Number.isFinite(rank)) {
+        if (rank <= 10) return 2;
+        if (rank <= 50) return 3;
+        if (rank <= 100) return 4;
+      }
+      const p = Number(pop || 0);
+      if (p >= 85) return 2;
+      if (p >= 70) return 3;
+      if (p >= 55) return 4;
+      return 5;
+    };
+
+    const items = [];
+    const seen = new Set(); // by spotifyUri
+
+    // Genre mapping: map Spotify's detailed genres to game categories used in game settings
+    const artistGenresCache = new Map();
+    function mapSpotifyGenres(genresArr) {
+      const g = (genresArr || []).map(s => String(s || '').toLowerCase());
+      const has = (...keys) => keys.some(k => g.some(s => s.includes(k)));
+      if (has('hip hop', 'rap', 'trap', 'grime', 'drill')) return 'hip-hop';
+      if (has('rock', 'metal', 'punk', 'grunge', 'emo')) return 'rock';
+      if (has('electronic', 'edm', 'house', 'techno', 'trance', 'dubstep', 'electro', 'drum and bass', 'dnb')) return 'electronic';
+      if (has('indie', 'alt', 'alternative', 'shoegaze', 'lo-fi', 'lofi')) return 'indie';
+      if (has('pop', 'k-pop', 'dance pop', 'synthpop', 'electropop', 'teen pop')) return 'pop';
+      // Map RnB/Soul to closest available game bucket
+      if (has('r&b', 'rnb', 'soul', 'funk')) return 'pop';
+      return null;
+    }
+
+    if (mode === 'billboard') {
+      // Fetch chart entries and resolve to Spotify
+      let chartEntries = await getChartEntries({
+        mode: 'recent',
+        difficulty: 'normal',
+        yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
+        yearMax: Number.isFinite(yearMax) ? yearMax : undefined
+      });
+      if (!chartEntries || !chartEntries.length) {
+        chartEntries = await getChartEntries({ mode: 'all', difficulty: 'normal' });
+      }
+
+      const token = await getClientToken();
+      for (const entry of chartEntries) {
+        if (items.length >= cap) break;
+        try {
+          const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
+          const resp = await spotifyGet('https://api.spotify.com/v1/search', {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { q, type: 'track', limit: 5, market: markets[0] || 'US' }
+          }, 'search:billboard');
+          const t = (resp.data.tracks.items || [])[0];
+          if (!t) continue;
+
+          const spotifyUri = t.uri;
+          if (seen.has(spotifyUri)) continue;
+          seen.add(spotifyUri);
+
+          const year = new Date(t.album.release_date).getFullYear();
+          const popularity = t.popularity;
+          const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
+
+          // Enhanced genre detection using hybrid MusicBrainz + Spotify system
+          let genreTag = null;
+          let genresArr = [];
+          try {
+            const genreResult = await detectGenresForArtist(t.artists[0]?.name || entry.artist);
+            if (genreResult && genreResult.genres.length > 0) {
+              genresArr = genreResult.genres;
+              genreTag = genreResult.genres[0]; // Primary genre
+              console.log(`[AdminImport] Enhanced genre detection for ${entry.artist}: ${genresArr.join(', ')} (sources: ${genreResult.sources.map(s => s.source).join(', ')})`);
+            }
+          } catch (e) {
+            console.warn(`[AdminImport] Enhanced genre detection failed for ${entry.artist}:`, e.message);
+          }
+          
+          // Fallback to Spotify artist genres if MusicBrainz didn't provide results
+          if (!genreTag) {
+            try {
+              const artistId = t.artists?.[0]?.id || null;
+              if (artistId) {
+                let artistGenres = artistGenresCache.get(artistId);
+                if (!artistGenres) {
+                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  }, 'artist:genres');
+                  artistGenres = artResp?.data?.genres || [];
+                  artistGenresCache.set(artistId, artistGenres);
+                }
+                genreTag = mapSpotifyGenres(artistGenres);
+                if (genreTag) {
+                  genresArr = [genreTag];
+                }
+              }
+            } catch (e) {
+              // ignore genre fetch failure; we'll fallback below
+            }
+          }
+          
+          // Final fallback
+          if (!genreTag) {
+            genreTag = genres[0] || 'chart';
+            genresArr = [genreTag];
+          }
+
+          // Detect origin country (artist-based)
+          let origin = markets[0] || 'US';
+          try {
+            const geoRes = await detectGeographyForArtist(t.artists[0]?.name || entry.artist);
+            if (geoRes && geoRes.geography) origin = geoRes.geography;
+          } catch (e) {}
+
+          // Compute markets (success regions): selected market, artist origin, and INTL for very high popularity
+          const marketsArr = Array.from(new Set([
+            (markets[0] || 'US').toUpperCase(),
+            origin ? String(origin).toUpperCase() : null,
+            (Number(popularity) >= 85 ? 'INTL' : null)
+          ].filter(Boolean)));
+
+          // Use the genresArr from enhanced detection, or fallback to single genre
+          if (!genresArr.length) {
+            genresArr = Array.from(new Set([genreTag].filter(Boolean)));
+          }
+
+          items.push({
+            spotifyUri,
+            title: t.name,
+            artist: t.artists[0]?.name || entry.artist,
+            year,
+            genre: genreTag,
+            genres: genresArr,
+            geography: origin,
+            markets: marketsArr,
+            searchMarket: markets[0] || 'US',
+            difficultyLevel,
+            popularity,
+            albumArt: t.album.images?.[0]?.url || null,
+            previewUrl: t.preview_url || null,
+            tags: [],
+            verified: true,
+            addedBy: 'import',
+            isBillboardChart: true,
+            chartInfo: {
+              rank: entry.rank ?? null,
+              peakPos: entry.peakPos ?? null,
+              weeksOnChart: entry.weeksOnChart ?? null,
+              chartDate: entry.chartDate ?? null
+            }
+          });
+        } catch (e) {
+          // ignore individual failures
+        }
+      }
+    } else {
+      // Generic Spotify search mode
+      const token = await getClientToken();
+      const yrRange = {
+        min: Number.isFinite(yearMin) ? yearMin : 1960,
+        max: Number.isFinite(yearMax) ? yearMax : 2025
+      };
+      const gen = genres.length ? genres : ['pop', 'rock', 'hip-hop', 'electronic', 'indie'];
+      const queries = createYearBasedSearches(yrRange, gen, markets).sort(() => 0.5 - Math.random());
+
+      for (const market of markets) {
+        for (const q of queries) {
+          if (items.length >= cap) break;
+          try {
+            let query = q;
+            if (!q.includes('year:') && Number.isFinite(yrRange.min) && Number.isFinite(yrRange.max)) {
+              query += ` year:${yrRange.min}-${yrRange.max}`;
+            }
+            const resp = await spotifyGet('https://api.spotify.com/v1/search', {
+              headers: { Authorization: `Bearer ${token}` },
+              params: { q: query, type: 'track', limit: 20, market }
+            }, 'search:generic');
+            for (const track of resp.data.tracks.items || []) {
+              if (items.length >= cap) break;
+
+              const trackYear = new Date(track.album.release_date).getFullYear();
+              if ((Number.isFinite(yrRange.min) && trackYear < yrRange.min) ||
+                  (Number.isFinite(yrRange.max) && trackYear > yrRange.max)) continue;
+
+              if (config.featureFlags.enableRemasterFilter) {
+                if (isSuspiciousTrack({ title: track.name, album: track.album?.name || '' })) continue;
+              }
+
+              const spotifyUri = track.uri;
+              if (seen.has(spotifyUri)) continue;
+              seen.add(spotifyUri);
+
+              const popularity = track.popularity;
+              const difficultyLevel = toDifficultyFromRankPop(null, popularity);
+              const genreTag = q.includes('genre:') ? q.split('genre:')[1].split(' ')[0] : (genres[0] || 'general');
+
+              items.push({
+                spotifyUri,
+                title: track.name,
+                artist: track.artists[0]?.name || '',
+                year: trackYear,
+                genre: genreTag,
+                genres: Array.from(new Set([genreTag].filter(Boolean))),
+                geography: (await (async () => { try { const r = await detectGeographyForArtist(track.artists[0]?.name || ''); return r?.geography || market; } catch (_) { return market; }})()),
+                markets: Array.from(new Set([String(market).toUpperCase(), (Number(popularity) >= 85 ? 'INTL' : null)].filter(Boolean))),
+                searchMarket: market,
+                difficultyLevel,
+                popularity,
+                albumArt: track.album.images?.[0]?.url || null,
+                previewUrl: track.preview_url || null,
+                tags: [],
+                verified: false,
+                addedBy: 'import',
+                isBillboardChart: false,
+                chartInfo: null
+              });
+            }
+          } catch (e) {
+            // ignore this query
+          }
+        }
+      }
+
+      // diversify by artist and cap
+      const diversified = diversifyByArtist(items, 1);
+      items.length = 0;
+      items.push(...diversified.slice(0, cap));
+    }
+
+    res.json({ ok: true, mode, total: items.length, items });
+  } catch (e) {
+    console.error('[AdminImport][preview] failed:', e && e.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Preview failed' });
+  }
+});
+
+/**
+ * Admin Bulk Import - Commit
+ * Body: { items: CuratedItem[] }
+ * Saves items into curated DB (dedup by spotifyUri).
+ */
+app.post('/api/admin/import/commit', requireAdmin, (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    let added = 0;
+    let updated = 0;
+    const seen = new Set();
+
+    for (const raw of items) {
+      const spotifyUri = raw.spotifyUri || raw.uri || null;
+      if (!spotifyUri || seen.has(spotifyUri)) continue;
+      seen.add(spotifyUri);
+
+      const rec = curatedDb.add({
+        spotifyUri,
+        title: raw.title,
+        artist: raw.artist,
+        year: Number.isFinite(Number(raw.year)) ? Number(raw.year) : null,
+        genre: raw.genre || '',
+        // Multi-field arrays with backward compatibility handled inside curatedDb.add
+        genres: Array.isArray(raw.genres) ? raw.genres : (raw.genre ? [raw.genre] : []),
+        markets: Array.isArray(raw.markets) ? raw.markets : (raw.searchMarket ? [String(raw.searchMarket).toUpperCase()] : []),
+        geography: raw.geography || raw.origin || '',
+        difficultyLevel: Number.isFinite(Number(raw.difficultyLevel)) ? Number(raw.difficultyLevel) : 2,
+        popularity: Number.isFinite(Number(raw.popularity)) ? Number(raw.popularity) : null,
+        albumArt: raw.albumArt || null,
+        previewUrl: raw.previewUrl || null,
+        tags: Array.isArray(raw.tags) ? raw.tags : [],
+        addedBy: 'admin-import',
+        verified: !!raw.verified,
+        isBillboardChart: !!raw.isBillboardChart,
+        chartInfo: raw.chartInfo || null
+      });
+
+      // Heuristic: curatedDb.add sets updatedAt on updates
+      if (rec && rec.updatedAt) updated++;
+      else added++;
+    }
+
+    res.json({ ok: true, attempted: items.length, saved: added + updated, added, updated });
+  } catch (e) {
+    console.error('[AdminImport][commit] failed:', e && e.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Commit failed' });
+  }
+});
+
+/**
+ * Admin One-time Population
+ * Body: {
+ *   yearMin?: number, yearMax?: number,
+ *   genres?: string[]|string,
+ *   markets?: string[]|string,
+ *   limits?: { billboard?: number, search?: number },
+ *   includeBillboard?: boolean, includeSearch?: boolean
+ * }
+ */
+app.post('/api/admin/populate/one-time', requireAdmin, async (req, res) => {
+  try {
+    const {
+      yearMin, yearMax, genres, markets,
+      limits = { billboard: 300, search: 300 },
+      includeBillboard = true,
+      includeSearch = true
+    } = req.body || {};
+
+    const filters = {
+      yearMin, yearMax, genres, markets
+    };
+
+    let totalAdded = 0, totalUpdated = 0, totalAttempted = 0;
+
+    if (includeBillboard) {
+      const prev = await (async () => {
+        return await axios.post(`${req.protocol}://${req.get('host')}/api/admin/import/preview`, {
+          mode: 'billboard',
+          filters,
+          limit: Number(limits.billboard) || 300
+        }, { headers: { 'x-admin-secret': process.env.ADMIN_PASSWORD } }).then(r => r.data).catch(() => ({ items: [] }));
+      })();
+
+      const com = await (async () => {
+        return await axios.post(`${req.protocol}://${req.get('host')}/api/admin/import/commit`, {
+          items: prev.items || []
+        }, { headers: { 'x-admin-secret': process.env.ADMIN_PASSWORD } }).then(r => r.data).catch(() => ({ added: 0, updated: 0, attempted: 0 }));
+      })();
+
+      totalAttempted += com.attempted || 0;
+      totalAdded += com.added || 0;
+      totalUpdated += com.updated || 0;
+    }
+
+    if (includeSearch) {
+      const prev = await (async () => {
+        return await axios.post(`${req.protocol}://${req.get('host')}/api/admin/import/preview`, {
+          mode: 'search',
+          filters,
+          limit: Number(limits.search) || 300
+        }, { headers: { 'x-admin-secret': process.env.ADMIN_PASSWORD } }).then(r => r.data).catch(() => ({ items: [] }));
+      })();
+
+      const com = await (async () => {
+        return await axios.post(`${req.protocol}://${req.get('host')}/api/admin/import/commit`, {
+          items: prev.items || []
+        }, { headers: { 'x-admin-secret': process.env.ADMIN_PASSWORD } }).then(r => r.data).catch(() => ({ added: 0, updated: 0, attempted: 0 }));
+      })();
+
+      totalAttempted += com.attempted || 0;
+      totalAdded += com.added || 0;
+      totalUpdated += com.updated || 0;
+    }
+
+    res.json({ ok: true, attempted: totalAttempted, added: totalAdded, updated: totalUpdated });
+  } catch (e) {
+    console.error('[AdminPopulate][one-time] failed:', e && e.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Populate failed' });
+  }
+});
+
+// --- Curated Selection Endpoint (public for game creator) ---
+app.post('/api/curated/select', (req, res) => {
+  try {
+    const {
+      musicPreferences = {},
+      difficulty = (config.difficulty || 'normal'),
+      playerCount = 2
+    } = req.body || {};
+
+    const {
+      genres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
+      yearRange = { min: 1980, max: 2024 },
+      markets = ['US']
+    } = musicPreferences || {};
+
+    const result = curatedDb.selectForGame({
+      yearRange,
+      genres,
+      markets,
+      difficulty,
+      playerCount
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'Selection failed' });
+  }
+});
 
 // Store fetched songs for debugging (in production, consider using Redis or database)
 let lastFetchedSongs = null;

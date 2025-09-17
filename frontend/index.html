@@ -32,6 +32,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chewy&family=Encode+Sans:wght@100..900&display=swap" rel="stylesheet">
+    <script>
+      (function () {
+        try {
+          // In Vite dev, SPA will serve index.html for /admin.
+          // Redirect early to the static admin panel.
+          var p = (window.location.pathname || '').replace(/\/+$/, '');
+          if (p === '/admin') {
+            window.location.replace('/admin.html');
+          }
+        } catch (e) {
+          // no-op
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

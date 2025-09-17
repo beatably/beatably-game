@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Beatably Admin - Curated Songs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #0b0f14;
+      color: #e6edf3;
+    }
+    header {
+      padding: 16px;
+      background: #111722;
+      border-bottom: 1px solid #223045;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .container {
+      padding: 16px;
+      max-width: 1600px; /* widen for desktop */
+      margin: 0 auto;
+    }
+    .card {
+      background: #10161f;
+      border: 1px solid #223045;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .row > * {
+      flex: 1 1 auto;
+      min-width: 200px;
+    }
+    input, select, button, textarea {
+      background: #0b0f14;
+      color: #e6edf3;
+      border: 1px solid #223045;
+      border-radius: 6px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #2ea043;
+      box-shadow: 0 0 0 2px rgba(46,160,67,0.2);
+    }
+    button {
+      background: #1f6feb;
+      border: 1px solid #1f6feb;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      border-color: #223045;
+    }
+    button.danger {
+      background: #da3633;
+      border-color: #da3633;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #223045;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 8px 10px; /* slightly tighter */
+      border-bottom: 1px solid #223045;
+      vertical-align: top;
+      font-size: 13px; /* tighter for density */
+    }
+    th {
+      background: #0b0f14;
+      text-align: left;
+      white-space: nowrap; /* keep headers compact */
+    }
+    tr:hover td {
+      background: rgba(255,255,255,0.02);
+    }
+    .muted {
+      color: #8b949e;
+      font-size: 12px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid #223045;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+    }
+    .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; }
+    .col-6 { grid-column: span 6; }
+    .col-12 { grid-column: span 12; }
+    @media (max-width: 900px) {
+      .col-3, .col-4, .col-6 { grid-column: span 12; }
+    }
+    .right { text-align: right; }
+    .nowrap { white-space: nowrap; }
+    .num { text-align: right; white-space: nowrap; }
+    .img {
+      width: 56px;
+      height: 56px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #0b0f14;
+      border: 1px solid #223045;
+    }
+    .status {
+      padding: 8px 12px;
+      background: #10161f;
+      border: 1px solid #223045;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .success { color: #3fb950; }
+    .warning { color: #d29922; }
+    .error { color: #f85149; }
+    .link {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+    .link:hover { text-decoration: underline; }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .small { font-size: 12px; padding: 6px 8px; }
+    .tight { padding: 4px 8px; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    
+    /* Audio controls */
+    .play-btn {
+      background: transparent;
+      border: 1px solid #223045;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0;
+      transition: all 0.2s ease;
+    }
+    .play-btn:hover {
+      border-color: #2ea043;
+      background: rgba(46,160,67,0.1);
+    }
+    .play-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .play-btn.playing {
+      background: #2ea043;
+      border-color: #2ea043;
+      color: white;
+    }
+    .play-btn.loading {
+      opacity: 0.7;
+      cursor: wait;
+    }
+    
+    .auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 999; }
+    .auth-dialog { background: #10161f; border: 1px solid #223045; border-radius: 10px; padding: 20px; width: 100%; max-width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .auth-dialog h3 { margin: 0 0 8px 0; }
+    .auth-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+
+    /* Pagination/status bar */
+    .pager {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 8px;
+      flex-wrap: wrap;
+    }
+    .pager .left,
+    .pager .right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header>
+    <div>
+      <strong>Beatably Admin</strong> <span class="muted">• Curated Songs</span>
+    </div>
+    <div class="row" style="justify-content:flex-end;">
+      <button id="bulkImportBtn">Bulk Import</button>
+      <button id="analyticsBtn" class="secondary">Analytics</button>
+      <button id="signOutBtn" class="secondary">Sign out</button>
+    </div>
+  </header>
+
+  <div id="authModal" class="auth-modal">
+    <div class="auth-dialog">
+      <h3>Admin access</h3>
+      <p class="muted">Enter admin password to continue.</p>
+      <input id="authInput" type="password" placeholder="Admin password" class="mono" style="width:100%; margin-top:8px;" />
+      <div class="auth-actions">
+        <button id="authSubmitBtn">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" id="adminContent" style="display:none;">
+    <!-- Admin main view -->
+    <div id="adminView">
+      <div class="card">
+        <div class="row" style="align-items:flex-end;">
+          <div class="col-3">
+            <label class="muted">Search</label>
+            <input id="filterQ" placeholder="Title or artist..." />
+          </div>
+          <div class="col-3">
+            <label class="muted">Genre</label>
+            <input id="filterGenre" placeholder="e.g. pop" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Geography (Market)</label>
+            <input id="filterGeo" placeholder="e.g. US" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Difficulty Level (1-5)</label>
+            <input id="filterDiff" type="number" min="1" max="5" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div class="col-3">
+            <label class="muted">Year Min</label>
+            <input id="filterYearMin" type="number" placeholder="1960" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Year Max</label>
+            <input id="filterYearMax" type="number" placeholder="2025" />
+          </div>
+          <div class="col-6 right">
+            <button id="applyFiltersBtn">Apply Filters</button>
+            <button id="resetFiltersBtn" class="secondary">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <strong>Curated Songs</strong>
+            <div id="resultCount" class="muted"></div>
+          </div>
+          <div class="actions">
+            <div class="row" style="align-items:center; gap:8px;">
+              <label for="perPageSelect" class="muted nowrap">Rows/page</label>
+              <select id="perPageSelect" class="tight nowrap" style="min-width:auto;">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+              </select>
+            </div>
+            <button id="refreshBtn" class="secondary">Refresh</button>
+            <button id="exportBtn" class="secondary">Export JSON</button>
+          </div>
+        </div>
+        <div id="status" class="status" style="margin:12px 0; display:none;"></div>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Cover</th>
+                <th>Preview</th>
+                <th style="min-width:280px;">Title / Artist</th>
+                <th class="num">Year</th>
+                <th>Genre</th>
+                <th>Origin</th>
+                <th>Markets</th>
+                <th class="num">Billboard</th>
+                <th class="num">Rank</th>
+                <th class="num">Peak</th>
+                <th class="num">Weeks</th>
+                <th>Chart Date</th>
+                <th class="num">Difficulty</th>
+                <th class="num">Popularity</th>
+                <th>Tags</th>
+                <th>Verified</th>
+                <th>Added</th>
+                <th>URI</th>
+                <th class="right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="songsTbody">
+              <tr><td colspan="19" class="muted">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager" id="pagerBar">
+          <div class="left">
+            <button id="prevPageBtn" class="secondary small">&larr; Prev</button>
+            <div id="pageInfo" class="muted nowrap">Page 1</div>
+            <button id="nextPageBtn" class="secondary small">Next &rarr;</button>
+          </div>
+          <div class="right">
+            <div id="pageRangeInfo" class="muted nowrap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk import view -->
+    <div id="importView" style="display:none;">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <div class="actions">
+          <button id="backToAdminBtn" class="secondary">&larr; Back to Admin</button>
+        </div>
+        <div>
+          <h3 style="margin:0;">Bulk Import (Preview &amp; Commit)</h3>
+        </div>
+        <div></div>
+      </div>
+
+      <div class="card">
+        <div class="grid">
+          <div class="col-3">
+            <label class="muted">Mode</label>
+            <select id="importMode">
+              <option value="billboard">Billboard</option>
+              <option value="search">Spotify Search</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="muted">Year Min</label>
+            <input id="importYearMin" type="number" placeholder="1960" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Year Max</label>
+            <input id="importYearMax" type="number" placeholder="2025" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Limit</label>
+            <input id="importLimit" type="number" min="1" max="500" value="100" />
+          </div>
+          <div class="col-6">
+            <label class="muted">Genres (comma separated)</label>
+            <input id="importGenres" placeholder="pop, rock, ..." />
+          </div>
+          <div class="col-6">
+            <label class="muted">Markets (comma separated)</label>
+            <input id="importMarkets" placeholder="US, GB, SE" value="US" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px; justify-content:space-between;">
+          <div class="muted" id="importPreviewCount"></div>
+          <div class="actions">
+            <button id="previewImportBtn">Preview</button>
+            <button id="cancelImportBtn" class="secondary" style="display:none;">Cancel</button>
+            <button id="commitImportBtn" class="danger" disabled>Commit Selected</button>
+          </div>
+        </div>
+        <div style="overflow:auto; margin-top:8px;">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="importSelectAll" /></th>
+                <th>Title</th>
+                <th>Artist</th>
+                <th>Year</th>
+                <th>Genre</th>
+                <th>Geo</th>
+                <th>Markets</th>
+                <th>Billboard</th>
+                <th>Rank</th>
+                <th>Popularity</th>
+                <th>URI</th>
+              </tr>
+            </thead>
+            <tbody id="importPreviewTbody">
+              <tr><td colspan="11" class="muted">No preview yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics view -->
+    <div id="analyticsView" style="display:none;">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <div class="actions">
+          <button id="backFromAnalyticsBtn" class="secondary">&larr; Back to Admin</button>
+        </div>
+        <div>
+          <h3 style="margin:0;">Song Analytics</h3>
+        </div>
+        <div class="row" style="gap:8px; align-items:center;">
+          <label class="muted nowrap">Gap threshold</label>
+          <input id="gapThreshold" type="number" min="1" max="500" value="30" style="width:90px;" />
+          <button id="refreshAnalyticsBtn">Refresh</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <strong>Total curated</strong>
+            <div id="curatedCount" class="muted">0</div>
+          </div>
+          <div>
+            <strong>Album art coverage</strong>
+            <div id="albumArtPct" class="muted">0%</div>
+          </div>
+          <div>
+            <strong>Preview coverage</strong>
+            <div id="previewPct" class="muted">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card col-6"><canvas id="decadeChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="yearChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="genreChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="difficultyChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="marketChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="billboardChart" height="200"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <div>
+            <strong>Gap analysis</strong>
+            <div class="muted">Segments below threshold needing attention (top 50)</div>
+          </div>
+          <div>
+            <ul id="gapRecommendations" class="muted" style="margin:0; padding-left:18px;"></ul>
+          </div>
+        </div>
+        <div style="overflow:auto; margin-top:8px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Decade</th>
+                <th>Genre</th>
+                <th class="num">Count</th>
+                <th class="num">Deficit</th>
+              </tr>
+            </thead>
+            <tbody id="gapTable">
+              <tr><td colspan="4" class="muted">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Config
+    const API_BASE_URL = (function() {
+      const loc = window.location;
+      if (loc.port === '5173') {
+        return loc.protocol + '//' + loc.hostname + ':3001';
+      }
+      return loc.origin.replace(/\/$/, '');
+    })();
+
+    // Simple view switcher
+    function switchView(view) {
+      const admin = document.getElementById('adminView');
+      const imp = document.getElementById('importView');
+      const analytics = document.getElementById('analyticsView');
+      if (view === 'import') {
+        if (admin) admin.style.display = 'none';
+        if (analytics) analytics.style.display = 'none';
+        if (imp) imp.style.display = 'block';
+      } else if (view === 'analytics') {
+        if (admin) admin.style.display = 'none';
+        if (imp) imp.style.display = 'none';
+        if (analytics) analytics.style.display = 'block';
+        try { loadAnalytics(); } catch (_) {}
+      } else {
+        if (imp) imp.style.display = 'none';
+        if (analytics) analytics.style.display = 'none';
+        if (admin) admin.style.display = 'block';
+        try { listSongs(); } catch (_) {}
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    const els = {
+      bulkImportBtn: document.getElementById('bulkImportBtn'),
+      backToAdminBtn: document.getElementById('backToAdminBtn'),
+      signOutBtn: document.getElementById('signOutBtn'),
+
+      authModal: document.getElementById('authModal'),
+      authInput: document.getElementById('authInput'),
+      authSubmitBtn: document.getElementById('authSubmitBtn'),
+      adminContent: document.getElementById('adminContent'),
+
+      // Admin filters
+      filterQ: document.getElementById('filterQ'),
+      filterGenre: document.getElementById('filterGenre'),
+      filterGeo: document.getElementById('filterGeo'),
+      filterDiff: document.getElementById('filterDiff'),
+      filterYearMin: document.getElementById('filterYearMin'),
+      filterYearMax: document.getElementById('filterYearMax'),
+      applyFiltersBtn: document.getElementById('applyFiltersBtn'),
+      resetFiltersBtn: document.getElementById('resetFiltersBtn'),
+
+      // Pagination
+      perPageSelect: document.getElementById('perPageSelect'),
+      prevPageBtn: document.getElementById('prevPageBtn'),
+      nextPageBtn: document.getElementById('nextPageBtn'),
+      pageInfo: document.getElementById('pageInfo'),
+      pageRangeInfo: document.getElementById('pageRangeInfo'),
+
+      // Bulk import elements
+      importMode: document.getElementById('importMode'),
+      importYearMin: document.getElementById('importYearMin'),
+      importYearMax: document.getElementById('importYearMax'),
+      importGenres: document.getElementById('importGenres'),
+      importMarkets: document.getElementById('importMarkets'),
+      importLimit: document.getElementById('importLimit'),
+      previewImportBtn: document.getElementById('previewImportBtn'),
+      commitImportBtn: document.getElementById('commitImportBtn'),
+      importPreviewTbody: document.getElementById('importPreviewTbody'),
+      importPreviewCount: document.getElementById('importPreviewCount'),
+      importSelectAll: document.getElementById('importSelectAll'),
+      cancelImportBtn: document.getElementById('cancelImportBtn'),
+
+      status: document.getElementById('status'),
+      songsTbody: document.getElementById('songsTbody'),
+      resultCount: document.getElementById('resultCount'),
+      refreshBtn: document.getElementById('refreshBtn'),
+      exportBtn: document.getElementById('exportBtn'),
+
+      // Analytics elements
+      analyticsBtn: document.getElementById('analyticsBtn'),
+      backFromAnalyticsBtn: document.getElementById('backFromAnalyticsBtn'),
+      gapThreshold: document.getElementById('gapThreshold'),
+      refreshAnalyticsBtn: document.getElementById('refreshAnalyticsBtn'),
+      curatedCount: document.getElementById('curatedCount'),
+      albumArtPct: document.getElementById('albumArtPct'),
+      previewPct: document.getElementById('previewPct'),
+      gapTable: document.getElementById('gapTable'),
+      gapRecommendations: document.getElementById('gapRecommendations')
+    };
+
+    // Pagination state
+    const pageState = {
+      page: Number(localStorage.getItem('admin_page')) || 1,
+      perPage: Math.min(500, Math.max(1, Number(localStorage.getItem('admin_perPage')) || 100)),
+      filteredTotal: 0,
+      dbTotal: 0
+    };
+
+    function getSecret() {
+      return localStorage.getItem('beatably_admin_secret') || '';
+    }
+    function setSecret(val) {
+      localStorage.setItem('beatably_admin_secret', val || '');
+    }
+    function showStatus(msg, type) {
+      els.status.style.display = 'block';
+      els.status.textContent = msg;
+      els.status.className = 'status ' + (type || '');
+      setTimeout(() => {
+        els.status.style.display = 'none';
+      }, 2500);
+    }
+
+    async function adminFetch(path, opts = {}) {
+      const secret = getSecret();
+      if (!secret) {
+        throw new Error('Admin password not set. Use the popup to authenticate.');
+      }
+      const headers = Object.assign(
+        { 'Content-Type': 'application/json', 'x-admin-secret': secret },
+        opts.headers || {}
+      );
+      const resp = await fetch(API_BASE_URL + path, { ...opts, headers });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        throw new Error('Request failed: ' + resp.status + ' ' + txt);
+      }
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return resp.json();
+      }
+      return resp.text();
+    }
+
+    async function ensureAuthenticated() {
+      const secret = getSecret();
+      if (!secret) {
+        if (els.authModal) els.authModal.style.display = 'flex';
+        if (els.adminContent) els.adminContent.style.display = 'none';
+        return;
+      }
+      try {
+        await adminFetch('/api/admin/curated-songs?limit=1');
+        if (els.authModal) els.authModal.style.display = 'none';
+        if (els.adminContent) els.adminContent.style.display = 'block';
+        // init per-page select
+        if (els.perPageSelect) els.perPageSelect.value = String(pageState.perPage);
+        listSongs();
+      } catch (e) {
+        if (els.authModal) els.authModal.style.display = 'flex';
+        if (els.adminContent) els.adminContent.style.display = 'none';
+        showStatus('Enter admin password to continue', 'warning');
+      }
+    }
+
+    async function tryAuth() {
+      const val = (els.authInput && els.authInput.value) ? els.authInput.value.trim() : '';
+      if (!val) {
+        showStatus('Password required', 'warning');
+        return;
+      }
+      setSecret(val);
+      try {
+        await adminFetch('/api/admin/curated-songs?limit=1');
+        if (els.authModal) els.authModal.style.display = 'none';
+        if (els.adminContent) els.adminContent.style.display = 'block';
+        els.authInput.value = '';
+        showStatus('Authenticated', 'success');
+        if (els.perPageSelect) els.perPageSelect.value = String(pageState.perPage);
+        listSongs();
+      } catch (e) {
+        setSecret('');
+        showStatus('Authentication failed', 'error');
+        if (els.authModal) els.authModal.style.display = 'flex';
+        if (els.adminContent) els.adminContent.style.display = 'none';
+      }
+    }
+
+    // ===== Bulk import (preview & commit) =====
+    window.__importPreviewItems = [];
+    window.__importAbort = null;
+    window.__importTimer = null;
+    window.__importStart = 0;
+
+    function renderLoadingRow(message) {
+      if (!els.importPreviewTbody) return;
+      els.importPreviewTbody.innerHTML = '';
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 11;
+      td.className = 'muted';
+      td.textContent = message || 'Fetching preview…';
+      tr.appendChild(td);
+      els.importPreviewTbody.appendChild(tr);
+    }
+
+    function setImportLoading(loading) {
+      if (loading) {
+        window.__importStart = Date.now();
+        if (els.previewImportBtn) els.previewImportBtn.disabled = true;
+        if (els.commitImportBtn) els.commitImportBtn.disabled = true;
+        if (els.importSelectAll) els.importSelectAll.disabled = true;
+        if (els.cancelImportBtn) els.cancelImportBtn.style.display = 'inline-block';
+        if (els.importPreviewCount) els.importPreviewCount.textContent = 'Fetching preview…';
+        if (window.__importTimer) clearInterval(window.__importTimer);
+        window.__importTimer = setInterval(() => {
+          const elapsed = ((Date.now() - window.__importStart) / 1000).toFixed(1);
+          if (els.importPreviewCount) els.importPreviewCount.textContent = `Fetching preview… ${elapsed}s`;
+        }, 200);
+      } else {
+        if (els.previewImportBtn) els.previewImportBtn.disabled = false;
+        if (els.importSelectAll) els.importSelectAll.disabled = false;
+        if (els.cancelImportBtn) els.cancelImportBtn.style.display = 'none';
+        if (window.__importTimer) {
+          clearInterval(window.__importTimer);
+          window.__importTimer = null;
+        }
+        updateImportCommitState();
+      }
+    }
+
+    function updateImportCommitState() {
+      const checkboxes = els.importPreviewTbody ? els.importPreviewTbody.querySelectorAll('.importRowCheckbox') : [];
+      let selected = 0;
+      checkboxes.forEach(cb => { if (cb.checked) selected++; });
+      if (els.commitImportBtn) els.commitImportBtn.disabled = selected === 0;
+      if (els.importPreviewCount) {
+        const total = window.__importPreviewItems.length || 0;
+        els.importPreviewCount.textContent = total ? `${selected}/${total} selected` : '';
+      }
+    }
+
+    function renderImportPreview(items) {
+      window.__importPreviewItems = Array.isArray(items) ? items : [];
+      const arr = window.__importPreviewItems;
+      els.importPreviewTbody.innerHTML = '';
+      if (!arr.length) {
+        els.importPreviewTbody.innerHTML = '<tr><td colspan="11" class="muted">No results</td></tr>';
+        updateImportCommitState();
+        return;
+      }
+      arr.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+
+        const tdSel = document.createElement('td');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'importRowCheckbox';
+        cb.dataset.index = String(idx);
+        cb.checked = true;
+        cb.addEventListener('change', updateImportCommitState);
+        tdSel.appendChild(cb);
+        tr.appendChild(tdSel);
+
+        const tdTitle = document.createElement('td');
+        tdTitle.textContent = it.title || '';
+        tr.appendChild(tdTitle);
+
+        const tdArtist = document.createElement('td');
+        tdArtist.textContent = it.artist || '';
+        tr.appendChild(tdArtist);
+
+        const tdYear = document.createElement('td');
+        tdYear.textContent = it.year || '';
+        tr.appendChild(tdYear);
+
+        const tdGenre = document.createElement('td');
+        tdGenre.textContent = (Array.isArray(it.genres) && it.genres.length) ? it.genres.join(', ') : (it.genre || '');
+        tr.appendChild(tdGenre);
+
+        const tdGeo = document.createElement('td');
+        tdGeo.textContent = it.geography || '';
+        tr.appendChild(tdGeo);
+
+        const tdMarket = document.createElement('td');
+        tdMarket.textContent = (Array.isArray(it.markets) && it.markets.length) ? it.markets.join(', ') : (it.searchMarket || '');
+        tr.appendChild(tdMarket);
+
+        const tdBill = document.createElement('td');
+        tdBill.textContent = it.isBillboardChart ? '✓' : '';
+        tr.appendChild(tdBill);
+
+        const tdRank = document.createElement('td');
+        tdRank.textContent = it.chartInfo?.rank ?? '';
+        tr.appendChild(tdRank);
+
+        const tdPop = document.createElement('td');
+        tdPop.textContent = typeof it.popularity === 'number' ? String(it.popularity) : '';
+        tr.appendChild(tdPop);
+
+        const tdUri = document.createElement('td');
+        tdUri.className = 'mono';
+        tdUri.textContent = it.spotifyUri || it.uri || '';
+        tr.appendChild(tdUri);
+
+        els.importPreviewTbody.appendChild(tr);
+      });
+
+      updateImportCommitState();
+    }
+
+    async function previewImport() {
+      try {
+        if (window.__importAbort) {
+          try { window.__importAbort.abort(); } catch (_) {}
+        }
+        const controller = new AbortController();
+        window.__importAbort = controller;
+        setImportLoading(true);
+        renderLoadingRow('Fetching preview…');
+
+        const mode = (els.importMode?.value || 'billboard').toLowerCase();
+        const yearMin = Number(els.importYearMin?.value);
+        const yearMax = Number(els.importYearMax?.value);
+        const genres = (els.importGenres?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+        const markets = (els.importMarkets?.value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        const limit = Math.max(1, Math.min(500, Number(els.importLimit?.value) || 100));
+
+        const body = {
+          mode,
+          filters: {
+            yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
+            yearMax: Number.isFinite(yearMax) ? yearMax : undefined,
+            genres: genres.length ? genres : undefined,
+            markets: markets.length ? markets : undefined
+          },
+          limit
+        };
+
+        const resp = await adminFetch('/api/admin/import/preview', {
+          method: 'POST',
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+        renderImportPreview(resp.items || []);
+        if (els.importPreviewCount) {
+          els.importPreviewCount.textContent = `${resp.total || (resp.items?.length || 0)} items`;
+        }
+        showStatus('Preview ready', 'success');
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          showStatus('Preview cancelled', 'warning');
+        } else {
+          renderImportPreview([]);
+          showStatus(e.message || 'Preview failed', 'error');
+        }
+      } finally {
+        setImportLoading(false);
+        window.__importAbort = null;
+      }
+    }
+
+    async function commitSelected() {
+      try {
+        const all = window.__importPreviewItems || [];
+        const selectedIdx = Array.from(els.importPreviewTbody.querySelectorAll('.importRowCheckbox'))
+          .filter(cb => cb.checked)
+          .map(cb => Number(cb.dataset.index));
+        const items = selectedIdx.map(i => all[i]).filter(Boolean);
+        if (!items.length) {
+          showStatus('Select at least one item to commit', 'warning');
+          return;
+        }
+        if (els.commitImportBtn) els.commitImportBtn.disabled = true;
+        if (els.previewImportBtn) els.previewImportBtn.disabled = true;
+        if (els.importPreviewCount) els.importPreviewCount.textContent = 'Saving…';
+        const resp = await adminFetch('/api/admin/import/commit', {
+          method: 'POST',
+          body: JSON.stringify({ items })
+        });
+        showStatus(`Saved ${resp.saved} (added ${resp.added}, updated ${resp.updated})`, 'success');
+        // Return to admin view and refresh list
+        switchView('admin');
+      } catch (e) {
+        showStatus(e.message || 'Commit failed', 'error');
+      } finally {
+        if (els.previewImportBtn) els.previewImportBtn.disabled = false;
+        updateImportCommitState();
+      }
+    }
+
+    // ===== Spotify Playback Management =====
+    let currentPlayingButton = null;
+    let currentPlayingUri = null;
+    let spotifyAuth = null;
+    let deviceAwarePlayback = null;
+
+    // Import Spotify utilities (we'll load them dynamically)
+    async function loadSpotifyModules() {
+      try {
+        // Load the Spotify auth module
+        const spotifyAuthModule = await import('/src/utils/spotifyAuth.js');
+        spotifyAuth = spotifyAuthModule.default;
+        
+        // Load device-aware playback
+        const devicePlaybackModule = await import('/src/utils/deviceAwarePlayback.js');
+        deviceAwarePlayback = devicePlaybackModule.default;
+        
+        console.log('[Admin] Spotify modules loaded successfully');
+        return true;
+      } catch (error) {
+        console.error('[Admin] Failed to load Spotify modules:', error);
+        showStatus('Failed to load Spotify integration. Some features may not work.', 'warning');
+        return false;
+      }
+    }
+
+    function stopCurrentPlayback() {
+      if (currentPlayingButton) {
+        currentPlayingButton.textContent = '▶';
+        currentPlayingButton.classList.remove('playing');
+        currentPlayingButton = null;
+      }
+      currentPlayingUri = null;
+    }
+
+    async function toggleSpotifyPlayback(spotifyUri, button, songTitle) {
+      // If this button is currently playing, pause it
+      if (currentPlayingButton === button) {
+        try {
+          if (spotifyAuth && deviceAwarePlayback) {
+            const deviceId = spotifyAuth.getStoredDeviceId();
+            await deviceAwarePlayback.pausePlayback(deviceId);
+            showStatus('Playback paused', 'success');
+          }
+        } catch (error) {
+          console.error('[Admin] Error pausing playback:', error);
+          showStatus('Failed to pause playback', 'error');
+        }
+        stopCurrentPlayback();
+        return;
+      }
+
+      // Stop any currently playing track
+      if (currentPlayingButton) {
+        try {
+          if (spotifyAuth && deviceAwarePlayback) {
+            const deviceId = spotifyAuth.getStoredDeviceId();
+            await deviceAwarePlayback.pausePlayback(deviceId);
+          }
+        } catch (error) {
+          console.error('[Admin] Error stopping current playback:', error);
+        }
+      }
+      stopCurrentPlayback();
+
+      // If no Spotify URI, show message
+      if (!spotifyUri) {
+        showStatus('No Spotify URI available for this track', 'warning');
+        return;
+      }
+
+      // Check if Spotify modules are loaded
+      if (!spotifyAuth || !deviceAwarePlayback) {
+        showStatus('Spotify integration not available. Please refresh the page.', 'error');
+        return;
+      }
+
+      try {
+        // Set button to loading state
+        button.classList.add('loading');
+        button.textContent = '⏳';
+        button.disabled = true;
+        currentPlayingButton = button;
+        currentPlayingUri = spotifyUri;
+
+        // Check if we have a valid token
+        const tokenStatus = await spotifyAuth.ensureValidToken();
+        if (!tokenStatus.valid) {
+          if (tokenStatus.requiresAuth) {
+            showStatus('Spotify authentication required. Please authenticate in the main game first.', 'warning');
+            stopCurrentPlayback();
+            return;
+          }
+        }
+
+        // Get available devices
+        const devices = await spotifyAuth.getDevices();
+        if (!devices || devices.length === 0) {
+          showStatus('No Spotify devices available. Please open Spotify on a device first.', 'warning');
+          stopCurrentPlayback();
+          return;
+        }
+
+        // Use stored device or first available device
+        let targetDevice = devices.find(d => d.id === spotifyAuth.getStoredDeviceId());
+        if (!targetDevice) {
+          targetDevice = devices.find(d => d.is_active) || devices[0];
+        }
+
+        if (!targetDevice) {
+          showStatus('No suitable Spotify device found', 'error');
+          stopCurrentPlayback();
+          return;
+        }
+
+        // Start playback using device-aware playback
+        const success = await deviceAwarePlayback.startPlayback(targetDevice.id, [spotifyUri], 0);
+        
+        if (success) {
+          button.classList.remove('loading');
+          button.classList.add('playing');
+          button.textContent = '⏸';
+          button.disabled = false;
+          showStatus(`Playing: ${songTitle}`, 'success');
+          
+          // Store the device for future use
+          spotifyAuth.storeDeviceId(targetDevice.id);
+        } else {
+          throw new Error('Failed to start playback');
+        }
+
+      } catch (error) {
+        console.error('[Admin] Spotify playback error:', error);
+        stopCurrentPlayback();
+        showStatus(`Failed to play track: ${error.message}`, 'error');
+      }
+    }
+
+    // Initialize Spotify integration when page loads
+    window.addEventListener('load', async () => {
+      await loadSpotifyModules();
+    });
+
+    // ===== Songs listing with pagination and counts =====
+    function buildFilterParams() {
+      const params = new URLSearchParams();
+      if (els.filterQ.value) params.set('q', els.filterQ.value);
+      if (els.filterGenre.value) params.set('genre', els.filterGenre.value);
+      if (els.filterGeo.value) params.set('geography', els.filterGeo.value);
+      if (els.filterDiff.value) params.set('difficulty', els.filterDiff.value);
+      if (els.filterYearMin.value) params.set('yearMin', els.filterYearMin.value);
+      if (els.filterYearMax.value) params.set('yearMax', els.filterYearMax.value);
+      return params;
+    }
+
+    async function listSongs() {
+      try {
+        const params = buildFilterParams();
+        const limit = Math.min(500, Math.max(1, Number(els.perPageSelect?.value || pageState.perPage) || 100));
+        pageState.perPage = limit;
+        localStorage.setItem('admin_perPage', String(pageState.perPage));
+        const offset = Math.max(0, (pageState.page - 1) * pageState.perPage);
+        params.set('limit', String(pageState.perPage));
+        params.set('offset', String(offset));
+
+        // Fetch filtered page and global total in parallel
+        const [filteredResp, totalResp] = await Promise.all([
+          adminFetch('/api/admin/curated-songs?' + params.toString()),
+          adminFetch('/api/admin/curated-songs?limit=1&offset=0')
+        ]);
+
+        const filteredItems = filteredResp.items || [];
+        const filteredTotal = Number(filteredResp.total || 0);
+        const dbTotal = Number(totalResp.total || 0);
+
+        pageState.filteredTotal = filteredTotal;
+        pageState.dbTotal = dbTotal;
+
+        renderSongs(filteredItems);
+        updateResultCount();
+        updatePager();
+      } catch (e) {
+        renderSongs([]);
+        showStatus(e.message || 'List failed', 'error');
+      }
+    }
+
+    function updateResultCount() {
+      const start = pageState.filteredTotal === 0 ? 0 : ((pageState.page - 1) * pageState.perPage + 1);
+      const end = Math.min(pageState.filteredTotal, pageState.page * pageState.perPage);
+      const text = `Showing ${start}-${end} of ${pageState.filteredTotal} filtered • ${pageState.dbTotal} total in DB`;
+      if (els.resultCount) els.resultCount.textContent = text;
+      if (els.pageRangeInfo) els.pageRangeInfo.textContent = text;
+    }
+
+    function updatePager() {
+      const totalPages = Math.max(1, Math.ceil(pageState.filteredTotal / Math.max(1, pageState.perPage)));
+      if (pageState.page > totalPages) pageState.page = totalPages;
+
+      if (els.pageInfo) els.pageInfo.textContent = `Page ${pageState.page} of ${totalPages}`;
+      if (els.prevPageBtn) els.prevPageBtn.disabled = pageState.page <= 1;
+      if (els.nextPageBtn) els.nextPageBtn.disabled = pageState.page >= totalPages;
+      localStorage.setItem('admin_page', String(pageState.page));
+    }
+
+    function renderSongs(items) {
+        els.songsTbody.innerHTML = '';
+        if (!items.length) {
+          els.songsTbody.innerHTML = '<tr><td colspan="19" class="muted">No results</td></tr>';
+          return;
+        }
+      for (const s of items) {
+        const tr = document.createElement('tr');
+
+        const tdCover = document.createElement('td');
+        const img = document.createElement('img');
+        img.className = 'img';
+        img.src = s.albumArt || '';
+        img.alt = '';
+        tdCover.appendChild(img);
+        tr.appendChild(tdCover);
+
+        const tdPreview = document.createElement('td');
+        const playBtn = document.createElement('button');
+        playBtn.className = 'play-btn';
+        playBtn.textContent = '▶';
+        playBtn.title = s.spotifyUri ? `Play ${s.title} by ${s.artist}` : 'No Spotify URI available';
+        if (!s.spotifyUri) {
+          playBtn.disabled = true;
+        }
+        playBtn.onclick = () => toggleSpotifyPlayback(s.spotifyUri, playBtn, `${s.title} by ${s.artist}`);
+        tdPreview.appendChild(playBtn);
+        tr.appendChild(tdPreview);
+
+        const tdTitle = document.createElement('td');
+        const strong = document.createElement('div');
+        strong.textContent = s.title || '';
+        const small = document.createElement('div');
+        small.className = 'muted';
+        small.textContent = s.artist || '';
+        tdTitle.appendChild(strong);
+        tdTitle.appendChild(small);
+        tr.appendChild(tdTitle);
+
+        const tdYear = document.createElement('td');
+        tdYear.className = 'num';
+        tdYear.textContent = s.year || '';
+        tr.appendChild(tdYear);
+
+        const tdGenre = document.createElement('td');
+        if (Array.isArray(s.genres) && s.genres.length) {
+          tdGenre.innerHTML = s.genres
+            .map(g => '<span class="pill">' + String(g) + '</span>')
+            .join(' ');
+        } else {
+          tdGenre.innerHTML = s.genre ? '<span class="pill">' + s.genre + '</span>' : '';
+        }
+        tr.appendChild(tdGenre);
+
+        const tdGeo = document.createElement('td');
+        const originCode = (function() {
+          if (s && s.origin) return s.origin;
+          if (Array.isArray(s.markets) && s.markets.length) {
+            const pick = s.markets.find(m => {
+              const code = String(m || '').toUpperCase();
+              return code && code !== 'US' && code !== 'INTL';
+            });
+            if (pick) return pick;
+          }
+          return s.geography || '';
+        })();
+        tdGeo.innerHTML = originCode ? '<span class="pill">' + originCode + '</span>' : '';
+        tr.appendChild(tdGeo);
+
+        const tdMarkets = document.createElement('td');
+        tdMarkets.textContent = (Array.isArray(s.markets) && s.markets.length)
+          ? s.markets.join(', ')
+          : (s.geography || '');
+        tr.appendChild(tdMarkets);
+
+        const tdBill = document.createElement('td');
+        tdBill.className = 'num';
+        tdBill.innerHTML = s.isBillboardChart ? '<span class="pill">✓</span>' : '';
+        tr.appendChild(tdBill);
+
+        const tdRank = document.createElement('td');
+        tdRank.className = 'num';
+        tdRank.textContent = (s.chartInfo && (s.chartInfo.rank ?? '') !== '' ? s.chartInfo.rank : '');
+        tr.appendChild(tdRank);
+
+        const tdPeak = document.createElement('td');
+        tdPeak.className = 'num';
+        tdPeak.textContent = (s.chartInfo && (s.chartInfo.peakPos ?? '') !== '' ? s.chartInfo.peakPos : '');
+        tr.appendChild(tdPeak);
+
+        const tdWeeks = document.createElement('td');
+        tdWeeks.className = 'num';
+        tdWeeks.textContent = (s.chartInfo && (s.chartInfo.weeksOnChart ?? '') !== '' ? s.chartInfo.weeksOnChart : '');
+        tr.appendChild(tdWeeks);
+
+        const tdChartDate = document.createElement('td');
+        tdChartDate.className = 'nowrap';
+        tdChartDate.textContent = (s.chartInfo && s.chartInfo.chartDate) ? s.chartInfo.chartDate : '';
+        tr.appendChild(tdChartDate);
+
+        const tdDiff = document.createElement('td');
+        tdDiff.className = 'num';
+        tdDiff.innerHTML = '<span class="pill">' + (s.difficultyLevel || 2) + '</span>';
+        tr.appendChild(tdDiff);
+
+        const tdPop = document.createElement('td');
+        tdPop.className = 'num';
+        tdPop.textContent = (typeof s.popularity === 'number') ? s.popularity : '';
+        tr.appendChild(tdPop);
+
+        const tdTags = document.createElement('td');
+        tdTags.textContent = Array.isArray(s.tags) ? s.tags.join(', ') : '';
+        tr.appendChild(tdTags);
+
+        const tdVer = document.createElement('td');
+        tdVer.innerHTML = s.verified ? '<span class="pill">Yes</span>' : '<span class="pill">No</span>';
+        tr.appendChild(tdVer);
+
+        const tdAdded = document.createElement('td');
+        tdAdded.className = 'nowrap';
+        tdAdded.textContent = s.addedDate ? String(s.addedDate).slice(0, 10) : '';
+        tr.appendChild(tdAdded);
+
+        const tdUri = document.createElement('td');
+        tdUri.className = 'mono';
+        tdUri.textContent = s.spotifyUri || '';
+        tr.appendChild(tdUri);
+
+        const tdActions = document.createElement('td');
+        tdActions.className = 'right nowrap actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'secondary small';
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = () => openEditDialog(s);
+        tdActions.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'danger small';
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = async () => {
+          if (!confirm('Delete this song?')) return;
+          try {
+            await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(s.id), { method: 'DELETE' });
+            showStatus('Deleted', 'success');
+            // refresh respecting current page
+            listSongs();
+          } catch (e) {
+            showStatus(e.message || 'Delete failed', 'error');
+          }
+        };
+        tdActions.appendChild(delBtn);
+
+        tr.appendChild(tdActions);
+
+        els.songsTbody.appendChild(tr);
+      }
+    }
+
+    function openEditDialog(song) {
+      const title = prompt('Title', song.title || '') ?? song.title;
+      const artist = prompt('Artist', song.artist || '') ?? song.artist;
+      const yearIn = prompt('Year', (song.year ?? '') + '');
+      const year = Number(yearIn);
+      const genre = prompt('Genre', song.genre || '') ?? song.genre;
+      const geography = prompt('Geography (Market)', song.geography || '') ?? song.geography;
+      const diffIn = prompt('Difficulty (1-5)', (song.difficultyLevel ?? 2) + '');
+      const difficultyLevel = Number(diffIn);
+      const albumArt = prompt('Album Art URL', song.albumArt || '') ?? song.albumArt;
+      const previewUrl = prompt('Preview URL', song.previewUrl || '') ?? song.previewUrl;
+
+      const billIn = prompt('Billboard chart? (true/false)', song.isBillboardChart ? 'true' : 'false') || '';
+      const isBillboardChart = /^y|t|1|true$/i.test(billIn.trim());
+      const rankIn = prompt('Chart Rank (number)', (song.chartInfo?.rank ?? '') + '');
+      const peakIn = prompt('Peak Position (number)', (song.chartInfo?.peakPos ?? '') + '');
+      const weeksIn = prompt('Weeks on Chart (number)', (song.chartInfo?.weeksOnChart ?? '') + '');
+      const chartDate = prompt('Chart Date (YYYY-MM-DD)', song.chartInfo?.chartDate || '') ?? (song.chartInfo?.chartDate || '');
+
+      const tagsIn = prompt('Tags (comma separated)', Array.isArray(song.tags) ? song.tags.join(',') : '') || '';
+      const verIn = prompt('Verified? (true/false)', song.verified ? 'true' : 'false') || '';
+      const verified = /^y|t|1|true$/i.test(verIn.trim());
+
+      const toNum = (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const patch = {
+        title,
+        artist,
+        year: Number.isFinite(year) ? year : null,
+        genre,
+        geography,
+        difficultyLevel: Number.isFinite(difficultyLevel) ? difficultyLevel : 2,
+        albumArt,
+        previewUrl,
+        isBillboardChart,
+        chartInfo: {
+          rank: toNum(rankIn),
+          peakPos: toNum(peakIn),
+          weeksOnChart: toNum(weeksIn),
+          chartDate: chartDate || null
+        },
+        tags: tagsIn.split(',').map(s => s.trim()).filter(Boolean),
+        verified
+      };
+
+      (async () => {
+        try {
+          await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(song.id), {
+            method: 'PUT',
+            body: JSON.stringify(patch)
+          });
+          showStatus('Updated', 'success');
+          listSongs();
+        } catch (e) {
+          showStatus(e.message || 'Update failed', 'error');
+        }
+      })();
+    }
+
+    function exportJson() {
+      // Request without filters to get full list (first 500)
+      const url = API_BASE_URL + '/api/admin/curated-songs?limit=500';
+      fetch(url, { headers: { 'x-admin-secret': getSecret() }})
+        .then(r => r.json())
+        .then(data => {
+          const blob = new Blob([JSON.stringify(data.items || [], null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'curated-songs.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        })
+        .catch(err => showStatus(err.message || 'Export failed', 'error'));
+    }
+
+    // ===== Analytics view =====
+    let __analyticsCharts = {};
+
+    function upsertChart(id, cfg) {
+      const el = document.getElementById(id);
+      if (!el || !window.Chart) return;
+      const ctx = el.getContext('2d');
+      if (__analyticsCharts[id]) {
+        try { __analyticsCharts[id].destroy(); } catch (_) {}
+      }
+      __analyticsCharts[id] = new Chart(ctx, cfg);
+    }
+
+    function renderGapTable(segments) {
+      const tbody = els.gapTable;
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!Array.isArray(segments) || !segments.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">No gaps under current threshold</td></tr>';
+        return;
+      }
+      segments.forEach(seg => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + seg.decade + '</td><td>' + seg.genre + '</td><td class="num">' + seg.count + '</td><td class="num">' + seg.deficit + '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderRecommendations(segments, n = 8) {
+      const el = els.gapRecommendations;
+      if (!el) return;
+      el.innerHTML = '';
+      if (!Array.isArray(segments) || !segments.length) return;
+      const top = segments.slice(0, n);
+      top.forEach(seg => {
+        const li = document.createElement('li');
+        li.textContent = seg.decade + ' • ' + seg.genre + ' — add ~' + seg.deficit + ' songs';
+        el.appendChild(li);
+      });
+    }
+
+    async function loadAnalytics() {
+      try {
+        const thr = Math.max(1, Number(els.gapThreshold?.value) || 30);
+        const data = await adminFetch('/api/admin/analytics?gapThreshold=' + thr);
+        // Totals
+        if (els.curatedCount) els.curatedCount.textContent = String(data.totals?.curatedCount ?? 0);
+        if (els.albumArtPct) els.albumArtPct.textContent = String(data.totals?.albumArtPct ?? 0) + '%';
+        if (els.previewPct) els.previewPct.textContent = String(data.totals?.previewPct ?? 0) + '%';
+
+        // Charts data
+        const decades = (data.counts?.byDecade || []).map(([k]) => k);
+        const decadeVals = (data.counts?.byDecade || []).map(([, v]) => v);
+
+        const years = (data.counts?.byYear || []).map(([k]) => k);
+        const yearVals = (data.counts?.byYear || []).map(([, v]) => v);
+
+        const genres = (data.counts?.byGenre || []).map(([k]) => k);
+        const genreVals = (data.counts?.byGenre || []).map(([, v]) => v);
+
+        const diffs = (data.counts?.byDifficulty || []).map(([k]) => k);
+        const diffVals = (data.counts?.byDifficulty || []).map(([, v]) => v);
+
+        const markets = (data.counts?.byMarket || []).map(([k]) => k);
+        const marketVals = (data.counts?.byMarket || []).map(([, v]) => v);
+
+        const billVals = [data.counts?.billboard?.billboard || 0, data.counts?.billboard?.nonBillboard || 0];
+
+        const palette = ['#1f6feb', '#2ea043', '#d29922', '#f85149', '#a371f7', '#58a6ff', '#3fb950', '#f2cc60', '#ffa198', '#d2a8ff'];
+
+        upsertChart('decadeChart', {
+          type: 'bar',
+          data: { labels: decades, datasets: [{ label: 'Songs by decade', data: decadeVals, backgroundColor: palette[0] }] },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+
+        upsertChart('yearChart', {
+          type: 'line',
+          data: { labels: years, datasets: [{ label: 'Songs per year', data: yearVals, borderColor: palette[1], backgroundColor: 'rgba(46,160,67,0.3)', fill: true, tension: 0.2 }] },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+
+        upsertChart('genreChart', {
+          type: 'bar',
+          data: { labels: genres, datasets: [{ label: 'Top genres', data: genreVals, backgroundColor: palette.slice(0, Math.max(1, genres.length)) }] },
+          options: { plugins: { legend: { display: false } }, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+        });
+
+        upsertChart('difficultyChart', {
+          type: 'doughnut',
+          data: { labels: diffs, datasets: [{ data: diffVals, backgroundColor: palette.slice(0, Math.max(1, diffs.length)) }] },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        });
+
+        upsertChart('marketChart', {
+          type: 'bar',
+          data: { labels: markets, datasets: [{ label: 'Top markets', data: marketVals, backgroundColor: palette.slice(2, 2 + Math.max(1, markets.length)) }] },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+
+        upsertChart('billboardChart', {
+          type: 'pie',
+          data: { labels: ['Billboard', 'Non-Billboard'], datasets: [{ data: billVals, backgroundColor: ['#f2cc60', '#58a6ff'] }] },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        });
+
+        renderGapTable(data.gapAnalysis?.segmentsNeedingAttention || []);
+        renderRecommendations(data.gapAnalysis?.segmentsNeedingAttention || []);
+
+      } catch (e) {
+        showStatus(e.message || 'Failed to load analytics', 'error');
+      }
+    }
+
+    // Wire UI
+    if (els.bulkImportBtn) {
+      els.bulkImportBtn.onclick = () => switchView('import');
+    }
+    if (els.analyticsBtn) {
+      els.analyticsBtn.onclick = () => switchView('analytics');
+    }
+    if (els.backToAdminBtn) {
+      els.backToAdminBtn.onclick = () => switchView('admin');
+    }
+    if (els.backFromAnalyticsBtn) {
+      els.backFromAnalyticsBtn.onclick = () => switchView('admin');
+    }
+    if (els.signOutBtn) {
+      els.signOutBtn.onclick = () => {
+        setSecret('');
+        if (els.adminContent) els.adminContent.style.display = 'none';
+        if (els.authModal) els.authModal.style.display = 'flex';
+        showStatus('Signed out', 'success');
+      };
+    }
+    if (els.authSubmitBtn) {
+      els.authSubmitBtn.onclick = tryAuth;
+    }
+    if (els.authInput) {
+      els.authInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') tryAuth();
+      });
+    }
+
+    // Filters
+    els.applyFiltersBtn.onclick = () => {
+      pageState.page = 1;
+      listSongs();
+    };
+    els.resetFiltersBtn.onclick = () => {
+      els.filterQ.value = '';
+      els.filterGenre.value = '';
+      els.filterGeo.value = '';
+      els.filterDiff.value = '';
+      els.filterYearMin.value = '';
+      els.filterYearMax.value = '';
+      pageState.page = 1;
+      listSongs();
+    };
+
+    // Pagination wiring
+    if (els.perPageSelect) {
+      els.perPageSelect.onchange = () => {
+        const val = Math.min(500, Math.max(1, Number(els.perPageSelect.value) || 100));
+        pageState.perPage = val;
+        pageState.page = 1;
+        localStorage.setItem('admin_perPage', String(pageState.perPage));
+        listSongs();
+      };
+    }
+    if (els.prevPageBtn) {
+      els.prevPageBtn.onclick = () => {
+        if (pageState.page > 1) {
+          pageState.page--;
+          listSongs();
+        }
+      };
+    }
+    if (els.nextPageBtn) {
+      els.nextPageBtn.onclick = () => {
+        const totalPages = Math.max(1, Math.ceil(pageState.filteredTotal / Math.max(1, pageState.perPage)));
+        if (pageState.page < totalPages) {
+          pageState.page++;
+          listSongs();
+        }
+      };
+    }
+
+    els.refreshBtn.onclick = listSongs;
+    els.exportBtn.onclick = exportJson;
+    if (els.refreshAnalyticsBtn) els.refreshAnalyticsBtn.onclick = loadAnalytics;
+    if (els.gapThreshold) els.gapThreshold.addEventListener('change', () => loadAnalytics());
+
+    // Bulk import wiring
+    if (els.previewImportBtn) els.previewImportBtn.onclick = previewImport;
+    if (els.commitImportBtn) els.commitImportBtn.onclick = commitSelected;
+    if (els.cancelImportBtn) els.cancelImportBtn.onclick = () => {
+      try { if (window.__importAbort) window.__importAbort.abort(); } catch (_) {}
+    };
+    if (els.importSelectAll) {
+      els.importSelectAll.onclick = () => {
+        const check = !!els.importSelectAll.checked;
+        els.importPreviewTbody.querySelectorAll('.importRowCheckbox').forEach(cb => { cb.checked = check; });
+        updateImportCommitState();
+      };
+    }
+
+    // Init
+    ensureAuthenticated();
+  </script>
+</body>
+</html>

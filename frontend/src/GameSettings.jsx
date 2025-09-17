@@ -436,7 +436,8 @@ function GameSettings({ settings, onUpdate }) {
   const chartModeActive = localSettings.useChartMode ?? useChartMode;
 
   const availableMarkets = [
-    { code: 'US', name: 'International (US)' },
+    { code: 'INTL', name: 'International' },
+    { code: 'US', name: 'United States' },
     { code: 'SE', name: 'Sweden' },
     { code: 'NO', name: 'Norway' },
     { code: 'GB', name: 'United Kingdom' },
@@ -672,7 +673,7 @@ function GameSettings({ settings, onUpdate }) {
       {/* Geography/Markets - Hidden when Chart Mode is active */}
       {!chartModeActive && (
         <div className="space-y-3">
-          <Label className="text-xl font-semibold text-foreground">Geography</Label>
+          <Label className="text-xl font-semibold text-foreground">Markets</Label>
           <div className="grid grid-cols-2 gap-2">
             {availableMarkets.map(market => (
               <Button

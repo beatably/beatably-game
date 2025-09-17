@@ -1,0 +1,659 @@
+[dotenv@17.0.0] injecting env (24) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+[dotenv@17.0.0] injecting env (24) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+=== Populate Initial Database ===
+Options: {
+  includeBillboard: true,
+  includeSearch: true,
+  billboardLimit: 4000,
+  searchLimit: 3000,
+  yearMin: 1960,
+  yearMax: 2024,
+  markets: [ 'US' ],
+  genres: [
+    'pop',       'rock',
+    'hip-hop',   'electronic',
+    'indie',     'country',
+    'jazz',      'blues',
+    'folk',      'reggae',
+    'metal',     'punk',
+    'classical', 'r'
+  ],
+  dryRun: false,
+  difficulty: 'hard'
+}
+[Backup] Saved backup to /Users/tim/Game/backend/cache/backups/curated-songs.backup.2025-09-16T09-34-09-264Z.json
+[CuratedDB] Loaded curated songs: 2651
+
+[Phase 1] Importing from Billboard (historical)...
+[ChartProvider] getChartEntries args: { mode: 'all', difficulty: 'hard', yearMin: 1960, yearMax: 2024 }
+[ChartProvider] Year range specified; skipping recent mode and fetching ALL with year filter
+[ChartProvider] Fetched remote https://raw.githubusercontent.com/mhollingshead/billboard-hot-100/main/all.json status 200 bytes ~ 43300569
+[ChartProvider] Top-level keys: [ '[array]', 'len=3502' ]
+[ChartProvider] Normalized ALL entries: 350187
+[ChartProvider] ALL entries after year filter: 339087 before: 350187
+[ChartProvider] Counts: raw 339087 deduped 30765 after difficulty 30765
+[Billboard] Entries after normalize/dedupe/difficulty: 30765
+[Billboard] Processed: 200, Saved: 0, Updated: 92, Skipped: 108, Collected: 92/4000
+[Billboard] Processed: 300, Saved: 0, Updated: 140, Skipped: 160, Collected: 140/4000
+[Billboard] Processed: 400, Saved: 0, Updated: 180, Skipped: 220, Collected: 180/4000
+[Billboard] Processed: 500, Saved: 0, Updated: 228, Skipped: 272, Collected: 228/4000
+[Billboard] Processed: 800, Saved: 0, Updated: 369, Skipped: 431, Collected: 369/4000
+[Billboard] Processed: 1000, Saved: 0, Updated: 473, Skipped: 527, Collected: 473/4000
+[Billboard] Processed: 1100, Saved: 0, Updated: 528, Skipped: 572, Collected: 528/4000
+[Billboard] Processed: 1400, Saved: 0, Updated: 663, Skipped: 737, Collected: 663/4000
+[Billboard] Processed: 1500, Saved: 0, Updated: 706, Skipped: 794, Collected: 706/4000
+[Billboard] Processed: 1600, Saved: 0, Updated: 759, Skipped: 841, Collected: 759/4000
+[Billboard] Processed: 1700, Saved: 0, Updated: 795, Skipped: 905, Collected: 795/4000
+[Billboard] Processed: 1800, Saved: 0, Updated: 845, Skipped: 955, Collected: 845/4000
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Minor error, continuing: Request failed with status code 401
+[Billboard] Done. Processed=30765, Saved=0, Updated=857, Skipped=29908, Collected=857
+
+[Phase 2] Supplementing by genres via Spotify search...
+[Supplement] Processed: 600, Saved: 243, Updated: 208, Skipped: 149, Collected: 451/3000
+[Supplement] Processed: 800, Saved: 297, Updated: 316, Skipped: 187, Collected: 613/3000
+[Supplement] Processed: 1600, Saved: 571, Updated: 526, Skipped: 503, Collected: 1097/3000
+[Supplement] Processed: 1800, Saved: 646, Updated: 585, Skipped: 569, Collected: 1231/3000
+[Supplement] Processed: 2000, Saved: 729, Updated: 610, Skipped: 661, Collected: 1339/3000
+[Supplement] Processed: 2200, Saved: 780, Updated: 664, Skipped: 756, Collected: 1444/3000
+[Supplement] Done. Processed=2862, Saved=1001, Updated=794, Skipped=1067, Collected=1795
+
+=== Population Report ===
+{
+  "billboard": {
+    "collected": 857,
+    "processed": 30765,
+    "saved": 0,
+    "updated": 857,
+    "skipped": 29908
+  },
+  "supplement": {
+    "collected": 1795,
+    "processed": 2862,
+    "saved": 1001,
+    "updated": 794,
+    "skipped": 1067
+  },
+  "startedAt": "2025-09-16T09:34:09.278Z",
+  "finishedAt": "2025-09-16T11:20:25.930Z",
+  "finalDbCount": 3652
+}
+
+[OK] Curated DB saved at backend/cache/curated-songs.json

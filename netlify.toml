@@ -8,6 +8,12 @@
   # Node version
   NODE_VERSION = "18"
 
+# Serve admin panel static page
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
 # Redirect all routes to index.html for React Router
 [[redirects]]
   from = "/*"

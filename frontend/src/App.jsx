@@ -1216,22 +1216,17 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     return false;
   };
 
-  // Fetch real songs from Spotify with music preferences
-  // Now includes useChartMode so backend uses the client's intended mode instead of falling back to server env default.
-  const fetchSpotifySongs = async (musicPreferences = null, useChartMode = null) => {
+  // Fetch curated songs for game (no Web API usage during gameplay)
+  const fetchCuratedSongs = async (musicPreferences = null) => {
     try {
-      const effectiveUseChartMode = (typeof useChartMode === 'boolean') ? useChartMode : (gameSettings.useChartMode ?? false);
-      console.log("[Spotify] Fetching songs from backend with preferences:", musicPreferences, "useChartMode:", effectiveUseChartMode);
-      const response = await fetch(`${API_BASE_URL}/api/fetch-songs`, {
+      console.log("[Curated] Selecting songs from curated DB with preferences:", musicPreferences);
+      const response = await fetch(`${API_BASE_URL}/api/curated/select`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           musicPreferences: musicPreferences || gameSettings.musicPreferences,
           difficulty: gameSettings.difficulty,
-          playerCount: players.length || 2,
-          useChartMode: effectiveUseChartMode
+          playerCount: players.length || 2
         })
       });
 
@@ -1240,18 +1235,17 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       }
 
       const data = await response.json();
-      console.log("[Spotify] Successfully fetched", data.tracks?.length || 0, "songs");
-      console.log("[Spotify] Metadata:", data.metadata);
-      
+      console.log("[Curated] Selected", data.tracks?.length || 0, "songs from curated DB");
+      console.log("[Curated] Metadata:", data.metadata);
+
       // Check for warnings and display them
-      if (data.metadata && data.metadata.warning) {
-        console.warn("[Spotify] Warning:", data.metadata.warning);
-        // You could show this warning in the UI if needed
+      if (data.warning) {
+        console.warn("[Curated] Warning:", data.warning);
       }
-      
+
       return data;
     } catch (error) {
-      console.error("[Spotify] Error fetching songs:", error);
+      console.error("[Curated] Error selecting curated songs:", error);
       return null;
     }
   };
@@ -1652,14 +1646,15 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     
     // Always fetch fresh songs when starting the game to ensure settings are applied
     try {
-      const freshSongsData = await fetchSpotifySongs(gameSettings.musicPreferences);
+      const freshSongsData = await fetchCuratedSongs(gameSettings.musicPreferences);
       if (freshSongsData && freshSongsData.tracks && freshSongsData.tracks.length > 0) {
         console.log("[App] Fresh songs fetched:", freshSongsData.tracks.length);
         
         // Check for warnings and potentially show them to the user
-        if (freshSongsData.metadata.warning) {
+        const __warning = (freshSongsData.metadata && freshSongsData.metadata.warning) || freshSongsData.warning;
+        if (__warning) {
           const shouldContinue = window.confirm(
-            `Warning: ${freshSongsData.metadata.warning}\n\nDo you want to continue with ${freshSongsData.tracks.length} songs, or go back to adjust your music preferences?`
+            `Warning: ${__warning}\n\nDo you want to continue with ${freshSongsData.tracks.length} songs, or go back to adjust your music preferences?`
           );
           if (!shouldContinue) {
             throw new Error("User cancelled game start due to song warning");
@@ -2227,7 +2222,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   useEffect(() => {
     if (isCreator && view === 'waiting') {
       console.log("[Spotify] Pre-fetching songs for preview (fresh songs will be fetched on game start)...");
-      fetchSpotifySongs().then((songsData) => {
+      fetchCuratedSongs().then((songsData) => {
         if (songsData && songsData.tracks && songsData.tracks.length > 0) {
           setRealSongs(songsData.tracks);
           console.log("[Spotify] Preview songs loaded");
