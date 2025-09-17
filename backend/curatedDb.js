@@ -71,6 +71,14 @@ function getCacheDir() {
 const CACHE_DIR = getCacheDir();
 const DB_FILE = path.join(CACHE_DIR, 'curated-songs.json');
 
+// Debug: Log the final paths being used
+console.log('[CuratedDB] Final paths determined:', {
+  CACHE_DIR,
+  DB_FILE,
+  exists: fs.existsSync(DB_FILE),
+  NODE_ENV: process.env.NODE_ENV
+});
+
 // In-memory cache
 let _songs = [];
 let _loaded = false;
