@@ -154,37 +154,29 @@
     .tight { padding: 4px 8px; font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
     
-    /* Audio controls */
-    .play-btn {
-      background: transparent;
-      border: 1px solid #223045;
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
+    /* Spotify URI links */
+    .spotify-link {
+      color: #1db954;
+      text-decoration: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 12px;
-      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 4px;
+      border-radius: 4px;
       transition: all 0.2s ease;
     }
-    .play-btn:hover {
-      border-color: #2ea043;
-      background: rgba(46,160,67,0.1);
+    .spotify-link:hover {
+      background: rgba(29, 185, 84, 0.1);
+      text-decoration: underline;
     }
-    .play-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .spotify-link::before {
+      content: "♫";
+      font-size: 14px;
     }
-    .play-btn.playing {
-      background: #2ea043;
-      border-color: #2ea043;
-      color: white;
-    }
-    .play-btn.loading {
-      opacity: 0.7;
-      cursor: wait;
+    .spotify-link:empty {
+      display: none;
     }
     
     .auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 999; }
@@ -868,148 +860,28 @@
       }
     }
 
-    // ===== Spotify Playback Management =====
-    let currentPlayingButton = null;
-    let currentPlayingUri = null;
-    let spotifyAuth = null;
-    let deviceAwarePlayback = null;
-
-    // Import Spotify utilities (we'll load them dynamically)
-    async function loadSpotifyModules() {
-      try {
-        // Load the Spotify auth module
-        const spotifyAuthModule = await import('/src/utils/spotifyAuth.js');
-        spotifyAuth = spotifyAuthModule.default;
-        
-        // Load device-aware playback
-        const devicePlaybackModule = await import('/src/utils/deviceAwarePlayback.js');
-        deviceAwarePlayback = devicePlaybackModule.default;
-        
-        console.log('[Admin] Spotify modules loaded successfully');
-        return true;
-      } catch (error) {
-        console.error('[Admin] Failed to load Spotify modules:', error);
-        showStatus('Failed to load Spotify integration. Some features may not work.', 'warning');
-        return false;
-      }
+    // ===== Spotify URI Helper Functions =====
+    function createSpotifyLink(spotifyUri) {
+      if (!spotifyUri) return null;
+      
+      // Create clickable link that opens in Spotify app
+      const link = document.createElement('a');
+      link.href = spotifyUri; // Direct URI link (opens desktop app)
+      link.className = 'spotify-link';
+      link.title = 'Click to open in Spotify';
+      link.textContent = spotifyUri;
+      link.target = '_blank';
+      
+      // Add fallback to web player on right-click or if desktop app fails
+      link.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const trackId = spotifyUri.replace('spotify:track:', '');
+        const webUrl = `https://open.spotify.com/track/${trackId}`;
+        window.open(webUrl, '_blank');
+      });
+      
+      return link;
     }
-
-    function stopCurrentPlayback() {
-      if (currentPlayingButton) {
-        currentPlayingButton.textContent = '▶';
-        currentPlayingButton.classList.remove('playing');
-        currentPlayingButton = null;
-      }
-      currentPlayingUri = null;
-    }
-
-    async function toggleSpotifyPlayback(spotifyUri, button, songTitle) {
-      // If this button is currently playing, pause it
-      if (currentPlayingButton === button) {
-        try {
-          if (spotifyAuth && deviceAwarePlayback) {
-            const deviceId = spotifyAuth.getStoredDeviceId();
-            await deviceAwarePlayback.pausePlayback(deviceId);
-            showStatus('Playback paused', 'success');
-          }
-        } catch (error) {
-          console.error('[Admin] Error pausing playback:', error);
-          showStatus('Failed to pause playback', 'error');
-        }
-        stopCurrentPlayback();
-        return;
-      }
-
-      // Stop any currently playing track
-      if (currentPlayingButton) {
-        try {
-          if (spotifyAuth && deviceAwarePlayback) {
-            const deviceId = spotifyAuth.getStoredDeviceId();
-            await deviceAwarePlayback.pausePlayback(deviceId);
-          }
-        } catch (error) {
-          console.error('[Admin] Error stopping current playback:', error);
-        }
-      }
-      stopCurrentPlayback();
-
-      // If no Spotify URI, show message
-      if (!spotifyUri) {
-        showStatus('No Spotify URI available for this track', 'warning');
-        return;
-      }
-
-      // Check if Spotify modules are loaded
-      if (!spotifyAuth || !deviceAwarePlayback) {
-        showStatus('Spotify integration not available. Please refresh the page.', 'error');
-        return;
-      }
-
-      try {
-        // Set button to loading state
-        button.classList.add('loading');
-        button.textContent = '⏳';
-        button.disabled = true;
-        currentPlayingButton = button;
-        currentPlayingUri = spotifyUri;
-
-        // Check if we have a valid token
-        const tokenStatus = await spotifyAuth.ensureValidToken();
-        if (!tokenStatus.valid) {
-          if (tokenStatus.requiresAuth) {
-            showStatus('Spotify authentication required. Please authenticate in the main game first.', 'warning');
-            stopCurrentPlayback();
-            return;
-          }
-        }
-
-        // Get available devices
-        const devices = await spotifyAuth.getDevices();
-        if (!devices || devices.length === 0) {
-          showStatus('No Spotify devices available. Please open Spotify on a device first.', 'warning');
-          stopCurrentPlayback();
-          return;
-        }
-
-        // Use stored device or first available device
-        let targetDevice = devices.find(d => d.id === spotifyAuth.getStoredDeviceId());
-        if (!targetDevice) {
-          targetDevice = devices.find(d => d.is_active) || devices[0];
-        }
-
-        if (!targetDevice) {
-          showStatus('No suitable Spotify device found', 'error');
-          stopCurrentPlayback();
-          return;
-        }
-
-        // Start playback using device-aware playback
-        const success = await deviceAwarePlayback.startPlayback(targetDevice.id, [spotifyUri], 0);
-        
-        if (success) {
-          button.classList.remove('loading');
-          button.classList.add('playing');
-          button.textContent = '⏸';
-          button.disabled = false;
-          showStatus(`Playing: ${songTitle}`, 'success');
-          
-          // Store the device for future use
-          spotifyAuth.storeDeviceId(targetDevice.id);
-        } else {
-          throw new Error('Failed to start playback');
-        }
-
-      } catch (error) {
-        console.error('[Admin] Spotify playback error:', error);
-        stopCurrentPlayback();
-        showStatus(`Failed to play track: ${error.message}`, 'error');
-      }
-    }
-
-    // Initialize Spotify integration when page loads
-    window.addEventListener('load', async () => {
-      await loadSpotifyModules();
-    });
 
     // ===== Songs listing with pagination and counts =====
     function buildFilterParams() {
@@ -1091,15 +963,12 @@
         tr.appendChild(tdCover);
 
         const tdPreview = document.createElement('td');
-        const playBtn = document.createElement('button');
-        playBtn.className = 'play-btn';
-        playBtn.textContent = '▶';
-        playBtn.title = s.spotifyUri ? `Play ${s.title} by ${s.artist}` : 'No Spotify URI available';
-        if (!s.spotifyUri) {
-          playBtn.disabled = true;
+        if (s.spotifyUri) {
+          const spotifyLink = createSpotifyLink(s.spotifyUri);
+          if (spotifyLink) {
+            tdPreview.appendChild(spotifyLink);
+          }
         }
-        playBtn.onclick = () => toggleSpotifyPlayback(s.spotifyUri, playBtn, `${s.title} by ${s.artist}`);
-        tdPreview.appendChild(playBtn);
         tr.appendChild(tdPreview);
 
         const tdTitle = document.createElement('td');
@@ -1198,7 +1067,14 @@
 
         const tdUri = document.createElement('td');
         tdUri.className = 'mono';
-        tdUri.textContent = s.spotifyUri || '';
+        if (s.spotifyUri) {
+          const spotifyLink = createSpotifyLink(s.spotifyUri);
+          if (spotifyLink) {
+            tdUri.appendChild(spotifyLink);
+          }
+        } else {
+          tdUri.textContent = '';
+        }
         tr.appendChild(tdUri);
 
         const tdActions = document.createElement('td');
