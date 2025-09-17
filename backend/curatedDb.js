@@ -39,10 +39,44 @@ function getCacheDir() {
         deployedDbExists: fs.existsSync(deployedDbFile)
       });
       
-      // If persistent disk has the database, use it
+      // If persistent disk has the database, check if it's actually populated
       if (fs.existsSync(persistentDbFile)) {
-        console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
-        return persistentPath;
+        try {
+          const persistentData = JSON.parse(fs.readFileSync(persistentDbFile, 'utf8'));
+          const persistentCount = Array.isArray(persistentData) ? persistentData.length : 0;
+          console.log('[CuratedDB] Persistent disk database exists with', persistentCount, 'songs');
+          
+          // If persistent disk has songs, use it
+          if (persistentCount > 0) {
+            console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+            return persistentPath;
+          }
+          
+          // If persistent disk is empty but deployed database exists, migrate it
+          if (fs.existsSync(deployedDbFile)) {
+            try {
+              const deployedData = JSON.parse(fs.readFileSync(deployedDbFile, 'utf8'));
+              const deployedCount = Array.isArray(deployedData) ? deployedData.length : 0;
+              console.log('[CuratedDB] Deployed database has', deployedCount, 'songs');
+              
+              if (deployedCount > 0) {
+                console.log('[CuratedDB] Migrating database from deployed to persistent disk (overwriting empty file)...');
+                fs.copyFileSync(deployedDbFile, persistentDbFile);
+                console.log('[CuratedDB] Database migration successful:', deployedDbFile, '->', persistentDbFile);
+                console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+                return persistentPath;
+              }
+            } catch (deployedError) {
+              console.warn('[CuratedDB] Failed to read deployed database:', deployedError.message);
+            }
+          }
+          
+          console.log('[CuratedDB] Using persistent disk cache directory (empty database):', persistentPath);
+          return persistentPath;
+        } catch (error) {
+          console.warn('[CuratedDB] Failed to read persistent database, will try migration:', error.message);
+          // Fall through to migration logic below
+        }
       }
       
       // If persistent disk is empty but deployed database exists, migrate it
