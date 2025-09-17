@@ -9,6 +9,11 @@ if (process.env.NODE_ENV !== 'production') {
 const axios = require('axios');
 const querystring = require('querystring');
 const curatedDb = require('./curatedDb');
+
+// Initialize curated database at startup to trigger migration if needed
+console.log('[Startup] Initializing curated database...');
+curatedDb.load(); // This will trigger getCacheDir() and any migration logic
+console.log('[Startup] Curated database initialization complete');
 const { detectGeographyForArtist, detectGenresForArtist } = require('./geographyDetection');
 
 // --- Spotify API Rate Limiting Helpers (to avoid 429s during bulk import) ---
