@@ -372,6 +372,10 @@ function requireAdmin(req, res, next) {
 // --- Curated DB Admin Endpoints ---
 app.get('/api/admin/curated-songs', requireAdmin, (req, res) => {
   try {
+    // Force reload database to ensure we have latest migrated data
+    console.log('[Admin] Force reloading curated database for admin request');
+    curatedDb.load();
+    
     const { q, genre, geography, yearMin, yearMax, difficulty, limit, offset } = req.query || {};
     const result = curatedDb.list({
       q: q || '',
@@ -383,8 +387,25 @@ app.get('/api/admin/curated-songs', requireAdmin, (req, res) => {
       limit: Number.isFinite(Number(limit)) ? Number(limit) : 100,
       offset: Number.isFinite(Number(offset)) ? Number(offset) : 0
     });
-    res.json({ ok: true, ...result });
+    
+    // Add diagnostic information
+    const diagnostics = {
+      databasePath: process.env.NODE_ENV === 'production' ? '/var/data/cache/curated-songs.json' : 'local',
+      totalSongs: result.total || 0,
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('[Admin] Curated songs list request:', {
+      totalFound: result.total,
+      itemsReturned: result.items?.length || 0,
+      filters: { q, genre, geography, yearMin, yearMax, difficulty },
+      pagination: { limit, offset }
+    });
+    
+    res.json({ ok: true, ...result, diagnostics });
   } catch (e) {
+    console.error('[Admin] Curated songs list failed:', e?.message, e?.stack);
     res.status(500).json({ ok: false, error: e?.message || 'List failed' });
   }
 });
@@ -420,10 +441,19 @@ app.delete('/api/admin/curated-songs/:id', requireAdmin, (req, res) => {
 // --- Curated DB Analytics (admin) ---
 app.get('/api/admin/analytics', requireAdmin, (req, res) => {
   try {
+    // Force reload database to ensure we have latest migrated data
+    console.log('[Admin] Force reloading curated database for analytics request');
+    curatedDb.load();
+    
     // Get all curated songs
     const first = curatedDb.list({ limit: 1, offset: 0 });
     const total = Number(first.total || 0);
     const all = total > 0 ? curatedDb.list({ limit: Math.max(1, total), offset: 0 }).items : [];
+    
+    console.log('[Admin] Analytics request:', {
+      totalSongs: total,
+      itemsAnalyzed: all.length
+    });
 
     const toDecade = (y) => {
       const n = Number(y);
@@ -579,6 +609,10 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
  */
 app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
   try {
+    // Force reload database to ensure we have latest migrated data
+    console.log('[Admin] Force reloading curated database for import preview request');
+    curatedDb.load();
+    
     const body = req.body || {};
     const mode = (body.mode || 'billboard').toLowerCase();
     const filters = body.filters || {};
