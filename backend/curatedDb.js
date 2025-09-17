@@ -122,21 +122,41 @@ function ensureCacheDir() {
 }
 
 function load() {
-  if (_loaded) return;
+  console.log('[CuratedDB] load() called, _loaded:', _loaded);
+  
+  // Force reload if we have 0 songs and this is production - something might be wrong
+  const forceReload = process.env.NODE_ENV === 'production' && _loaded && _songs.length === 0;
+  
+  if (_loaded && !forceReload) {
+    console.log('[CuratedDB] Already loaded, skipping. Songs:', _songs.length);
+    return;
+  }
+  
+  if (forceReload) {
+    console.log('[CuratedDB] Force reloading due to 0 songs in production');
+    _loaded = false; // Reset to allow re-evaluation
+  }
+  
   ensureCacheDir();
   try {
+    console.log('[CuratedDB] Checking DB_FILE:', DB_FILE, 'exists:', fs.existsSync(DB_FILE));
+    
     if (!fs.existsSync(DB_FILE)) {
+      console.log('[CuratedDB] DB file does not exist, creating empty array');
       _songs = [];
       save();
     } else {
+      console.log('[CuratedDB] Reading DB file...');
       const raw = fs.readFileSync(DB_FILE, 'utf8');
       _songs = JSON.parse(raw);
       if (!Array.isArray(_songs)) _songs = [];
+      console.log('[CuratedDB] Successfully parsed', _songs.length, 'songs from DB file');
     }
     _loaded = true;
     console.log('[CuratedDB] Loaded curated songs:', _songs.length);
   } catch (e) {
     console.warn('[CuratedDB] Load failed:', e && e.message);
+    console.warn('[CuratedDB] Stack trace:', e && e.stack);
     _songs = [];
     _loaded = true;
   }
