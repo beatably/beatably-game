@@ -155,19 +155,26 @@ function ensureCacheDir() {
   }
 }
 
-function load() {
-  console.log('[CuratedDB] load() called, _loaded:', _loaded);
+function load(forceReload = false) {
+  console.log('[CuratedDB] load() called, _loaded:', _loaded, 'forceReload:', forceReload);
+  
+  // Always reload if explicitly requested (for admin endpoints)
+  if (forceReload) {
+    console.log('[CuratedDB] Force reload requested, resetting cache');
+    _loaded = false;
+    _songs = [];
+  }
   
   // Force reload if we have 0 songs and this is production - something might be wrong
-  const forceReload = process.env.NODE_ENV === 'production' && _loaded && _songs.length === 0;
+  const autoForceReload = process.env.NODE_ENV === 'production' && _loaded && _songs.length === 0;
   
-  if (_loaded && !forceReload) {
+  if (_loaded && !autoForceReload) {
     console.log('[CuratedDB] Already loaded, skipping. Songs:', _songs.length);
     return;
   }
   
-  if (forceReload) {
-    console.log('[CuratedDB] Force reloading due to 0 songs in production');
+  if (autoForceReload) {
+    console.log('[CuratedDB] Auto force reloading due to 0 songs in production');
     _loaded = false; // Reset to allow re-evaluation
   }
   

@@ -374,7 +374,7 @@ app.get('/api/admin/curated-songs', requireAdmin, (req, res) => {
   try {
     // Force reload database to ensure we have latest migrated data
     console.log('[Admin] Force reloading curated database for admin request');
-    curatedDb.load();
+    curatedDb.load(true); // Pass true to force reload
     
     const { q, genre, geography, yearMin, yearMax, difficulty, limit, offset } = req.query || {};
     const result = curatedDb.list({
@@ -443,7 +443,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
   try {
     // Force reload database to ensure we have latest migrated data
     console.log('[Admin] Force reloading curated database for analytics request');
-    curatedDb.load();
+    curatedDb.load(true); // Pass true to force reload
     
     // Get all curated songs
     const first = curatedDb.list({ limit: 1, offset: 0 });
