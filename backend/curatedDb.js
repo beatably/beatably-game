@@ -9,14 +9,35 @@ const path = require('path');
 
 // Use persistent disk in production if available, otherwise fall back to deployed cache
 function getCacheDir() {
+  console.log('[CuratedDB] getCacheDir() called - starting path detection');
+  console.log('[CuratedDB] Environment check:', {
+    NODE_ENV: process.env.NODE_ENV,
+    __dirname: __dirname,
+    cwd: process.cwd()
+  });
+  
   if (process.env.NODE_ENV === 'production') {
     const persistentPath = '/var/data/cache';
     const deployedPath = path.join(__dirname, 'cache');
+    
+    console.log('[CuratedDB] Production paths:', {
+      persistentPath,
+      deployedPath,
+      persistentExists: fs.existsSync(persistentPath),
+      deployedDirExists: fs.existsSync(deployedPath)
+    });
     
     // Check if persistent disk is available
     if (fs.existsSync(persistentPath)) {
       const persistentDbFile = path.join(persistentPath, 'curated-songs.json');
       const deployedDbFile = path.join(deployedPath, 'curated-songs.json');
+      
+      console.log('[CuratedDB] Database file check:', {
+        persistentDbFile,
+        deployedDbFile,
+        persistentDbExists: fs.existsSync(persistentDbFile),
+        deployedDbExists: fs.existsSync(deployedDbFile)
+      });
       
       // If persistent disk has the database, use it
       if (fs.existsSync(persistentDbFile)) {
@@ -52,7 +73,13 @@ function getCacheDir() {
     }
     
     // No persistent disk - check if deployed database exists
-    if (fs.existsSync(path.join(deployedPath, 'curated-songs.json'))) {
+    const fallbackDbFile = path.join(deployedPath, 'curated-songs.json');
+    console.log('[CuratedDB] No persistent disk, checking fallback:', {
+      fallbackDbFile,
+      exists: fs.existsSync(fallbackDbFile)
+    });
+    
+    if (fs.existsSync(fallbackDbFile)) {
       console.log('[CuratedDB] Using deployed cache directory:', deployedPath);
       return deployedPath;
     }
