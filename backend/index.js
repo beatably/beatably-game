@@ -2848,21 +2848,49 @@ io.on('connection', (socket) => {
     let newTimeline = [...timelineWithoutOriginal];
     newTimeline.splice(adjustedIndex, 0, currentCard);
 
-    // Check challenger's correctness using the adjusted index
+    // CRITICAL FIX: Check challenger's correctness - use the challenger's visual index directly
+    // The challenger sees the timeline WITH the original card and chooses a position
+    // We need to validate against the timeline WITHOUT the original card using the visual index
     let prevYear, nextYear;
     
-    if (adjustedIndex === 0) {
-      // Placing at the beginning
+    // For first round (single card timeline), handle the special case
+    if (timelineWithoutOriginal.length === 0) {
+      // Empty timeline after removing original - challenger can place anywhere
       prevYear = -Infinity;
-      nextYear = timelineWithoutOriginal.length > 0 ? timelineWithoutOriginal[0].year : Infinity;
-    } else if (adjustedIndex >= timelineWithoutOriginal.length) {
-      // Placing at the end (beyond current timeline)
-      prevYear = timelineWithoutOriginal.length > 0 ? timelineWithoutOriginal[timelineWithoutOriginal.length - 1].year : -Infinity;
+      nextYear = Infinity;
+    } else if (index === 0) {
+      // Challenger chose to place at the very beginning
+      prevYear = -Infinity;
+      nextYear = timelineWithoutOriginal[0].year;
+    } else if (index > timelineWithoutOriginal.length) {
+      // Challenger chose to place at the very end
+      prevYear = timelineWithoutOriginal[timelineWithoutOriginal.length - 1].year;
       nextYear = Infinity;
     } else {
-      // Placing in the middle
-      prevYear = timelineWithoutOriginal[adjustedIndex - 1].year;
-      nextYear = timelineWithoutOriginal[adjustedIndex].year;
+      // Challenger chose to place in the middle - use the visual index to determine bounds
+      // Since the challenger saw the timeline WITH the original card, we need to map their choice
+      // to the timeline WITHOUT the original card
+      if (index <= game.challenge.originalIndex) {
+        // Challenger placed at or before the original card's position
+        if (index === 0) {
+          prevYear = -Infinity;
+          nextYear = timelineWithoutOriginal.length > 0 ? timelineWithoutOriginal[0].year : Infinity;
+        } else {
+          prevYear = timelineWithoutOriginal[index - 1].year;
+          nextYear = index < timelineWithoutOriginal.length ? timelineWithoutOriginal[index].year : Infinity;
+        }
+      } else {
+        // Challenger placed after the original card's position
+        // Adjust the index since the original card is no longer in the timeline
+        const adjustedIdx = index - 1;
+        if (adjustedIdx >= timelineWithoutOriginal.length) {
+          prevYear = timelineWithoutOriginal.length > 0 ? timelineWithoutOriginal[timelineWithoutOriginal.length - 1].year : -Infinity;
+          nextYear = Infinity;
+        } else {
+          prevYear = adjustedIdx > 0 ? timelineWithoutOriginal[adjustedIdx - 1].year : -Infinity;
+          nextYear = timelineWithoutOriginal[adjustedIdx].year;
+        }
+      }
     }
     
     const challengerCorrect = prevYear <= currentCard.year && currentCard.year <= nextYear;

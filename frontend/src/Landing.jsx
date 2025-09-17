@@ -17,6 +17,7 @@ function Landing({ onCreate, onJoin }) {
   const joinWithCodeButtonRef = useRef(null);
   const joinGameButtonRef = useRef(null);
   const cancelButtonRef = useRef(null);
+  const isProgrammaticFocus = useRef(false);
 
   useEffect(() => {
     if (joining) {
@@ -31,6 +32,13 @@ function Landing({ onCreate, onJoin }) {
       // Only handle for input elements
       if (e.target.tagName !== 'INPUT') return;
       
+      // Skip scrolling if this is a programmatic focus (auto-advance)
+      if (isProgrammaticFocus.current) {
+        isProgrammaticFocus.current = false;
+        return;
+      }
+      
+      // Only scroll for manual focus events (user tapping)
       // Small delay to let keyboard animation start
       setTimeout(() => {
         // Scroll the focused input into view
@@ -122,7 +130,11 @@ function Landing({ onCreate, onJoin }) {
     // Auto-advance to next field
     if (value && index < 3) {
       const nextInput = document.getElementById(`code-${index + 1}`);
-      if (nextInput) nextInput.focus();
+      if (nextInput) {
+        // Flag this as programmatic focus to prevent scrolling
+        isProgrammaticFocus.current = true;
+        nextInput.focus();
+      }
     }
   };
 
@@ -130,7 +142,11 @@ function Landing({ onCreate, onJoin }) {
     // Handle backspace to go to previous field
     if (e.key === "Backspace" && !joinCode[index] && index > 0) {
       const prevInput = document.getElementById(`code-${index - 1}`);
-      if (prevInput) prevInput.focus();
+      if (prevInput) {
+        // Flag this as programmatic focus to prevent scrolling
+        isProgrammaticFocus.current = true;
+        prevInput.focus();
+      }
     }
   };
 
