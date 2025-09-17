@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import spotifyAuth from "./utils/spotifyAuth";
+import productionPlaybackFix from "./utils/productionPlaybackFix";
 import DeviceSwitchModal from './DeviceSwitchModal';
 import SongGuessModal from './SongGuessModal';
 
@@ -134,11 +135,13 @@ function GameFooter({
 
   // Function to trigger Spotify playback with enhanced error handling
   const triggerSpotifyPlayback = async () => {
-    if (!isCreator || !spotifyDeviceId || !currentCard?.uri) {
+    const trackUri = currentCard?.uri || currentCard?.spotifyUri;
+    if (!isCreator || !spotifyDeviceId || !trackUri) {
       console.log('[GameFooter] Cannot play - missing requirements:', {
         isCreator,
         spotifyDeviceId: !!spotifyDeviceId,
-        hasUri: !!currentCard?.uri
+        hasUri: !!trackUri,
+        currentCard: currentCard ? { title: currentCard.title, uri: currentCard.uri, spotifyUri: currentCard.spotifyUri } : null
       });
       return false;
     }
@@ -168,7 +171,7 @@ function GameFooter({
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Now start playback on the active device (without device_id to avoid 404)
-      const success = await spotifyAuth.verifiedStartPlayback(null, currentCard.uri, 0, {
+      const success = await spotifyAuth.verifiedStartPlayback(null, trackUri, 0, {
         pauseFirst: false, // Don't pause since we just transferred
         transferFirst: false, // Already transferred above
         maxVerifyAttempts: 4,
@@ -393,7 +396,7 @@ function GameFooter({
         }
         const statePlaying = !!state?.is_playing;
         const stateUri = state?.item?.uri || null;
-        const targetUri = currentCard?.uri || null;
+        const targetUri = currentCard?.uri || currentCard?.spotifyUri || null;
         const sameTrack = !!targetUri && targetUri === stateUri;
 
         // If currently playing the same track -> pause
@@ -411,7 +414,22 @@ function GameFooter({
           return;
         }
 
-        // Different or no track -> explicitly start target track on selected device
+        // Different or no track -> check if we need production fix first
+        const needsFix = await productionPlaybackFix.shouldApplyFix();
+        
+        if (needsFix) {
+          console.log('[GameFooter] Applying production playback fix...');
+          const fixSuccess = await productionPlaybackFix.forcePlaybackReset(spotifyDeviceId, targetUri);
+          if (fixSuccess) {
+            setIsSpotifyPlaying(true);
+            setCurrentSpotifyUri(targetUri);
+            return;
+          } else {
+            console.warn('[GameFooter] Production fix failed, falling back to normal playback');
+          }
+        }
+        
+        // Normal playback start
         const started = await triggerSpotifyPlayback();
         if (started) {
           setIsSpotifyPlaying(true);
