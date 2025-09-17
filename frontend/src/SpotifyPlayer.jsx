@@ -36,26 +36,64 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
       isUnlocked: () => playbackUnlocked,
       ensureUnlockedViaGesture: async () => {
         try {
-          // Resume/create an AudioContext with a short silent sound to satisfy gesture
+          console.log('[Playback] Attempting to unlock AudioContext via user gesture...');
+          
+          // Enhanced AudioContext unlock with better error handling
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
           if (AudioCtx) {
-            const ctx = new AudioCtx();
+            // Check if we already have a suspended context
+            let ctx = window.beatablyAudioContext;
+            if (!ctx) {
+              ctx = new AudioCtx();
+              window.beatablyAudioContext = ctx;
+            }
+            
+            // Resume suspended context
+            if (ctx.state === 'suspended') {
+              console.log('[Playback] Resuming suspended AudioContext...');
+              await ctx.resume();
+            }
+            
+            // Create a brief silent tone to satisfy gesture requirements
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
-            gain.gain.value = 0;
+            gain.gain.value = 0.001; // Very quiet but not completely silent
             osc.connect(gain);
             gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.05);
+            osc.frequency.setValueAtTime(440, ctx.currentTime);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.1);
+            
+            console.log('[Playback] AudioContext state after unlock attempt:', ctx.state);
           }
-          // Attempt to resume the Spotify player if available
-          if (window.spotifyPlayerInstance?.resume) {
-            try { await window.spotifyPlayerInstance.resume(); } catch (_) {}
+          
+          // Attempt to activate Spotify Web Playback SDK
+          if (window.spotifyPlayerInstance) {
+            try {
+              // Call activateElement if available (Safari requirement)
+              if (window.spotifyPlayerInstance.activateElement) {
+                console.log('[Playback] Calling activateElement for Safari...');
+                await window.spotifyPlayerInstance.activateElement();
+              }
+              
+              // Try to resume playback
+              if (window.spotifyPlayerInstance.resume) {
+                console.log('[Playback] Attempting to resume Spotify player...');
+                await window.spotifyPlayerInstance.resume();
+              }
+            } catch (e) {
+              console.warn('[Playback] Spotify player activation failed:', e.message);
+              // Don't fail the entire unlock process for this
+            }
           }
+          
           setPlaybackUnlocked(true);
+          console.log('[Playback] Playback successfully unlocked via user gesture');
           return true;
         } catch (e) {
-          console.warn('[Playback] ensureUnlockedViaGesture failed:', e);
+          console.error('[Playback] ensureUnlockedViaGesture failed:', e);
+          // Still mark as unlocked if we got this far - the gesture was made
+          setPlaybackUnlocked(true);
           return false;
         }
       },

@@ -237,6 +237,7 @@ class ProductionPlaybackFix {
       // 1. No active playback state
       // 2. Has item but not playing (stuck state)
       // 3. Progress seems stale (> 30 seconds without being explicitly set)
+      // 4. Empty curated database scenario (no songs available)
       
       if (!state) {
         console.log('[ProductionFix] No playback state - fix needed');
@@ -248,10 +249,45 @@ class ProductionPlaybackFix {
         return true;
       }
 
+      // Check for empty song database scenario
+      if (!state.item && window.location.pathname.includes('/game')) {
+        console.log('[ProductionFix] No song item in game context - possible empty database');
+        return true;
+      }
+
       return false;
     } catch (error) {
       console.warn('[ProductionFix] Error checking if fix needed:', error);
       return true; // Apply fix on error to be safe
+    }
+  }
+
+  /**
+   * Handle empty curated database scenario
+   */
+  async handleEmptyDatabase() {
+    console.log('[ProductionFix] Handling empty curated database scenario');
+    
+    try {
+      // Check if we're in a game context
+      if (!window.location.pathname.includes('/game')) {
+        return false;
+      }
+
+      // Show user-friendly error message
+      const errorMessage = 'No songs available for playback. The song database may be empty or still loading.';
+      
+      // Try to notify the user through existing error handling mechanisms
+      if (window.beatablyPlayback && window.beatablyPlayback.showError) {
+        window.beatablyPlayback.showError(errorMessage);
+      } else {
+        console.error('[ProductionFix] Empty database:', errorMessage);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[ProductionFix] Error handling empty database:', error);
+      return false;
     }
   }
 

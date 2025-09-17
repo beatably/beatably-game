@@ -70,8 +70,13 @@ const discovery = require('./discovery');
 const fs = require('fs');
 const path = require('path');
 
-const STATE_DIR = path.join(__dirname, 'cache');
+// Use persistent disk in production, local cache in development
+const STATE_DIR = process.env.NODE_ENV === 'production' 
+  ? '/var/data/cache' 
+  : path.join(__dirname, 'cache');
 const STATE_FILE = path.join(STATE_DIR, 'state.json');
+
+console.log('[State] Using state directory:', STATE_DIR);
 
 function sanitizeForSave(obj) {
   // JSON-safe deep clone with Set support

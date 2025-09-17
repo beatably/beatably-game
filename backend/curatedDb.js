@@ -7,8 +7,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const CACHE_DIR = path.join(__dirname, 'cache');
+// Use persistent disk in production, local cache in development
+const CACHE_DIR = process.env.NODE_ENV === 'production' 
+  ? '/var/data/cache' 
+  : path.join(__dirname, 'cache');
 const DB_FILE = path.join(CACHE_DIR, 'curated-songs.json');
+
+console.log('[CuratedDB] Using cache directory:', CACHE_DIR);
 
 // In-memory cache
 let _songs = [];
