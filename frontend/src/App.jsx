@@ -860,6 +860,13 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       (Array.isArray(data?.uris) ? data.uris[0] : null) ||
       null;
 
+    // Validate URI format
+    const isValidUri = payloadUri && payloadUri.startsWith('spotify:track:');
+    if (payloadUri && !isValidUri) {
+      console.warn("[App] Invalid Spotify URI format:", payloadUri);
+      return;
+    }
+
     // Resolve the locked device (explicit user selection), if any
     const lockedDevice = localStorage.getItem('spotify_device_id');
 
@@ -867,6 +874,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       hasSpotifyToken,
       haveDevice: !!spotifyDeviceId,
       payloadUri,
+      isValidUri,
       lockedDevice,
       deviceIdType: typeof spotifyDeviceId,
       actualDeviceId: spotifyDeviceId,
@@ -880,16 +888,18 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         return;
       }
 
-      // If no URI in payload, do NOT attempt playback here. The URI-change effect will handle autoplay once currentCard updates.
-      if (!payloadUri) {
-        console.log("[App] No URI in payload; deferring autoplay until currentCard.uri updates.");
+      // If no valid URI in payload, do NOT attempt playback here. The URI-change effect will handle autoplay once currentCard updates.
+      if (!isValidUri) {
+        console.log("[App] No valid URI in payload; deferring autoplay until currentCard.uri updates.");
         return;
       }
 
-      // FIXED: Check current active device first before falling back to locked device
-      // This prevents forcing playback back to web player when user has switched to external device
+      // Enhanced device-aware autoplay with initialization check
       (async () => {
         try {
+          // Wait for deviceAwarePlayback initialization with fallback
+          const isInitialized = await deviceAwarePlayback.waitForInitialization(2000);
+          
           // First, check what device is currently active
           const devices = await spotifyAuth.getDevices();
           const activeDevice = devices.find(d => d.is_active);
@@ -897,7 +907,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           console.log("[App] Device check for autoplay:", {
             activeDevice: activeDevice ? { id: activeDevice.id, name: activeDevice.name } : null,
             lockedDevice,
-            currentSpotifyDeviceId: spotifyDeviceId
+            currentSpotifyDeviceId: spotifyDeviceId,
+            deviceAwareInitialized: isInitialized
           });
 
           let targetDevice = null;
@@ -930,16 +941,34 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           }
 
           if (targetDevice) {
-            console.log("[App] Starting playback on target device using deviceAwarePlayback:", targetDevice);
+            console.log("[App] Starting playback on target device:", targetDevice, "initialized:", isInitialized);
             await pauseSpotifyPlayback().catch(() => {});
             
-            try {
-              await deviceAwarePlayback.startPlayback(targetDevice, [payloadUri], 0);
-              setIsPlayingMusic(true);
-              console.log("[App] Successfully started playback via deviceAwarePlayback");
-            } catch (error) {
-              console.warn("[App] deviceAwarePlayback failed, falling back to spotifyAuth:", error);
-              // Fallback to original method
+            // Use deviceAwarePlayback if initialized, otherwise fall back to spotifyAuth
+            if (isInitialized) {
+              try {
+                await deviceAwarePlayback.startPlayback(targetDevice, [payloadUri], 0);
+                setIsPlayingMusic(true);
+                console.log("[App] Successfully started playback via deviceAwarePlayback");
+              } catch (error) {
+                console.warn("[App] deviceAwarePlayback failed, falling back to spotifyAuth:", error);
+                // Fallback to original method
+                const ok = await spotifyAuth.verifiedStartPlayback(
+                  targetDevice,
+                  payloadUri,
+                  0,
+                  { 
+                    pauseFirst: true, 
+                    transferFirst: false, 
+                    maxVerifyAttempts: 4, 
+                    verifyDelayMs: 250,
+                    forcePositionReset: true
+                  }
+                );
+                if (ok) setIsPlayingMusic(true);
+              }
+            } else {
+              console.log("[App] Using spotifyAuth fallback (deviceAware not initialized)");
               const ok = await spotifyAuth.verifiedStartPlayback(
                 targetDevice,
                 payloadUri,
@@ -948,7 +977,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                   pauseFirst: true, 
                   transferFirst: false, 
                   maxVerifyAttempts: 4, 
-                  verifyDelayMs: 250
+                  verifyDelayMs: 250,
+                  forcePositionReset: true
                 }
               );
               if (ok) setIsPlayingMusic(true);

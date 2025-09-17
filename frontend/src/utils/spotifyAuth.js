@@ -511,7 +511,7 @@ class SpotifyAuthManager {
       transferFirst = false,
       maxVerifyAttempts = 3,
       verifyDelayMs = 250,
-      forcePositionReset = true // NEW: Force position reset to prevent ~30s start bug
+      forcePositionReset = false // FIXED: Default to false to prevent audio cutoff
     } = opts || {};
 
     const tokenStatus = await this.ensureValidToken();
@@ -530,20 +530,20 @@ class SpotifyAuthManager {
         // Pause active device to ensure a clean cut; avoid device_id query to minimize 404
         await this.pausePlayback().catch(() => {});
         
-        // CRITICAL FIX: Force seek to position 0 after pause to clear any cached position
-        if (forcePositionReset) {
-          await sleep(100); // Brief pause to ensure pause command is processed
+        // REFINED: Only force position reset when explicitly requested (e.g., for new game rounds)
+        if (forcePositionReset && positionMs === 0) {
+          await sleep(150); // Slightly longer pause to ensure pause command is processed
           try {
             await this.seekToPosition(deviceId, 0);
-            console.log('[SpotifyAuth] Forced position reset to 0 to prevent ~30s start bug');
+            console.log('[SpotifyAuth] Forced position reset to 0 for new round start');
           } catch (seekErr) {
             console.warn('[SpotifyAuth] Position reset failed (continuing):', seekErr?.message || seekErr);
           }
         }
       }
 
-      // Ensure position is explicitly 0 for new round starts
-      const finalPositionMs = forcePositionReset ? 0 : positionMs;
+      // Use the requested position (don't override unless explicitly resetting)
+      const finalPositionMs = (forcePositionReset && positionMs === 0) ? 0 : positionMs;
 
       // First attempt: play WITHOUT device_id (active device)
       let playUrl = `https://api.spotify.com/v1/me/player/play`;
@@ -566,18 +566,15 @@ class SpotifyAuthManager {
         });
       }
 
-      // Enhanced verification: check both URI and position
+      // Enhanced verification: check URI match (position verification removed to prevent cutoff)
       for (let i = 0; i < maxVerifyAttempts; i++) {
         await sleep(verifyDelayMs);
         try {
           const state = await this.getPlaybackState(deviceId); // may try with device_id query
           const itemUri = state?.item?.uri;
-          const currentPosition = state?.progress_ms || 0;
           
           if (itemUri === trackUri) {
-            // FIXED: Removed aggressive position correction that was causing audio cutoff at 8-15 seconds
-            // The original position reset during pause is sufficient for new round starts
-            console.log('[SpotifyAuth] Verified playback on correct target:', itemUri, 'at position:', currentPosition, 'ms');
+            console.log('[SpotifyAuth] Verified playback on correct target:', itemUri);
             return true;
           }
         } catch (vErr) {

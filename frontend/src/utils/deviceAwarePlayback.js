@@ -11,6 +11,7 @@ class DeviceAwarePlayback {
     this.sdkDeviceId = null;
     this.currentDevice = null;
     this.isInitialized = false;
+    this.initializationPromise = null;
   }
 
   /**
@@ -21,6 +22,44 @@ class DeviceAwarePlayback {
     this.sdkDeviceId = deviceId;
     this.isInitialized = true;
     console.log('DeviceAwarePlayback initialized with SDK player:', deviceId);
+    
+    // Resolve any pending initialization promises
+    if (this.initializationPromise) {
+      this.initializationPromise.resolve();
+      this.initializationPromise = null;
+    }
+  }
+
+  /**
+   * Wait for initialization to complete
+   */
+  async waitForInitialization(timeoutMs = 5000) {
+    if (this.isInitialized) {
+      return true;
+    }
+
+    if (!this.initializationPromise) {
+      this.initializationPromise = {};
+      this.initializationPromise.promise = new Promise((resolve, reject) => {
+        this.initializationPromise.resolve = resolve;
+        this.initializationPromise.reject = reject;
+        
+        // Set timeout
+        setTimeout(() => {
+          if (!this.isInitialized) {
+            this.initializationPromise.reject(new Error('DeviceAwarePlayback initialization timeout'));
+          }
+        }, timeoutMs);
+      });
+    }
+
+    try {
+      await this.initializationPromise.promise;
+      return true;
+    } catch (error) {
+      console.warn('[DeviceAwarePlayback] Initialization timeout, falling back to spotifyAuth');
+      return false;
+    }
   }
 
   /**

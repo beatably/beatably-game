@@ -303,6 +303,7 @@ function selectForGame(criteria = {}) {
     artist: s.artist,
     year: s.year,
     uri: s.spotifyUri, // must be spotify:track:...
+    spotifyUri: s.spotifyUri, // Keep both for compatibility
     preview_url: s.previewUrl || null,
     external_url: null,
     album_art: s.albumArt || null,
@@ -318,11 +319,21 @@ function selectForGame(criteria = {}) {
       if (lvl === 3) return 'normal';
       return 'hard';
     })(),
+    // Add URI validation
+    isValidUri: !!(s.spotifyUri && s.spotifyUri.startsWith('spotify:track:')),
   }));
+
+  // Filter out invalid URIs to prevent playback issues
+  const validTracks = tracks.filter(t => t.isValidUri);
+  if (validTracks.length < tracks.length) {
+    console.warn(`[CuratedDB] Filtered out ${tracks.length - validTracks.length} tracks with invalid URIs`);
+  }
 
   const metadata = {
     mode: 'curated',
-    finalCount: tracks.length,
+    finalCount: validTracks.length,
+    originalCount: tracks.length,
+    invalidUriCount: tracks.length - validTracks.length,
     difficulty,
     preferences: {
       genres,
@@ -335,11 +346,15 @@ function selectForGame(criteria = {}) {
   };
 
   let warning = null;
-  if (tracks.length < minSongsNeeded) {
-    warning = `Only found ${tracks.length} curated songs, but need at least ${minSongsNeeded} for ${playerCount} players. Consider adding more songs or broadening your filters.`;
+  if (validTracks.length < minSongsNeeded) {
+    warning = `Only found ${validTracks.length} curated songs, but need at least ${minSongsNeeded} for ${playerCount} players. Consider adding more songs or broadening your filters.`;
+  }
+  if (tracks.length - validTracks.length > 0) {
+    const uriWarning = `${tracks.length - validTracks.length} songs had invalid Spotify URIs and were excluded.`;
+    warning = warning ? `${warning} ${uriWarning}` : uriWarning;
   }
 
-  return { tracks, metadata, warning };
+  return { tracks: validTracks, metadata, warning };
 }
 
 module.exports = {
