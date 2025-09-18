@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from './config';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import SongDebugPanel from './SongDebugPanel';
 
 function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
@@ -19,10 +17,6 @@ function GameSettings({ settings, onUpdate }) {
 
   // Remove showAdvancedSettings state since we're making all settings visible
   const [useChartMode, setUseChartMode] = useState(settings?.useChartMode ?? false);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [debugData, setDebugData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [showSongsButton, setShowSongsButton] = useState(false);
   const [activeHandle, setActiveHandle] = useState(null);
   const trackRef = React.useRef(null);
   // Keep a ref to the active handle so pointer events can be coordinated
@@ -78,13 +72,6 @@ function GameSettings({ settings, onUpdate }) {
     });
   }, [settings]);
 
-  // Load showSongsButton state from localStorage
-  useEffect(() => {
-    const savedShowSongsButton = localStorage.getItem('showSongsButton');
-    if (savedShowSongsButton !== null) {
-      setShowSongsButton(savedShowSongsButton === 'true');
-    }
-  }, []);
   
   // Track which handle is currently active so we can put it on top for pointer events.
   useEffect(() => {
@@ -447,52 +434,6 @@ function GameSettings({ settings, onUpdate }) {
     { code: 'IT', name: 'Italy' }
   ];
 
-  // Debug functions
-  const fetchDebugData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/debug/songs`);
-      const data = await response.json();
-      setDebugData(data);
-    } catch (error) {
-      console.error('Error fetching debug data:', error);
-      setDebugData({ error: 'Failed to fetch debug data' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testFetchSongs = async () => {
-    setLoading(true);
-    try {
-      const effectiveChartMode = localSettings.useChartMode ?? useChartMode;
-      console.log('[DebugPanel] Sending fetch request with:', {
-        musicPreferences: localSettings.musicPreferences,
-        difficulty: localSettings.difficulty,
-        useChartMode: effectiveChartMode
-      });
-      
-      const response = await fetch(`${API_BASE_URL}/api/fetch-songs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          musicPreferences: localSettings.musicPreferences,
-          difficulty: localSettings.difficulty,
-          useChartMode: effectiveChartMode
-        })
-      });
-      const data = await response.json();
-      console.log('[DebugPanel] Received fetch response:', data);
-      setDebugData({ testFetch: data, timestamp: new Date().toISOString() });
-    } catch (error) {
-      console.error('Error testing song fetch:', error);
-      setDebugData({ error: 'Failed to test song fetch' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
     return (
     <div className="space-y-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}>
@@ -731,55 +672,6 @@ function GameSettings({ settings, onUpdate }) {
         </button>
       </div>
 
-      {/* Debug Panel Link (inline text action) */}
-      <div className="flex justify-center">
-        <button
-          onClick={() => setShowDebugPanel(true)}
-          aria-label="Open debug panel"
-          className="text-foreground underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none"
-        >
-          <svg
-            className="w-4 h-4 text-muted-foreground mr-2 inline"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path d="M12 2v20" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-          Debug Panel
-        </button>
-      </div>
-
-      {/* Show Song List Toggle */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-xl font-semibold text-foreground">Show Song List</Label>
-            <p className="text-sm text-muted-foreground mt-1">Display song list during gameplay</p>
-          </div>
-          <Switch
-            checked={showSongsButton}
-            onCheckedChange={(checked) => {
-              setShowSongsButton(checked);
-              localStorage.setItem('showSongsButton', checked.toString());
-            }}
-            className="data-[state=checked]:bg-primary"
-          />
-        </div>
-      </div>
-
-      {/* Song Debug Panel */}
-      <SongDebugPanel
-        roomCode={null}
-        isVisible={showDebugPanel}
-        onClose={() => setShowDebugPanel(false)}
-      />
     </div>
   );
 }

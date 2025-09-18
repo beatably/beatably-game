@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import SongDebugPanel from './SongDebugPanel';
 
 const CurvedTimeline = ({ 
   timeline, 
@@ -12,11 +13,54 @@ const CurvedTimeline = ({
   feedback,
   showFeedback,
   pendingDropIndex,
-  currentPlayerName 
+  currentPlayerName,
+  roomCode
 }) => {
   const [hoveredNodeIndex, setHoveredNodeIndex] = useState(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
   const containerRef = useRef(null);
+  
+  // Secret tap pattern state for debug panel
+  const [tapCount, setTapCount] = useState(0);
+  const [tapTimer, setTapTimer] = useState(null);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+
+  // Secret tap pattern handler for timeline title
+  const handleSecretTap = (event) => {
+    event.stopPropagation();
+    
+    const newTapCount = tapCount + 1;
+    setTapCount(newTapCount);
+
+    // Clear existing timer
+    if (tapTimer) {
+      clearTimeout(tapTimer);
+    }
+
+    // Set new timer to reset tap count after 4 seconds
+    const timer = setTimeout(() => {
+      setTapCount(0);
+      setTapTimer(null);
+    }, 4000);
+    setTapTimer(timer);
+
+    // Check if we've reached 6 taps
+    if (newTapCount >= 6) {
+      setShowDebugPanel(true);
+      setTapCount(0);
+      clearTimeout(timer);
+      setTapTimer(null);
+    }
+  };
+
+  // Reset tap pattern when component unmounts
+  useEffect(() => {
+    return () => {
+      if (tapTimer) {
+        clearTimeout(tapTimer);
+      }
+    };
+  }, [tapTimer]);
 
   // Effect to measure container dimensions and handle resize
   useEffect(() => {
@@ -556,7 +600,10 @@ const CurvedTimeline = ({
       {/* Timeline Title */}
       {currentPlayerName && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
-          <h2 className="text-lg font-semibold text-foreground text-center">
+          <h2 
+            className="text-lg font-semibold text-foreground text-center cursor-pointer select-none"
+            onClick={handleSecretTap}
+          >
             {currentPlayerName}'s timeline
           </h2>
         </div>
@@ -715,6 +762,13 @@ const CurvedTimeline = ({
           return null;
         })}
       </div>
+      
+      {/* Song Debug Panel */}
+      <SongDebugPanel
+        roomCode={roomCode}
+        isVisible={showDebugPanel}
+        onClose={() => setShowDebugPanel(false)}
+      />
       
     </div>
   );

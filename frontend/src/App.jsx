@@ -171,7 +171,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Debug panel state
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [showDebugButton, setShowDebugButton] = useState(false);
 
   // Song guess notification state
   const [songGuessNotification, setSongGuessNotification] = useState(null);
@@ -223,26 +222,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     };
   }, []);
 
-  // Load showDebugButton state from localStorage
-  useEffect(() => {
-    const savedShowDebugButton = localStorage.getItem('showSongsButton');
-    if (savedShowDebugButton !== null) {
-      setShowDebugButton(savedShowDebugButton === 'true');
-    }
-  }, []);
-
-  // Add keyboard shortcut to toggle debug panel (Ctrl+D or Cmd+D)
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'd') {
-        event.preventDefault();
-        setShowDebugPanel(prev => !prev);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // Initialize feature flags (e.g., default chart mode) from backend so UI reflects server defaults
   useEffect(() => {
@@ -2571,6 +2550,7 @@ r            onRenew={handleSpotifyAuthRenewal}
               pendingDropIndex={pendingDropIndex}
               onPendingDrop={handlePendingDrop}
               currentPlayerName={timelineOwnerName}
+              roomCode={roomCode}
             />
           </div>
           <GameFooter
@@ -2636,16 +2616,6 @@ r            onRenew={handleSpotifyAuthRenewal}
             onClose={() => setSongGuessNotification(null)}
           />
           
-          {/* Debug Panel Toggle Button - only show if enabled in settings */}
-          {showDebugButton && (
-            <button
-              onClick={() => setShowDebugPanel(!showDebugPanel)}
-              className="fixed top-20 right-4 bg-gray-600 hover:bg-gray-500 text-white p-1 rounded-full shadow-lg z-40 text-xl font-medium"
-              title="Toggle Song Debug Panel (Ctrl+D / Cmd+D)"
-            >
-              🎸
-            </button>
-          )}
 
           {/* Spotify Authorization Renewal Modal */}
           {showSpotifyAuthRenewal && (
