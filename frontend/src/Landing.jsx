@@ -38,34 +38,30 @@ function Landing({ onCreate, onJoin }) {
         return;
       }
       
-      // Only scroll for manual focus events (user tapping)
-      // Small delay to let keyboard animation start
-      setTimeout(() => {
-        // Scroll the focused input into view
-        e.target.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-          inline: 'nearest'
-        });
-      }, 300);
-    };
-
-    const handleInputBlur = () => {
-      // Reset scroll position when keyboard disappears
-      setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
+      // Only scroll for the very first manual focus on code inputs
+      // Check if this is the first code input and no other code inputs have values
+      const isFirstCodeInput = e.target.id === 'code-0';
+      const hasAnyCodeValues = joinCode.some(digit => digit !== '');
+      
+      if (isFirstCodeInput && !hasAnyCodeValues) {
+        // Only scroll for the initial focus on the first code field
+        setTimeout(() => {
+          e.target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }, 300);
+      }
     };
 
     // Add event listeners
     document.addEventListener('focusin', handleInputFocus);
-    document.addEventListener('focusout', handleInputBlur);
 
     return () => {
       document.removeEventListener('focusin', handleInputFocus);
-      document.removeEventListener('focusout', handleInputBlur);
     };
-  }, []);
+  }, [joinCode]);
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -160,9 +156,10 @@ function Landing({ onCreate, onJoin }) {
         backgroundPosition: "center top",
         backgroundRepeat: "no-repeat",
         // Use single height declaration to avoid conflicts
-        height: "100dvh",
-        // Prevent any overflow
-        overflow: "hidden",
+        minHeight: "100dvh",
+        // Allow vertical scrolling when keyboard appears
+        overflowY: "auto",
+        overflowX: "hidden",
         // iOS optimizations
         WebkitOverflowScrolling: "touch",
         overscrollBehavior: "contain",
