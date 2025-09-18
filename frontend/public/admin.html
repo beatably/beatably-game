@@ -482,8 +482,14 @@
     const API_BASE_URL = (function() {
       const loc = window.location;
       if (loc.port === '5173') {
+        // Development: local backend
         return loc.protocol + '//' + loc.hostname + ':3001';
       }
+      if (loc.hostname.includes('netlify.app')) {
+        // Production: Netlify frontend -> OnRender backend
+        return 'https://beatably-backend.onrender.com';
+      }
+      // Fallback: same origin
       return loc.origin.replace(/\/$/, '');
     })();
 

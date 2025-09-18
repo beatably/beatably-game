@@ -183,7 +183,40 @@ function load(forceReload = false) {
     console.log('[CuratedDB] Checking DB_FILE:', DB_FILE, 'exists:', fs.existsSync(DB_FILE));
     
     if (!fs.existsSync(DB_FILE)) {
-      console.log('[CuratedDB] DB file does not exist, creating empty array');
+      console.log('[CuratedDB] DB file does not exist');
+      
+      // CRITICAL: In production, try to find and copy the database from deployed location
+      if (process.env.NODE_ENV === 'production') {
+        console.log('[CuratedDB] Production mode - attempting to locate deployed database');
+        const deployedDbFile = path.join(__dirname, 'cache', 'curated-songs.json');
+        console.log('[CuratedDB] Looking for deployed database at:', deployedDbFile);
+        
+        if (fs.existsSync(deployedDbFile)) {
+          try {
+            console.log('[CuratedDB] Found deployed database, copying to:', DB_FILE);
+            const deployedData = fs.readFileSync(deployedDbFile, 'utf8');
+            const parsedData = JSON.parse(deployedData);
+            console.log('[CuratedDB] Deployed database contains', Array.isArray(parsedData) ? parsedData.length : 0, 'songs');
+            
+            if (Array.isArray(parsedData) && parsedData.length > 0) {
+              fs.writeFileSync(DB_FILE, deployedData, 'utf8');
+              console.log('[CuratedDB] Successfully copied deployed database to persistent location');
+              _songs = parsedData;
+              _loaded = true;
+              console.log('[CuratedDB] Loaded', _songs.length, 'songs from deployed database');
+              return;
+            } else {
+              console.warn('[CuratedDB] Deployed database is empty or invalid');
+            }
+          } catch (copyError) {
+            console.error('[CuratedDB] Failed to copy deployed database:', copyError.message);
+          }
+        } else {
+          console.warn('[CuratedDB] No deployed database found at:', deployedDbFile);
+        }
+      }
+      
+      console.log('[CuratedDB] Creating empty database');
       _songs = [];
       save();
     } else {
@@ -192,9 +225,31 @@ function load(forceReload = false) {
       _songs = JSON.parse(raw);
       if (!Array.isArray(_songs)) _songs = [];
       console.log('[CuratedDB] Successfully parsed', _songs.length, 'songs from DB file');
+      
+      // CRITICAL: If we got 0 songs in production, try the deployed database as backup
+      if (process.env.NODE_ENV === 'production' && _songs.length === 0) {
+        console.log('[CuratedDB] Production mode with 0 songs - checking deployed database as backup');
+        const deployedDbFile = path.join(__dirname, 'cache', 'curated-songs.json');
+        
+        if (fs.existsSync(deployedDbFile)) {
+          try {
+            const deployedData = fs.readFileSync(deployedDbFile, 'utf8');
+            const parsedData = JSON.parse(deployedData);
+            
+            if (Array.isArray(parsedData) && parsedData.length > 0) {
+              console.log('[CuratedDB] Found', parsedData.length, 'songs in deployed database, using as backup');
+              _songs = parsedData;
+              // Save to persistent location
+              save();
+            }
+          } catch (backupError) {
+            console.error('[CuratedDB] Failed to read deployed database backup:', backupError.message);
+          }
+        }
+      }
     }
     _loaded = true;
-    console.log('[CuratedDB] Loaded curated songs:', _songs.length);
+    console.log('[CuratedDB] Final loaded curated songs:', _songs.length);
   } catch (e) {
     console.warn('[CuratedDB] Load failed:', e && e.message);
     console.warn('[CuratedDB] Stack trace:', e && e.stack);
