@@ -742,6 +742,15 @@ const CurvedTimeline = ({
                   height: 24,
                 }}
               >
+                {/* "You" label for player's own guess during challenge resolution */}
+                {item.card.isYourGuess && (
+                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                    <span className="text-xs font-semibold bg-none text-white px-2 py-0.5 rounded shadow-md">
+                      You
+                    </span>
+                  </div>
+                )}
+                
                 <div
                   className={`w-full h-full rounded-lg shadow-md flex items-center justify-center text-xs font-bold transition-all duration-300 px-1 ${
                     yearState === 'green'

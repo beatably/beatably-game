@@ -2841,10 +2841,11 @@ io.on('connection', (socket) => {
 
   // Challenge card placement
   socket.on('challenge_place_card', ({ code, index }) => {
-    console.log('[Backend] Received challenge_place_card for code:', code, 'from socket:', socket.id);
+    console.log('[CHALLENGE] ===== CHALLENGE PLACE CARD START =====');
+    console.log('[CHALLENGE] Received challenge_place_card for code:', code, 'from socket:', socket.id, 'at index:', index);
     const game = games[code];
     if (!game || !game.challenge || game.challenge.phase !== 'challenger-turn') {
-      console.log('[Backend] Invalid challenge_place_card state:', {
+      console.log('[CHALLENGE] Invalid challenge_place_card state:', {
         gameExists: !!game,
         challengeExists: !!game?.challenge,
         challengePhase: game?.challenge?.phase
@@ -2854,21 +2855,34 @@ io.on('connection', (socket) => {
     
     const playerId = socket.id;
     if (playerId !== game.challenge.challengerId) {
-      console.log('[Backend] Wrong challenger for challenge_place_card:', {
+      console.log('[CHALLENGE] Wrong challenger for challenge_place_card:', {
         playerId,
         expectedChallenger: game.challenge.challengerId
       });
       return;
     }
-    console.log('[Backend] Processing challenge_place_card...');
+    console.log('[CHALLENGE] Processing challenge_place_card...');
     
     const originalPlayerId = game.challenge.originalPlayerId;
     const originalTimeline = game.timelines[originalPlayerId] || [];
     const currentCard = game.sharedDeck[game.currentCardIndex];
-    if (!currentCard) return;
+    
+    console.log('[CHALLENGE] Current state:', {
+      originalPlayerId,
+      originalTimeline: originalTimeline.map(c => ({ id: c.id, year: c.year })),
+      currentCard: { id: currentCard?.id, year: currentCard?.year, title: currentCard?.title },
+      originalIndex: game.challenge.originalIndex,
+      challengerIndex: index
+    });
+    
+    if (!currentCard) {
+      console.log('[CHALLENGE] ERROR: No current card!');
+      return;
+    }
 
     // Remove the original placement first
     const timelineWithoutOriginal = originalTimeline.filter(c => c.id !== currentCard.id);
+    console.log('[CHALLENGE] Timeline without original:', timelineWithoutOriginal.map(c => ({ id: c.id, year: c.year })));
     
     // CRITICAL FIX: Adjust challenger's index to account for the original card's position
     // The challenger sees a timeline WITH the original card, but we process against timeline WITHOUT it
@@ -2934,40 +2948,43 @@ io.on('connection', (socket) => {
     // CRITICAL: Update the main game phase to challenge-resolved
     game.phase = 'challenge-resolved';
     
-    // SIMPLIFIED FIX: Show the actual final timeline state instead of complex display logic
-    // The final timeline will be determined by the challenge outcome logic below
-    let displayTimeline = [...timelineWithoutOriginal];
+    // VISUAL TIMELINE APPROACH: Create a clean visual representation for the reveal phase
+    // This separates the backend correctness logic from the UI display logic
     
-    // Add both cards in their actual positions for visual comparison
-    // Original card at its position
-    const originalDisplayCard = { ...currentCard, originalCard: true };
-    const challengerDisplayCard = { ...currentCard, challengerCard: true };
+    console.log('[CHALLENGE] Building visual timeline for reveal phase');
+    console.log('[CHALLENGE] Base timeline:', originalTimeline.map(c => c.year));
+    console.log('[CHALLENGE] Card year:', currentCard.year);
+    console.log('[CHALLENGE] Original player clicked at visual index:', game.challenge.originalIndex);
+    console.log('[CHALLENGE] Challenger clicked at visual index:', index);
     
-    // Insert original card at its position
-    const originalDisplayTimeline = [...timelineWithoutOriginal];
-    originalDisplayTimeline.splice(game.challenge.originalIndex, 0, originalDisplayCard);
+    // Start with the base timeline that both players saw (WITH the card they were challenging)
+    const visualTimelineBase = [...originalTimeline];
     
-    // Insert challenger card at its position  
-    const challengerDisplayTimeline = [...timelineWithoutOriginal];
-    challengerDisplayTimeline.splice(index, 0, challengerDisplayCard);
+    // Create marked cards
+    const originalDisplayCard = { ...currentCard, originalCard: true, visualPosition: game.challenge.originalIndex };
+    const challengerDisplayCard = { ...currentCard, challengerCard: true, visualPosition: index };
     
-    // For display, show both cards in a simple way - just add them both to show comparison
-    displayTimeline = [...timelineWithoutOriginal];
+    // Build visual timeline by inserting both guesses at their clicked positions
+    // The key insight: both players saw the SAME timeline when they clicked, so we use those exact indices
+    let displayTimeline = [...visualTimelineBase];
     
-    // CRITICAL FIX: Use the adjusted index for display to match the actual placement logic
-    // Both indices are relative to the timelineWithoutOriginal, so we need to be careful about insertion order
-    
-    if (game.challenge.originalIndex <= adjustedIndex) {
-      // Original comes first or at same position, insert original first
+    // Insert both cards at their visual positions
+    // Always insert the lower index first to avoid position shifts
+    if (game.challenge.originalIndex <= index) {
       displayTimeline.splice(game.challenge.originalIndex, 0, originalDisplayCard);
-      // Now challenger index needs to be adjusted since we inserted original card before it
-      displayTimeline.splice(adjustedIndex + 1, 0, challengerDisplayCard);
+      displayTimeline.splice(index + 1, 0, challengerDisplayCard); // +1 because original was inserted first
     } else {
-      // Challenger comes first, insert challenger first
-      displayTimeline.splice(adjustedIndex, 0, challengerDisplayCard);
-      // Now original index needs to be adjusted since we inserted challenger card before it
-      displayTimeline.splice(game.challenge.originalIndex + 1, 0, originalDisplayCard);
+      displayTimeline.splice(index, 0, challengerDisplayCard);
+      displayTimeline.splice(game.challenge.originalIndex + 1, 0, originalDisplayCard); // +1 because challenger was inserted first
     }
+    
+    console.log('[CHALLENGE] Visual timeline for reveal:', displayTimeline.map(c => ({ 
+      year: c.year, 
+      isOriginal: c.originalCard || false, 
+      isChallenger: c.challengerCard || false,
+      visualPosition: c.visualPosition
+    })));
+    console.log('[CHALLENGE] ===== CHALLENGE PLACE CARD END =====');
     
     // Determine challenge outcome and update actual timelines
     let challengeWon = false;
@@ -3036,9 +3053,24 @@ io.on('connection', (socket) => {
     updatePlayerScores(game);
 
     // Broadcast challenge result with display timeline showing both cards
+    // Mark cards with player-specific ownership for UI labels
     game.players.forEach((p) => {
+      // Create a player-specific timeline where each card knows if it belongs to this player
+      const playerSpecificTimeline = displayTimeline.map(card => {
+        const cardCopy = { ...card };
+        
+        // Mark which card is "yours" for this specific player
+        if (card.originalCard && p.id === originalPlayerId) {
+          cardCopy.isYourGuess = true;
+        } else if (card.challengerCard && p.id === playerId) {
+          cardCopy.isYourGuess = true;
+        }
+        
+        return cardCopy;
+      });
+      
       io.to(p.id).emit('game_update', {
-        timeline: displayTimeline, // Show both cards for resolution
+        timeline: playerSpecificTimeline, // Show both cards with ownership markers
         deck: [currentCard],
         players: game.players,
         phase: "challenge-resolved",
@@ -4011,6 +4043,42 @@ app.get('/api/debug/spotify-token-test', async (req, res) => {
       ],
       timestamp: new Date().toISOString()
     });
+  }
+});
+
+// Admin endpoint to clear all lobbies and games (for testing)
+app.post('/api/admin/clear-all', requireAdmin, (req, res) => {
+  try {
+    const lobbyCount = Object.keys(lobbies).length;
+    const gameCount = Object.keys(games).length;
+    const sessionCount = Object.keys(playerSessions).length;
+    
+    // Clear all lobbies
+    Object.keys(lobbies).forEach(code => delete lobbies[code]);
+    
+    // Clear all games
+    Object.keys(games).forEach(code => delete games[code]);
+    
+    // Clear all player sessions
+    Object.keys(playerSessions).forEach(sessionId => delete playerSessions[sessionId]);
+    
+    // Persist the cleared state
+    schedulePersist();
+    
+    console.log('[Admin] Cleared all lobbies, games, and sessions');
+    
+    res.json({
+      ok: true,
+      cleared: {
+        lobbies: lobbyCount,
+        games: gameCount,
+        sessions: sessionCount
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error('[Admin] Clear all failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Clear failed' });
   }
 });
 
