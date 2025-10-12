@@ -825,153 +825,10 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   socketRef.current.on("new_song_loaded", (data) => {
     console.log("[App] New song loaded:", data);
 
-    // Reset progress UI state for all players
+    // Reset progress UI state for all players - no auto-play
     setIsPlayingMusic(false);
-
-    // Treat presence of a Spotify token as creator indicator
-    const hasSpotifyToken = !!localStorage.getItem('access_token');
-
-    // Extract URI from payload if available; otherwise we will wait for currentCard update
-    const payloadUri =
-      data?.uri ||
-      data?.trackUri ||
-      data?.card?.uri ||
-      (Array.isArray(data?.uris) ? data.uris[0] : null) ||
-      null;
-
-    // Validate URI format
-    const isValidUri = payloadUri && payloadUri.startsWith('spotify:track:');
-    if (payloadUri && !isValidUri) {
-      console.warn("[App] Invalid Spotify URI format:", payloadUri);
-      return;
-    }
-
-    // Resolve the locked device (explicit user selection), if any
-    const lockedDevice = localStorage.getItem('spotify_device_id');
-
-    console.log("[App] New song autoplay check:", {
-      hasSpotifyToken,
-      haveDevice: !!spotifyDeviceId,
-      payloadUri,
-      isValidUri,
-      lockedDevice,
-      deviceIdType: typeof spotifyDeviceId,
-      actualDeviceId: spotifyDeviceId,
-    });
-
-    // Creator autoplay path with strict gating: never resume without a concrete new URI
-    if (hasSpotifyToken) {
-      // iOS Safari gating
-      if (window.beatablyPlayback && !window.beatablyPlayback.isUnlocked()) {
-        console.log("[App] Autoplay blocked (needs gesture). Will require user tap to play.");
-        return;
-      }
-
-      // If no valid URI in payload, do NOT attempt playback here. The URI-change effect will handle autoplay once currentCard updates.
-      if (!isValidUri) {
-        console.log("[App] No valid URI in payload; deferring autoplay until currentCard.uri updates.");
-        return;
-      }
-
-      // Enhanced device-aware autoplay with initialization check
-      (async () => {
-        try {
-          // Wait for deviceAwarePlayback initialization with fallback
-          const isInitialized = await deviceAwarePlayback.waitForInitialization(2000);
-          
-          // First, check what device is currently active
-          const devices = await spotifyAuth.getDevices();
-          const activeDevice = devices.find(d => d.is_active);
-          
-          console.log("[App] Device check for autoplay:", {
-            activeDevice: activeDevice ? { id: activeDevice.id, name: activeDevice.name } : null,
-            lockedDevice,
-            currentSpotifyDeviceId: spotifyDeviceId,
-            deviceAwareInitialized: isInitialized
-          });
-
-          let targetDevice = null;
-
-          // If there's an active device that's NOT the web player, use it (respect user's device switch)
-          if (activeDevice && !activeDevice.name?.toLowerCase().includes('beatably') && !activeDevice.name?.toLowerCase().includes('web player')) {
-            console.log("[App] Using currently active external device:", activeDevice.name);
-            targetDevice = activeDevice.id;
-            // Update our state to reflect the active device
-            setSpotifyDeviceId(activeDevice.id);
-            spotifyAuth.storeDeviceId(activeDevice.id);
-          }
-          // If no external device is active, fall back to locked device
-          else if (lockedDevice) {
-            console.log("[App] No external device active, using locked device:", lockedDevice);
-            targetDevice = lockedDevice;
-            // Wake the locked device if needed
-            await spotifyAuth.transferPlayback(lockedDevice, false);
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-          // If no locked device either, discover a suitable device
-          else {
-            console.log("[App] No locked device, discovering suitable device");
-            const webDevice = devices.find(d => d.name?.toLowerCase().includes('beatably') || d.name?.toLowerCase().includes('web player'));
-            if (webDevice) {
-              targetDevice = webDevice.id;
-              setSpotifyDeviceId(webDevice.id);
-              spotifyAuth.storeDeviceId(webDevice.id);
-            }
-          }
-
-          if (targetDevice) {
-            console.log("[App] Starting playback on target device:", targetDevice, "initialized:", isInitialized);
-            await pauseSpotifyPlayback().catch(() => {});
-            
-            // Use deviceAwarePlayback if initialized, otherwise fall back to spotifyAuth
-            if (isInitialized) {
-              try {
-                await deviceAwarePlayback.startPlayback(targetDevice, [payloadUri], 0);
-                setIsPlayingMusic(true);
-                console.log("[App] Successfully started playback via deviceAwarePlayback");
-              } catch (error) {
-                console.warn("[App] deviceAwarePlayback failed, falling back to spotifyAuth:", error);
-                // Fallback to original method
-                const ok = await spotifyAuth.verifiedStartPlayback(
-                  targetDevice,
-                  payloadUri,
-                  0,
-                  { 
-                    pauseFirst: true, 
-                    transferFirst: false, 
-                    maxVerifyAttempts: 4, 
-                    verifyDelayMs: 250,
-                    forcePositionReset: true
-                  }
-                );
-                if (ok) setIsPlayingMusic(true);
-              }
-            } else {
-              console.log("[App] Using spotifyAuth fallback (deviceAware not initialized)");
-              const ok = await spotifyAuth.verifiedStartPlayback(
-                targetDevice,
-                payloadUri,
-                0,
-                { 
-                  pauseFirst: true, 
-                  transferFirst: true, // PRODUCTION: Enable device transfer
-                  maxVerifyAttempts: 5, // PRODUCTION: More attempts
-                  verifyDelayMs: 500, // PRODUCTION: Longer delays
-                  forcePositionReset: true
-                }
-              );
-              if (ok) setIsPlayingMusic(true);
-            }
-          } else {
-            console.warn("[App] No suitable device found for autoplay");
-          }
-        } catch (e) {
-          console.warn("[App] Device-aware autoplay flow failed:", e?.message || e);
-        }
-      })();
-    } else {
-      console.log("[App] Not creator, waiting for progress sync from creator");
-    }
+    
+    console.log("[App] New song loaded - auto-play disabled. User must press play manually.");
   });
 
       // Listen for progress synchronization from creator
@@ -2057,139 +1914,19 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Track the last URI we successfully started to avoid duplicate starts
   const lastPlayedUriRef = useRef(null);
 
-  // Autoplay when currentCard URI changes to a new song (after first round initial load)
+  // Track current card for device switching - no auto-play
   useEffect(() => {
     // Expose current card globally for device switching
     if (currentCard) {
       window.currentGameCard = currentCard;
     }
-
-    // Preconditions common to both immediate and deferred start
-    if (!isCreator) return;
-    if (!currentCard?.uri) return;
-
-    // Suppress autoplay for very first round initial song
-    if (phase === 'player-turn' && gameRound === 1 && !lastPlayedUriRef.current) {
-      console.log("[Spotify] First round initial song - autoplay suppressed.");
-      return;
+    
+    // Update last played URI ref when card changes to track state
+    if (currentCard?.uri && currentCard.uri !== lastPlayedUriRef.current) {
+      console.log("[Spotify] New song URI detected (no auto-play):", currentCard.uri);
+      // Don't set lastPlayedUriRef here - let manual play button set it
     }
-
-    // iOS Safari gating
-    if (window.beatablyPlayback && !window.beatablyPlayback.isUnlocked()) {
-      console.log("[Spotify] Autoplay blocked (needs gesture). Waiting for user tap.");
-      return;
-    }
-
-    // Only proceed if this is a new URI different from what we last started
-    if (lastPlayedUriRef.current === currentCard.uri) return;
-
-    const startWithDevice = async (deviceId) => {
-      try {
-        console.log("[Spotify] Detected new song URI, attempting verified start:", currentCard.uri);
-        // Cut any current audio and start the exact new track
-        await pauseSpotifyPlayback().catch(() => {});
-        const ok = await spotifyAuth.verifiedStartPlayback(
-          deviceId,
-          currentCard.uri,
-          0,
-          { 
-            pauseFirst: true, 
-            transferFirst: false, 
-            maxVerifyAttempts: 4, 
-            verifyDelayMs: 250
-          }
-        );
-        if (ok) {
-          lastPlayedUriRef.current = currentCard.uri;
-          setIsPlayingMusic(true);
-          // Clear pending intent if any
-          window.__beatablyPendingAutoplay = false;
-        } else {
-          console.warn("[Spotify] verifiedStartPlayback returned false for:", currentCard.uri);
-        }
-      } catch (e) {
-        console.warn("[Spotify] Autoplay failed for new uri:", currentCard.uri, e);
-      }
-    };
-
-    // If device is ready, start immediately using the currently selected device (preserve user choice)
-    if (spotifyDeviceId) {
-      startWithDevice(spotifyDeviceId);
-      return;
-    }
-
-    // If device not yet ready, aggressively discover and activate a device if we intend to autoplay
-    if (window.__beatablyPendingAutoplay) {
-      console.log("[Spotify] Device not ready; attempting active device discovery for autoplay...");
-      let attempts = 0;
-      const maxAttempts = 10; // up to ~3s
-      const tryDiscover = async () => {
-        attempts += 1;
-        try {
-          // 1) Try stored device first
-          const stored = spotifyAuth.getStoredDeviceId();
-
-          // 2) Query available devices
-          const devices = await spotifyAuth.getDevices();
-          let candidate = null;
-
-          // Prefer Beatably SDK player if present
-          candidate = devices.find(d => d.name?.toLowerCase().includes('beatably') || d.name?.toLowerCase().includes('web player'));
-
-          // Else prefer active device
-          if (!candidate) candidate = devices.find(d => d.is_active);
-
-          // Else fall back to stored device
-          if (!candidate && stored) candidate = devices.find(d => d.id === stored);
-
-          // 3) If we found a candidate, use it but DO NOT overwrite current selection if one exists
-          if (candidate?.id) {
-            console.log("[Spotify] Discovered candidate device:", {
-              id: candidate.id,
-              name: candidate.name,
-              is_active: candidate.is_active
-            });
-
-            // If user has already selected a device, honor it over discovered one
-            const deviceToUse = spotifyDeviceId || candidate.id;
-
-            if (!spotifyDeviceId) {
-              // Store only the chosen device (candidate) when we had none
-              spotifyAuth.storeDeviceId(deviceToUse);
-              setSpotifyDeviceId(deviceToUse);
-            }
-
-            // Only transfer when the deviceToUse is NOT active; otherwise start directly.
-            if (!candidate.is_active && deviceToUse === candidate.id) {
-              await spotifyAuth.transferPlayback(candidate.id, false);
-              setTimeout(() => startWithDevice(candidate.id), 200);
-            } else {
-              startWithDevice(deviceToUse);
-            }
-            return;
-          }
-
-          // 4) If no candidate and we have stored device, only consider it when no user-selected device exists
-          if (!spotifyDeviceId && stored) {
-            console.log("[Spotify] No candidate found; attempting transfer to stored device to activate it:", stored);
-            await spotifyAuth.transferPlayback(stored, false);
-          }
-        } catch (e) {
-          console.warn("[Spotify] Active device discovery error:", e?.message || e);
-        }
-
-        if (attempts < maxAttempts) {
-          setTimeout(tryDiscover, 300);
-        } else {
-          console.log("[Spotify] Device discovery exhausted; will defer autoplay until manual play.");
-        }
-      };
-      tryDiscover();
-      return;
-    }
-
-    // If no explicit intent flag, do nothing until deviceId appears and/or next state change occurs.
-  }, [currentCard?.uri, spotifyDeviceId, isCreator, phase, gameRound]);
+  }, [currentCard?.uri]);
 
   // Additional effect to trigger playback when device becomes ready
   useEffect(() => {

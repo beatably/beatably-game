@@ -38,11 +38,49 @@ function GameFooter({
   const [progress, setProgress] = React.useState(0);
   const [duration, setDuration] = React.useState(30); // Default 30 seconds
   const [spotifyPosition, setSpotifyPosition] = React.useState(0);
+  
+  // Track when a new song has been loaded but not yet played
+  const [showNewSongMessage, setShowNewSongMessage] = React.useState(false);
+  const lastCardIdRef = React.useRef(null);
+  
+  // Track if play has been pressed at least once for current song
+  const [hasPlayedOnce, setHasPlayedOnce] = React.useState(false);
 
   // Use real Spotify playing state if available, otherwise use local state
   const [isSpotifyPlaying, setIsSpotifyPlaying] = React.useState(false);
   const [currentSpotifyUri, setCurrentSpotifyUri] = React.useState(null);
-  const actualIsPlaying = isCreator && spotifyDeviceId ? isSpotifyPlaying : localIsPlaying;
+  
+  // Add optimistic UI state for instant visual feedback
+  const [optimisticIsPlaying, setOptimisticIsPlaying] = React.useState(null);
+  
+  // Pulsating glow effect for paused state
+  const [glowIntensity, setGlowIntensity] = React.useState(0.3);
+  
+  // Use optimistic state if available, otherwise fall back to actual state
+  const actualIsPlaying = optimisticIsPlaying !== null 
+    ? optimisticIsPlaying 
+    : (isCreator && spotifyDeviceId ? isSpotifyPlaying : localIsPlaying);
+  
+  // Pulsating animation for paused button
+  React.useEffect(() => {
+    if (!actualIsPlaying && isCreator) {
+      let intensity = 0.3;
+      let increasing = true;
+      
+      const pulseInterval = setInterval(() => {
+        if (increasing) {
+          intensity += 0.01;
+          if (intensity >= 0.5) increasing = false;
+        } else {
+          intensity -= 0.01;
+          if (intensity <= 0.3) increasing = true;
+        }
+        setGlowIntensity(intensity);
+      }, 50); // Update every 50ms for smooth animation
+      
+      return () => clearInterval(pulseInterval);
+    }
+  }, [actualIsPlaying, isCreator]);
 
   // Get real Spotify playback position with enhanced error handling
   React.useEffect(() => {
@@ -107,6 +145,22 @@ function GameFooter({
     }
   }, [isPlayingMusic, localIsPlaying, isCreator, spotifyDeviceId]);
 
+  // Detect when a new song is loaded and show message
+  React.useEffect(() => {
+    if (currentCard?.id && currentCard.id !== lastCardIdRef.current) {
+      console.log('[GameFooter] New song detected:', currentCard.title);
+      lastCardIdRef.current = currentCard.id;
+      
+      // Reset hasPlayedOnce for new song
+      setHasPlayedOnce(false);
+      
+      // Show "new song loaded" message for creator only
+      if (isCreator) {
+        setShowNewSongMessage(true);
+      }
+    }
+  }, [currentCard?.id, isCreator]);
+  
   // Reset progress when new song starts (when currentCard changes)
   React.useEffect(() => {
     console.log('[GameFooter] Current card changed, resetting progress:', currentCard?.title);
@@ -345,6 +399,12 @@ function GameFooter({
       currentCardTitle: currentCard?.title
     });
 
+    // Hide "new song loaded" message when play is pressed and mark that play has been pressed
+    if (showNewSongMessage) {
+      setShowNewSongMessage(false);
+      setHasPlayedOnce(true);
+    }
+
     // CRITICAL FIX: Reset progress when user manually presses play (fallback for failed auto-play)
     if (!actualIsPlaying && phase === 'player-turn') {
       console.log('[GameFooter] Manual play detected, resetting progress as fallback');
@@ -401,6 +461,10 @@ function GameFooter({
 
         // If currently playing the same track -> pause
         if (statePlaying && sameTrack) {
+          // Set optimistic state for instant feedback
+          setOptimisticIsPlaying(false);
+          setTimeout(() => setOptimisticIsPlaying(null), 2000);
+          
           await pauseSpotifyPlayback();
           // update UI immediately; poller will refresh soon
           setIsSpotifyPlaying(false);
@@ -409,6 +473,10 @@ function GameFooter({
 
         // If same track but paused -> resume
         if (!statePlaying && sameTrack) {
+          // Set optimistic state for instant feedback
+          setOptimisticIsPlaying(true);
+          setTimeout(() => setOptimisticIsPlaying(null), 2000);
+          
           const ok = await resumeSpotifyPlayback();
           if (ok) setIsSpotifyPlaying(true);
           return;
@@ -726,8 +794,8 @@ function GameFooter({
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0px)" }}
     >
       {/* Spotify-style player */}
-      <div className="w-full max-w-md flex flex-col items-center">
-        <div className="w-full bg-none rounded-2xl shadow-2xl shadow-background p-3 md:p-2 flex flex-col items-center mb-3">
+      <div className="w-full max-w-md flex flex-col items-center" style={{ overflow: 'visible' }}>
+        <div className="w-full bg-none rounded-2xl shadow-2xl shadow-background p-3 md:p-2 flex flex-col items-center mb-3" style={{ overflow: 'visible' }}>
           {/* Artist, title, year with album art - show during reveal phase or challenge-resolved */}
           {currentCard && ((showFeedback && feedback) || (phase === 'challenge-resolved' && feedback)) && (
             <div className="mb-2 flex items-center gap-4 justify-center w-full">
@@ -808,41 +876,52 @@ function GameFooter({
                   </div>
                 </button>
                 
-                <button
-                  ref={mainPlayButtonRef}
-                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-primary hover:bg-primary/90 active:bg-primary/90 shadow-[0_10px_15px_-3px_theme(colors.primary.300)/50] border-4 border-primary/20 flex-shrink-0 no-focus-outline force-no-outline"
-                  onClick={() => {
-                    handlePlayPauseClick();
-                    // Immediately blur after click to prevent focus ring
-                    if (mainPlayButtonRef.current) {
-                      setTimeout(() => {
-                        mainPlayButtonRef.current.blur();
-                      }, 0);
-                    }
-                  }}
-                  onTouchStart={() => {
-                    // Prevent focus on touch start
-                    if (mainPlayButtonRef.current) {
-                      mainPlayButtonRef.current.blur();
-                    }
-                  }}
-                  onTouchEnd={() => {
-                    // Blur the button after touch to remove persistent focus highlight
-                    if (mainPlayButtonRef.current) {
-                      mainPlayButtonRef.current.blur();
-                    }
-                  }}
-                  aria-label={actualIsPlaying ? "Pause" : "Play"}
-                  style={{ 
-                    WebkitTapHighlightColor: 'transparent',
-                    outline: 'none !important',
-                    border: 'none !important',
-                    boxShadow: 'none !important',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
-                    appearance: 'none'
+                <div
+                  style={{
+                    filter: actualIsPlaying
+                      ? 'drop-shadow(0 0 20px rgba(34, 197, 94, 1)) drop-shadow(0 5px 12px rgba(34, 197, 94, 0.6))'
+                      : `drop-shadow(0 0 ${17.5 + (glowIntensity - 0.3) * 18.75}px rgba(34, 197, 94, ${glowIntensity})) drop-shadow(0 ${glowIntensity * 5}px ${10 + (glowIntensity - 0.3) * 12.5}px rgba(34, 197, 94, ${0.4 + (glowIntensity - 0.3) * 0.75}))`,
+                    transition: 'none'
                   }}
                 >
+                  <button
+                    ref={mainPlayButtonRef}
+                    className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full border-4 border-primary/20 flex-shrink-0 no-focus-outline force-no-outline"
+                    onClick={() => {
+                      handlePlayPauseClick();
+                      // Immediately blur after click to prevent focus ring
+                      if (mainPlayButtonRef.current) {
+                        setTimeout(() => {
+                          mainPlayButtonRef.current.blur();
+                        }, 0);
+                      }
+                    }}
+                    onTouchStart={() => {
+                      // Prevent focus on touch start
+                      if (mainPlayButtonRef.current) {
+                        mainPlayButtonRef.current.blur();
+                      }
+                    }}
+                    onTouchEnd={() => {
+                      // Blur the button after touch to remove persistent focus highlight
+                      if (mainPlayButtonRef.current) {
+                        mainPlayButtonRef.current.blur();
+                      }
+                    }}
+                    aria-label={actualIsPlaying ? "Pause" : "Play"}
+                    style={{ 
+                      WebkitTapHighlightColor: 'transparent',
+                      outline: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none',
+                      appearance: 'none',
+                      boxShadow: 'none',
+                      backgroundColor: actualIsPlaying
+                        ? 'hsl(142, 76%, 36%)'
+                        : `hsl(142, 76%, ${36 + (glowIntensity - 0.3) * 15}%)`,
+                      transition: 'none'
+                    }}
+                  >
                   {actualIsPlaying ? (
                     <div className="text-white text-2xl md:text-4xl font-bold">
                       <svg className="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24">
@@ -856,7 +935,8 @@ function GameFooter({
                      </svg>
                     </div>
                   )}
-                </button>
+                  </button>
+                </div>
               </>
             ) : (
               /* Spacer for non-creators to maintain layout */
@@ -1444,12 +1524,23 @@ function GameFooter({
           </div>
         ) : currentCard && phase === 'player-turn' && pendingDropIndex === null ? (
           <div className="w-full p-2 md:p-4 rounded text-center bg-none mb-1">
-            <div className="text-foreground text-md md:text-2xl font-bold mb-1">
-              {isMyTurn ? "Select a place in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}
-            </div>
+            {showNewSongMessage && isCreator ? (
+              <>
+                <div className="text-foreground text-md md:text-2xl font-bold mb-1">
+                  New song loaded
+                </div>
+                <div className="text-foreground text-sm md:text-base mb-2">
+                  Press play when you are ready
+                </div>
+              </>
+            ) : (
+              <div className="text-foreground text-md md:text-2xl font-bold mb-1">
+                {isMyTurn ? "Select a place in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}
+              </div>
+            )}
             
-            {/* New Song button - only for current player with tokens */}
-            {isMyTurn && myPlayer && myPlayer.tokens > 0 && (
+            {/* New Song button - only for current player with tokens, shown after first play */}
+            {isMyTurn && myPlayer && myPlayer.tokens > 0 && hasPlayedOnce && (
               <div className="flex flex-col items-center">
                 <div className="text-gray-300 text-sm mb-8">You can pay 1 token to get another song</div>
                 <button 
