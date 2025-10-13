@@ -142,8 +142,9 @@ button:hover {
 html, body, #root {
   background: hsl(var(--background));
   background-color: hsl(var(--background));
-  /* Hard fallback to ensure webview/backdrop uses the dark surface */
-  background-color: #121212 !important;
+  /* Vibrant cosmic background with gradient */
+  background: radial-gradient(ellipse at center, hsl(245 60% 12%) 0%, hsl(245 60% 8%) 100%);
+  background-color: hsl(245 60% 8%) !important;
   
   /* Dynamic viewport height for mobile Safari toolbar handling */
   height: 100%;
@@ -428,6 +429,38 @@ audio {
     background: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(262 83% 65%) 100%);
   }
   
+  /* Primary CTA gradient - Horizontal gradient from teal to purple */
+  .primary-gradient {
+    position: relative;
+    background: transparent;
+    overflow: hidden;
+  }
+  
+  .primary-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #08AF9A 0%, #7D3BED 100%);
+    border-radius: inherit;
+    z-index: -1;
+  }
+  
+  .primary-gradient:hover::before {
+    background: linear-gradient(90deg, #07a08e 0%, #6d32d4 100%);
+  }
+  
+  /* Override for bg-primary to use gradient */
+  .bg-primary {
+    position: relative !important;
+    background: linear-gradient(90deg, #08AF9A 0%, #7D3BED 100%) !important;
+    overflow: hidden !important;
+    color: white !important;
+  }
+  
+  .bg-primary:hover {
+    background: linear-gradient(90deg, #07a08e 0%, #6d32d4 100%) !important;
+  }
+  
   .mobile-shadow {
     box-shadow: 
       0 4px 6px -1px rgba(0, 0, 0, 0.1),
@@ -441,6 +474,98 @@ audio {
   
   .glow-purple {
     box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+  }
+  
+  /* Vibrant neon glow effects */
+  .neon-glow-cyan {
+    box-shadow: 0 0 20px rgba(0, 206, 209, 0.5), 0 0 40px rgba(0, 206, 209, 0.3);
+  }
+  
+  .neon-glow-magenta {
+    box-shadow: 0 0 20px rgba(255, 20, 147, 0.5), 0 0 40px rgba(255, 20, 147, 0.3);
+  }
+  
+  .neon-glow-purple {
+    box-shadow: 0 0 20px rgba(153, 69, 255, 0.5), 0 0 40px rgba(153, 69, 255, 0.3);
+  }
+  
+  .neon-glow-blue {
+    box-shadow: 0 0 20px rgba(65, 105, 225, 0.5), 0 0 40px rgba(65, 105, 225, 0.3);
+  }
+  
+  /* Gradient borders for cards */
+  .gradient-border-magenta {
+    position: relative;
+    background: linear-gradient(135deg, rgba(255, 20, 147, 0.3), rgba(153, 69, 255, 0.3));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  
+  .gradient-border-magenta::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(135deg, #FF1493, #9945FF);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  
+  .gradient-border-cyan {
+    position: relative;
+    background: linear-gradient(135deg, rgba(0, 206, 209, 0.3), rgba(32, 178, 170, 0.3));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  
+  .gradient-border-cyan::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(135deg, #00CED1, #20B2AA);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  
+  /* Animated floating dots background */
+  .cosmic-dots {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  .cosmic-dot {
+    position: absolute;
+    border-radius: 50%;
+    animation: float 20s infinite ease-in-out;
+  }
+  
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+      opacity: 0.3;
+    }
+    25% {
+      transform: translateY(-20px) translateX(10px);
+      opacity: 0.6;
+    }
+    50% {
+      transform: translateY(-40px) translateX(-10px);
+      opacity: 0.3;
+    }
+    75% {
+      transform: translateY(-20px) translateX(10px);
+      opacity: 0.6;
+    }
   }
   
   /* Visual hierarchy improvements */
@@ -538,26 +663,40 @@ audio {
 
 @layer base {
   :root {
-    /* Dark theme as default for mobile-first design */
-    --background: 0 0% 7%;
+    /* Vibrant cosmic theme inspired by design mockup */
+    --background: 245 60% 8%; /* Deep navy/purple background */
     --foreground: 0 0% 98%;
-    --card: 0 0% 12%;
+    --card: 245 45% 12%; /* Slightly lighter purple for cards */
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 12%;
+    --popover: 245 45% 12%;
     --popover-foreground: 0 0% 98%;
     --primary: 142 76% 36%; /* Spotify Green */
     --primary-foreground: 0 0% 98%;
     --secondary: 262 83% 58%; /* Purple accent */
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 20%;
+    --muted: 245 30% 20%;
     --muted-foreground: 0 0% 63.9%;
     --accent: 262 83% 58%; /* Purple accent */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 15%;
-    --ring: 142 76% 36%; /* Spotify Green for focus rings */
+    --border: 245 30% 25%;
+    --input: 245 35% 18%;
+    --ring: 174 92% 48%; /* Teal #08AF9A for focus rings */
+    
+    /* Vibrant color palette for timeline and UI elements */
+    --neon-blue: 217 91% 60%; /* #4169E1 */
+    --neon-cyan: 180 100% 50%; /* #00CED1 */
+    --neon-teal: 174 72% 56%; /* #20B2AA */
+    --neon-purple: 262 83% 58%; /* #9945FF */
+    --neon-magenta: 328 100% 54%; /* #FF1493 */
+    --neon-pink: 330 100% 71%; /* #FF69B4 */
+    --neon-green: 142 76% 36%; /* Spotify Green */
+    --neon-lime: 123 100% 62%; /* #32CD32 */
+    --neon-red: 4 90% 58%; /* #FF4757 */
+    --neon-orange: 14 100% 61%; /* #FF6348 */
+    --neon-yellow: 48 100% 67%; /* #FFD700 */
+    
     --chart-1: 142 76% 36%;
     --chart-2: 262 83% 58%;
     --chart-3: 197 37% 24%;

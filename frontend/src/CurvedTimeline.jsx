@@ -375,6 +375,13 @@ const CurvedTimeline = ({
     const years = timelineLayout.filter(item => item.type === 'year');
     const nodes = timelineLayout.filter(item => item.type === 'node');
     
+    console.log('[CurvedTimeline] Generating path:', { 
+      yearCount: years.length, 
+      nodeCount: nodes.length,
+      years: years.map(y => ({ x: y.x, y: y.y })),
+      nodes: nodes.map(n => ({ x: n.x, y: n.y }))
+    });
+    
     // Calculate the same scale factor used in timeline layout for consistent scaling
     const items = [...timeline];
     const confirmedItems = items.filter(item => 
@@ -433,6 +440,7 @@ const CurvedTimeline = ({
       for (let i = 1; i < nodes.length; i++) {
         mainPath += ` L ${nodes[i].x} ${nodes[i].y}`;
       }
+      console.log('[CurvedTimeline] No years path:', mainPath);
       return { mainPath, continuationPaths: [] };
     }
     
@@ -481,9 +489,11 @@ const CurvedTimeline = ({
       mainPath += ` L ${lastNode.x} ${lastNode.y}`;
     }
     
+    console.log('[CurvedTimeline] Final path:', mainPath);
+    
     // Removed all continuation lines from nodes
     
-    return { mainPath, continuationPaths };
+    return { mainPath, continuationPaths: [] };
   }, [timelineLayout]);
 
   // Handle node click
@@ -538,8 +548,21 @@ const CurvedTimeline = ({
     return false;
   };
 
+  // Helper to get vibrant color for year nodes (cycle through neon colors)
+  const getYearColor = (index) => {
+    const colors = [
+      { bg: 'hsl(217 91% 60%)', border: 'hsl(217 91% 70%)', glow: 'rgba(65, 105, 225, 0.6)' }, // Neon Blue
+      { bg: 'hsl(262 83% 58%)', border: 'hsl(262 83% 68%)', glow: 'rgba(153, 69, 255, 0.6)' }, // Neon Purple
+      { bg: 'hsl(180 100% 50%)', border: 'hsl(180 100% 60%)', glow: 'rgba(0, 206, 209, 0.6)' }, // Neon Cyan
+      { bg: 'hsl(328 100% 54%)', border: 'hsl(328 100% 64%)', glow: 'rgba(255, 20, 147, 0.6)' }, // Neon Magenta
+      { bg: 'hsl(174 72% 56%)', border: 'hsl(174 72% 66%)', glow: 'rgba(32, 178, 170, 0.6)' }, // Neon Teal
+      { bg: 'hsl(330 100% 71%)', border: 'hsl(330 100% 81%)', glow: 'rgba(255, 105, 180, 0.6)' }, // Neon Pink
+    ];
+    return colors[index % colors.length];
+  };
+
   // Determine year visual state
-  const getYearState = (card) => {
+  const getYearState = (card, index) => {
     // Handle challenge-resolved phase with special logic for challenger and original cards
     if (phase === 'challenge-resolved' && challenge && challenge.phase === 'resolved') {
       // Check if this is a challenger card
@@ -550,11 +573,13 @@ const CurvedTimeline = ({
       if (card.originalCard) {
         return challenge.result?.originalCorrect ? 'green' : 'red';
       }
-      // For all other cards during challenge resolution, return normal (no special coloring)
-      return 'normal';
+      // For all other cards during challenge resolution, use vibrant colors
+      return { type: 'vibrant', color: getYearColor(index) };
     }
     
-    if (!lastPlaced || card.id !== lastPlaced.id) return 'normal';
+    if (!lastPlaced || card.id !== lastPlaced.id) {
+      return { type: 'vibrant', color: getYearColor(index) };
+    }
     
     if (phase === 'song-guess') return 'grey';
     if (phase === 'challenge-window' || (phase === 'challenge' && lastPlaced.phase === 'challenged')) {
@@ -595,7 +620,90 @@ const CurvedTimeline = ({
   };
 
   return (
-    <div ref={containerRef} className="curved-timeline-container w-full h-full relative bg-background">
+    <div ref={containerRef} className="curved-timeline-container w-full h-full relative overflow-hidden">
+      {/* Vibrant gradient background with stars */}
+      <div className="absolute inset-0 z-0">
+        {/* Multi-layer gradient background */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(ellipse at 20% 30%, rgba(153, 69, 255, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 70%, rgba(0, 206, 209, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at 50% 50%, rgba(255, 20, 147, 0.1) 0%, transparent 60%),
+              hsl(245 60% 8%)
+            `
+          }}
+        />
+        
+        {/* Animated floating stars/dots */}
+        {[...Array(30)].map((_, i) => {
+          const colors = [
+            'rgba(0, 206, 209, 0.8)',    // Cyan
+            'rgba(153, 69, 255, 0.8)',   // Purple
+            'rgba(255, 20, 147, 0.8)',   // Magenta
+            'rgba(255, 105, 180, 0.8)',  // Pink
+            'rgba(32, 178, 170, 0.8)',   // Teal
+            'rgba(65, 105, 225, 0.8)',   // Blue
+          ];
+          const size = Math.random() * 3 + 1;
+          const left = Math.random() * 100;
+          const top = Math.random() * 100;
+          const delay = Math.random() * 20;
+          const duration = Math.random() * 10 + 15;
+          const color = colors[i % colors.length];
+          
+          return (
+            <div
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                width: `${size}px`,
+                height: `${size}px`,
+                left: `${left}%`,
+                top: `${top}%`,
+                backgroundColor: color,
+                boxShadow: `0 0 ${size * 3}px ${color}`,
+                animation: `float ${duration}s infinite ease-in-out`,
+                animationDelay: `${delay}s`,
+                opacity: 0.6,
+              }}
+            />
+          );
+        })}
+        
+        {/* Larger glowing orbs */}
+        {[...Array(5)].map((_, i) => {
+          const colors = [
+            'rgba(153, 69, 255, 0.3)',   // Purple
+            'rgba(0, 206, 209, 0.3)',    // Cyan
+            'rgba(255, 20, 147, 0.3)',   // Magenta
+          ];
+          const size = Math.random() * 100 + 80;
+          const left = Math.random() * 100;
+          const top = Math.random() * 100;
+          const delay = Math.random() * 10;
+          const duration = Math.random() * 15 + 20;
+          const color = colors[i % colors.length];
+          
+          return (
+            <div
+              key={`orb-${i}`}
+              className="absolute rounded-full blur-3xl"
+              style={{
+                width: `${size}px`,
+                height: `${size}px`,
+                left: `${left}%`,
+                top: `${top}%`,
+                backgroundColor: color,
+                animation: `float ${duration}s infinite ease-in-out`,
+                animationDelay: `${delay}s`,
+                opacity: 0.4,
+              }}
+            />
+          );
+        })}
+      </div>
       
       {/* Timeline Title */}
       {currentPlayerName && (
@@ -612,7 +720,7 @@ const CurvedTimeline = ({
       {/* SVG Container for the curved path */}
       <svg 
         className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 1 }}
+        style={{ zIndex: 2 }}
       >
         <defs>
           <filter id="glow">
@@ -622,18 +730,28 @@ const CurvedTimeline = ({
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
+          <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="hsl(262 83% 58%)" stopOpacity="1" />
+            <stop offset="50%" stopColor="hsl(328 100% 54%)" stopOpacity="1" />
+            <stop offset="100%" stopColor="hsl(180 100% 50%)" stopOpacity="1" />
+          </linearGradient>
         </defs>
         
-        {/* Main curved path line - enhanced styling */}
-        <path
-          d={generateCurvePath.mainPath}
-          stroke="#4a5568"
-          strokeWidth="16"
-          fill="none"
-          className="opacity-70"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        {/* Timeline path - only showing blur/shadow effect (no solid line) */}
+        {generateCurvePath.mainPath && generateCurvePath.mainPath.trim() !== '' && (
+          <path
+            d={generateCurvePath.mainPath}
+            stroke="rgba(153, 69, 255, 0.8)"
+            strokeWidth="20"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              filter: 'blur(8px)',
+              opacity: 0.6
+            }}
+          />
+        )}
         
         {/* Continuation lines from each node - enhanced */}
         {generateCurvePath.continuationPaths?.map((pathData, index) => {
@@ -659,7 +777,7 @@ const CurvedTimeline = ({
       </svg>
       
       {/* Timeline Items */}
-      <div className="relative w-full h-full" style={{ zIndex: 2 }}>
+      <div className="relative w-full h-full" style={{ zIndex: 3 }}>
         {timelineLayout.map((item, index) => {
           if (item.type === 'node') {
             // Hide all nodes during reveal and challenge-resolved phases
@@ -725,11 +843,42 @@ const CurvedTimeline = ({
           }
           
           if (item.type === 'year') {
-            const yearState = getYearState(item.card);
+            const yearState = getYearState(item.card, item.index);
             const showYear = shouldShowYear(item.card);
             
             // Only render year if it should be shown
             if (!showYear) return null;
+            
+            // Determine styling based on state
+            let bgStyle = {};
+            let className = 'w-full h-full rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-300 px-1';
+            
+            if (yearState === 'green') {
+              // Green outline style - keep vibrant background with 5px green outline (outside)
+              const yearColor = getYearColor(item.index);
+              className += ' text-white';
+              bgStyle.backgroundColor = yearColor.bg;
+              bgStyle.outline = '5px solid rgb(34, 197, 94)';
+              bgStyle.outlineOffset = '0px';
+              bgStyle.boxShadow = `0 0 15px ${yearColor.glow}, 0 0 30px ${yearColor.glow}`;
+            } else if (yearState === 'red') {
+              // Red outline style - keep vibrant background with 5px red outline (outside)
+              const yearColor = getYearColor(item.index);
+              className += ' text-white';
+              bgStyle.backgroundColor = yearColor.bg;
+              bgStyle.outline = '5px solid rgb(239, 68, 68)';
+              bgStyle.outlineOffset = '0px';
+              bgStyle.boxShadow = `0 0 15px ${yearColor.glow}, 0 0 30px ${yearColor.glow}`;
+            } else if (yearState === 'grey') {
+              className += ' bg-gray-600 text-white ring-1 ring-gray-400';
+            } else if (yearState.type === 'vibrant') {
+              className += ' text-white ring-2';
+              bgStyle.backgroundColor = yearState.color.bg;
+              bgStyle.borderColor = yearState.color.border;
+              bgStyle.boxShadow = `0 0 15px ${yearState.color.glow}, 0 0 30px ${yearState.color.glow}`;
+            } else {
+              className += ' bg-gray-700 text-white shadow-black/20';
+            }
             
             return (
               <div
@@ -752,15 +901,8 @@ const CurvedTimeline = ({
                 )}
                 
                 <div
-                  className={`w-full h-full rounded-lg shadow-md flex items-center justify-center text-xs font-bold transition-all duration-300 px-1 ${
-                    yearState === 'green'
-                      ? 'bg-green-600 text-white ring-1 ring-green-400'
-                      : yearState === 'red'
-                      ? 'bg-red-600 text-white ring-1 ring-red-400'
-                      : yearState === 'grey'
-                      ? 'bg-gray-600 text-white ring-1 ring-gray-400'
-                      : 'bg-gray-700 text-white shadow-black/20'
-                  }`}
+                  className={className}
+                  style={bgStyle}
                 >
                   {item.card.year}
                 </div>

@@ -97,11 +97,15 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
       )}
       
       <div className="flex flex-wrap gap-4 md:gap-6 text-[10px] md:text-xs">
-        {players.map((p) => (
+        {players.map((p, index) => (
           <div
             key={p.id}
-            className={`flex flex-col rounded-md items-center px-1.5 py-1 md:px-2 md:py-1 min-w-[70px] md:min-w-[80px] justify-center ${
-              p.id === currentPlayerId ? "bg-input ring-1 ring-primary" : "bg-transparent"
+            className={`flex flex-col rounded-xl items-center px-1.5 py-1 md:px-2 md:py-1 min-w-[70px] md:min-w-[80px] justify-center relative ${
+              p.id === currentPlayerId 
+                ? "gradient-border-magenta neon-glow-magenta" 
+                : index % 2 === 0 
+                  ? "gradient-border-cyan" 
+                  : "bg-card/50 border-2 border-border"
             }`}
           >
             <span className="font-bold text-foreground truncate max-w-[70px] md:max-w-[60px] mb-0.5 md:mb-1">{p.name}</span>

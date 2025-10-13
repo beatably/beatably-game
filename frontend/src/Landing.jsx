@@ -168,19 +168,96 @@ function Landing({ onCreate, onJoin }) {
         paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
       }}
     >
-      {/* Gradient overlay for better readability */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 100%)"
-        }}
-      />
+      {/* Vibrant gradient background with stars - same as CurvedTimeline */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {/* Multi-layer gradient background */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(ellipse at 20% 30%, rgba(153, 69, 255, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 70%, rgba(0, 206, 209, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at 50% 50%, rgba(255, 20, 147, 0.1) 0%, transparent 60%),
+              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 100%)
+            `
+          }}
+        />
+        
+        {/* Animated floating stars/dots - 2x size */}
+        {[...Array(100)].map((_, i) => {
+          const colors = [
+            'rgba(0, 206, 209, 1)',    // Cyan
+            'rgba(153, 69, 255, 1)',   // Purple
+            'rgba(255, 20, 147, 1)',   // Magenta
+            'rgba(255, 105, 180, 1)',  // Pink
+            'rgba(32, 178, 170, 1)',   // Teal
+            'rgba(65, 105, 225, 1)',   // Blue
+          ];
+          const size = Math.random() * 4 + 1; // 2x original size (was 1-4px, now 2-8px)
+          const left = Math.random() * 100;
+          const top = Math.random() * 100;
+          const delay = Math.random() * 20;
+          const duration = Math.random() * 10 + 15;
+          const color = colors[i % colors.length];
+          
+          return (
+            <div
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                width: `${size}px`,
+                height: `${size}px`,
+                left: `${left}%`,
+                top: `${top}%`,
+                backgroundColor: color,
+                boxShadow: `0 0 ${size * 5}px ${color}`,
+                animation: `float ${duration}s infinite ease-in-out`,
+                animationDelay: `${delay}s`,
+                opacity: 0.99,
+                filter: 'blur(1px)',
+              }}
+            />
+          );
+        })}
+        
+        {/* Larger glowing orbs - 2x size */}
+        {[...Array(5)].map((_, i) => {
+          const colors = [
+            'rgba(153, 69, 255, 0.1)',   // Purple
+            'rgba(0, 206, 209, 0.1)',    // Cyan
+            'rgba(255, 20, 147, 0.1)',   // Magenta
+          ];
+          const size = Math.random() * 200 + 160; // 2x original size (was 80-180px, now 160-360px)
+          const left = Math.random() * 100;
+          const top = Math.random() * 100;
+          const delay = Math.random() * 10;
+          const duration = Math.random() * 15 + 20;
+          const color = colors[i % colors.length];
+          
+          return (
+            <div
+              key={`orb-${i}`}
+              className="absolute rounded-full blur-3xl"
+              style={{
+                width: `${size}px`,
+                height: `${size}px`,
+                left: `${left}%`,
+                top: `${top}%`,
+                backgroundColor: color,
+                animation: `float ${duration}s infinite ease-in-out`,
+                animationDelay: `${delay}s`,
+                opacity: 0.4,
+              }}
+            />
+          );
+        })}
+      </div>
       {/* Minimal Header */}
       <div className="text-center mb-6 sm:mb-8 relative z-10">
         <img
           src={beatablyLogo}
           alt="Beatably Logo"
-          className="h-10 sm:h-12 w-auto mx-auto"
+          className="h-16 sm:h-20 w-auto mx-auto"
         />
       </div>
 

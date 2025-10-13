@@ -793,9 +793,9 @@ function GameFooter({
       className="w-full bg-card shadow flex flex-col items-center px-1 py-1 md:py-2 border-t border-border rounded-t-2xl"
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0px)" }}
     >
-      {/* Spotify-style player */}
+      {/* Spotify-style player with vibrant gradient border */}
       <div className="w-full max-w-md flex flex-col items-center" style={{ overflow: 'visible' }}>
-        <div className="w-full bg-none rounded-2xl shadow-2xl shadow-background p-3 md:p-2 flex flex-col items-center mb-3" style={{ overflow: 'visible' }}>
+        <div className="w-full rounded-2xl p-3 md:p-2 flex flex-col items-center mb-3" style={{ overflow: 'visible' }}>
           {/* Artist, title, year with album art - show during reveal phase or challenge-resolved */}
           {currentCard && ((showFeedback && feedback) || (phase === 'challenge-resolved' && feedback)) && (
             <div className="mb-2 flex items-center gap-4 justify-center w-full">
@@ -879,14 +879,14 @@ function GameFooter({
                 <div
                   style={{
                     filter: actualIsPlaying
-                      ? 'drop-shadow(0 0 20px rgba(34, 197, 94, 1)) drop-shadow(0 5px 12px rgba(34, 197, 94, 0.6))'
-                      : `drop-shadow(0 0 ${17.5 + (glowIntensity - 0.3) * 18.75}px rgba(34, 197, 94, ${glowIntensity})) drop-shadow(0 ${glowIntensity * 5}px ${10 + (glowIntensity - 0.3) * 12.5}px rgba(34, 197, 94, ${0.4 + (glowIntensity - 0.3) * 0.75}))`,
+                      ? 'drop-shadow(0 0 20px rgba(8, 175, 154, 1)) drop-shadow(0 5px 12px rgba(8, 175, 154, 0.6))'
+                      : `drop-shadow(0 0 ${17.5 + (glowIntensity - 0.3) * 18.75}px rgba(8, 175, 154, ${glowIntensity})) drop-shadow(0 ${glowIntensity * 5}px ${10 + (glowIntensity - 0.3) * 12.5}px rgba(8, 175, 154, ${0.4 + (glowIntensity - 0.3) * 0.75}))`,
                     transition: 'none'
                   }}
                 >
                   <button
                     ref={mainPlayButtonRef}
-                    className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full border-4 border-primary/20 flex-shrink-0 no-focus-outline force-no-outline"
+                    className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full border-4 flex-shrink-0 no-focus-outline force-no-outline"
                     onClick={() => {
                       handlePlayPauseClick();
                       // Immediately blur after click to prevent focus ring
@@ -917,8 +917,9 @@ function GameFooter({
                       appearance: 'none',
                       boxShadow: 'none',
                       backgroundColor: actualIsPlaying
-                        ? 'hsl(142, 76%, 36%)'
-                        : `hsl(142, 76%, ${36 + (glowIntensity - 0.3) * 15}%)`,
+                        ? '#08AF9A'
+                        : `rgba(8, 175, 154, ${0.85 + (glowIntensity - 0.3) * 0.5})`,
+                      borderColor: 'rgba(8, 175, 154, 0.3)',
                       transition: 'none'
                     }}
                   >
@@ -1025,7 +1026,7 @@ function GameFooter({
       </div>
       {/* Challenge section */}
       {challenge && challenge.targetId === myPlayerId && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+        <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
           <div className="text-white font-bold mb-2">
             {players?.find(p => p.id === challenge.challengerId)?.name} challenges your placement!
           </div>
@@ -1134,7 +1135,7 @@ function GameFooter({
 
       {/* Song guess section - only for current player */}
       {phase === 'song-guess' && isMyTurn && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+        <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
           <div className="text-white mb-8">
             Do you want to guess the song for bonus tokens?
           </div>
@@ -1201,7 +1202,7 @@ function GameFooter({
 
       {/* Song guess section - waiting for current player */}
       {phase === 'song-guess' && !isMyTurn && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+        <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
           <div className="text-white mb-4">
             {players?.find(p => p.id === currentPlayerId)?.name} is deciding whether to guess the song...
           </div>
@@ -1223,7 +1224,7 @@ function GameFooter({
           }
         }
         return (
-          <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+          <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
             <div className="text-white font-bold mb-8">
               Other players can now challenge.
             </div>
@@ -1331,7 +1332,7 @@ function GameFooter({
 
       {/* Challenge in progress section */}
       {phase === 'challenge' && challenge && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-8 text-center">
+        <div className="w-full max-w-md p-3 text-center mb-8" style={{ background: 'transparent' }}>
           <div className="text-white font-bold mb-2">
             {challenge.challengerId === myPlayerId ? 
               "You are challenging the placement!" : 
@@ -1351,7 +1352,7 @@ function GameFooter({
 
       {/* Challenge resolved section */}
       {phase === 'challenge-resolved' && challenge && feedback && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+        <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
           <div className="text-white font-bold">
             Challenge Complete!
           </div>
@@ -1404,7 +1405,7 @@ function GameFooter({
       
       {/* Pending drop confirmation section */}
       {pendingDropIndex !== null && isMyTurn && (
-        <div className="w-full max-w-md p-3 rounded bg-none mb-2 text-center">
+        <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
           <div className="text-white mb-8">
             You have now selected a place on the timeline.
           </div>
@@ -1472,7 +1473,7 @@ function GameFooter({
       {/* Feedback section */}
       <div className="w-full max-w-md flex flex-col items-center">
         {showFeedback && feedback ? (
-          <div className="w-full p-3 rounded text-center bg-none mb-2">
+          <div className="w-full p-3 text-center mb-2" style={{ background: 'transparent' }}>
             <div className="font-bold mb-4">
               {feedback.correct ? 
                 (myPlayerId === currentPlayerId ? 
@@ -1523,7 +1524,7 @@ function GameFooter({
             )}
           </div>
         ) : currentCard && phase === 'player-turn' && pendingDropIndex === null ? (
-          <div className="w-full p-2 md:p-4 rounded text-center bg-none mb-1">
+          <div className="w-full p-2 md:p-4 text-center mb-1" style={{ background: 'transparent' }}>
             {showNewSongMessage && isCreator ? (
               <>
                 <div className="text-foreground text-md md:text-2xl font-bold mb-1">
@@ -1542,7 +1543,7 @@ function GameFooter({
             {/* New Song button - only for current player with tokens, shown after first play */}
             {isMyTurn && myPlayer && myPlayer.tokens > 0 && hasPlayedOnce && (
               <div className="flex flex-col items-center">
-                <div className="text-gray-300 text-sm mb-8">You can pay 1 token to get another song</div>
+                <div className="text-muted-foreground text-sm mb-8">You can pay 1 token to get another song</div>
                 <button 
                   ref={newSongButtonRef}
                   onClick={() => {

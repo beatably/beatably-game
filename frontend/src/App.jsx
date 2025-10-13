@@ -2200,7 +2200,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         {showSpotifyAuthRenewal && (
           <SpotifyAuthRenewal
             isVisible={showSpotifyAuthRenewal}
-r            onRenew={handleSpotifyAuthRenewal}
+            onRenew={handleSpotifyAuthRenewal}
             onDismiss={handleSpotifyAuthRenewalDismiss}
             gameState={authRenewalGameState}
             autoRedirect={false}
