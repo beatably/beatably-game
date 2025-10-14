@@ -168,8 +168,8 @@ function Landing({ onCreate, onJoin }) {
         paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
       }}
     >
-      {/* Vibrant gradient background with stars - same as CurvedTimeline */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
+      {/* Optimized gradient background - performance-friendly for iOS Safari */}
+      <div className="absolute inset-0 z-0 overflow-hidden" style={{ contain: 'layout style paint' }}>
         {/* Multi-layer gradient background */}
         <div 
           className="absolute inset-0"
@@ -183,17 +183,17 @@ function Landing({ onCreate, onJoin }) {
           }}
         />
         
-        {/* Animated floating stars/dots - 2x size */}
-        {[...Array(100)].map((_, i) => {
+        {/* Reduced animated stars for better iOS performance - only 25 stars */}
+        {[...Array(25)].map((_, i) => {
           const colors = [
-            'rgba(0, 206, 209, 1)',    // Cyan
-            'rgba(153, 69, 255, 1)',   // Purple
-            'rgba(255, 20, 147, 1)',   // Magenta
-            'rgba(255, 105, 180, 1)',  // Pink
-            'rgba(32, 178, 170, 1)',   // Teal
-            'rgba(65, 105, 225, 1)',   // Blue
+            'rgba(0, 206, 209, 0.8)',    // Cyan
+            'rgba(153, 69, 255, 0.8)',   // Purple
+            'rgba(255, 20, 147, 0.8)',   // Magenta
+            'rgba(255, 105, 180, 0.8)',  // Pink
+            'rgba(32, 178, 170, 0.8)',   // Teal
+            'rgba(65, 105, 225, 0.8)',   // Blue
           ];
-          const size = Math.random() * 4 + 1; // 2x original size (was 1-4px, now 2-8px)
+          const size = Math.random() * 3 + 2; // 2-5px
           const left = Math.random() * 100;
           const top = Math.random() * 100;
           const delay = Math.random() * 20;
@@ -210,24 +210,23 @@ function Landing({ onCreate, onJoin }) {
                 left: `${left}%`,
                 top: `${top}%`,
                 backgroundColor: color,
-                boxShadow: `0 0 ${size * 5}px ${color}`,
                 animation: `float ${duration}s infinite ease-in-out`,
                 animationDelay: `${delay}s`,
-                opacity: 0.99,
-                filter: 'blur(1px)',
+                opacity: 0.8,
+                willChange: 'transform',
               }}
             />
           );
         })}
         
-        {/* Larger glowing orbs - 2x size */}
-        {[...Array(5)].map((_, i) => {
+        {/* Simplified glowing orbs - only 3 orbs without heavy blur */}
+        {[...Array(3)].map((_, i) => {
           const colors = [
-            'rgba(153, 69, 255, 0.1)',   // Purple
-            'rgba(0, 206, 209, 0.1)',    // Cyan
-            'rgba(255, 20, 147, 0.1)',   // Magenta
+            'rgba(153, 69, 255, 0.08)',   // Purple
+            'rgba(0, 206, 209, 0.08)',    // Cyan
+            'rgba(255, 20, 147, 0.08)',   // Magenta
           ];
-          const size = Math.random() * 200 + 160; // 2x original size (was 80-180px, now 160-360px)
+          const size = Math.random() * 150 + 120; // 120-270px
           const left = Math.random() * 100;
           const top = Math.random() * 100;
           const delay = Math.random() * 10;
@@ -237,7 +236,7 @@ function Landing({ onCreate, onJoin }) {
           return (
             <div
               key={`orb-${i}`}
-              className="absolute rounded-full blur-3xl"
+              className="absolute rounded-full"
               style={{
                 width: `${size}px`,
                 height: `${size}px`,
@@ -246,7 +245,9 @@ function Landing({ onCreate, onJoin }) {
                 backgroundColor: color,
                 animation: `float ${duration}s infinite ease-in-out`,
                 animationDelay: `${delay}s`,
-                opacity: 0.4,
+                opacity: 0.3,
+                filter: 'blur(40px)',
+                willChange: 'transform',
               }}
             />
           );

@@ -2151,7 +2151,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           />
         )}
         {/* Show Spotify login ONLY when the user is (or will be) the host AND no session restore is available */}
-        {isCreator && !spotifyToken && !showSessionRestore && (
+        {isCreator && !spotifyToken && !showSessionRestore && !isPreviewMode && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
             <div className="bg-gray-800 rounded-lg p-6 text-center">
               <h2 className="text-xl font-bold text-white mb-4">Spotify Login Required</h2>

@@ -704,19 +704,19 @@ const CurvedTimeline = ({
     return confirmedYears.length === 1 ? confirmedYears[0].card.year : null;
   };
 
-  // Memoize background stars and orbs to prevent regeneration on every render
+  // Memoize background stars and orbs - optimized for iOS Safari performance
   const backgroundStars = useMemo(() => {
     const colors = [
-      'rgba(0, 206, 209, 0.8)',    // Cyan
-      'rgba(153, 69, 255, 0.8)',   // Purple
-      'rgba(255, 20, 147, 0.8)',   // Magenta
-      'rgba(255, 105, 180, 0.8)',  // Pink
-      'rgba(32, 178, 170, 0.8)',   // Teal
-      'rgba(65, 105, 225, 0.8)',   // Blue
+      'rgba(0, 206, 209, 0.7)',    // Cyan
+      'rgba(153, 69, 255, 0.7)',   // Purple
+      'rgba(255, 20, 147, 0.7)',   // Magenta
+      'rgba(255, 105, 180, 0.7)',  // Pink
+      'rgba(32, 178, 170, 0.7)',   // Teal
+      'rgba(65, 105, 225, 0.7)',   // Blue
     ];
     
-    return [...Array(30)].map((_, i) => {
-      const size = Math.random() * 3 + 1;
+    return [...Array(20)].map((_, i) => {
+      const size = Math.random() * 3 + 1.5;
       const left = Math.random() * 100;
       const top = Math.random() * 100;
       const delay = Math.random() * 20;
@@ -737,13 +737,13 @@ const CurvedTimeline = ({
   
   const backgroundOrbs = useMemo(() => {
     const colors = [
-      'rgba(153, 69, 255, 0.3)',   // Purple
-      'rgba(0, 206, 209, 0.3)',    // Cyan
-      'rgba(255, 20, 147, 0.3)',   // Magenta
+      'rgba(153, 69, 255, 0.08)',   // Purple
+      'rgba(0, 206, 209, 0.08)',    // Cyan
+      'rgba(255, 20, 147, 0.08)',   // Magenta
     ];
     
-    return [...Array(5)].map((_, i) => {
-      const size = Math.random() * 100 + 80;
+    return [...Array(3)].map((_, i) => {
+      const size = Math.random() * 120 + 100;
       const left = Math.random() * 100;
       const top = Math.random() * 100;
       const delay = Math.random() * 10;
@@ -764,8 +764,8 @@ const CurvedTimeline = ({
 
   return (
     <div ref={containerRef} className="curved-timeline-container w-full h-full relative overflow-hidden">
-      {/* Vibrant gradient background with stars */}
-      <div className="absolute inset-0 z-0">
+      {/* Vibrant gradient background with stars - optimized for iOS Safari */}
+      <div className="absolute inset-0 z-0" style={{ contain: 'layout style paint' }}>
         {/* Multi-layer gradient background */}
         <div 
           className="absolute inset-0"
@@ -779,7 +779,7 @@ const CurvedTimeline = ({
           }}
         />
         
-        {/* Animated floating stars/dots */}
+        {/* Animated floating stars/dots - optimized */}
         {backgroundStars.map((star) => (
           <div
             key={star.key}
@@ -790,19 +790,19 @@ const CurvedTimeline = ({
               left: `${star.left}%`,
               top: `${star.top}%`,
               backgroundColor: star.color,
-              boxShadow: `0 0 ${star.size * 3}px ${star.color}`,
               animation: `float ${star.duration}s infinite ease-in-out`,
               animationDelay: `${star.delay}s`,
               opacity: 0.6,
+              willChange: 'transform',
             }}
           />
         ))}
         
-        {/* Larger glowing orbs */}
+        {/* Larger glowing orbs - optimized with lighter blur */}
         {backgroundOrbs.map((orb) => (
           <div
             key={orb.key}
-            className="absolute rounded-full blur-3xl"
+            className="absolute rounded-full"
             style={{
               width: `${orb.size}px`,
               height: `${orb.size}px`,
@@ -811,7 +811,9 @@ const CurvedTimeline = ({
               backgroundColor: orb.color,
               animation: `float ${orb.duration}s infinite ease-in-out`,
               animationDelay: `${orb.delay}s`,
-              opacity: 0.4,
+              opacity: 0.3,
+              filter: 'blur(40px)',
+              willChange: 'transform',
             }}
           />
         ))}
