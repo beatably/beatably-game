@@ -619,6 +619,64 @@ const CurvedTimeline = ({
     return confirmedYears.length === 1 ? confirmedYears[0].card.year : null;
   };
 
+  // Memoize background stars and orbs to prevent regeneration on every render
+  const backgroundStars = useMemo(() => {
+    const colors = [
+      'rgba(0, 206, 209, 0.8)',    // Cyan
+      'rgba(153, 69, 255, 0.8)',   // Purple
+      'rgba(255, 20, 147, 0.8)',   // Magenta
+      'rgba(255, 105, 180, 0.8)',  // Pink
+      'rgba(32, 178, 170, 0.8)',   // Teal
+      'rgba(65, 105, 225, 0.8)',   // Blue
+    ];
+    
+    return [...Array(30)].map((_, i) => {
+      const size = Math.random() * 3 + 1;
+      const left = Math.random() * 100;
+      const top = Math.random() * 100;
+      const delay = Math.random() * 20;
+      const duration = Math.random() * 10 + 15;
+      const color = colors[i % colors.length];
+      
+      return {
+        key: i,
+        size,
+        left,
+        top,
+        delay,
+        duration,
+        color
+      };
+    });
+  }, []); // Empty deps - only generate once
+  
+  const backgroundOrbs = useMemo(() => {
+    const colors = [
+      'rgba(153, 69, 255, 0.3)',   // Purple
+      'rgba(0, 206, 209, 0.3)',    // Cyan
+      'rgba(255, 20, 147, 0.3)',   // Magenta
+    ];
+    
+    return [...Array(5)].map((_, i) => {
+      const size = Math.random() * 100 + 80;
+      const left = Math.random() * 100;
+      const top = Math.random() * 100;
+      const delay = Math.random() * 10;
+      const duration = Math.random() * 15 + 20;
+      const color = colors[i % colors.length];
+      
+      return {
+        key: `orb-${i}`,
+        size,
+        left,
+        top,
+        delay,
+        duration,
+        color
+      };
+    });
+  }, []); // Empty deps - only generate once
+
   return (
     <div ref={containerRef} className="curved-timeline-container w-full h-full relative overflow-hidden">
       {/* Vibrant gradient background with stars */}
@@ -637,72 +695,41 @@ const CurvedTimeline = ({
         />
         
         {/* Animated floating stars/dots */}
-        {[...Array(30)].map((_, i) => {
-          const colors = [
-            'rgba(0, 206, 209, 0.8)',    // Cyan
-            'rgba(153, 69, 255, 0.8)',   // Purple
-            'rgba(255, 20, 147, 0.8)',   // Magenta
-            'rgba(255, 105, 180, 0.8)',  // Pink
-            'rgba(32, 178, 170, 0.8)',   // Teal
-            'rgba(65, 105, 225, 0.8)',   // Blue
-          ];
-          const size = Math.random() * 3 + 1;
-          const left = Math.random() * 100;
-          const top = Math.random() * 100;
-          const delay = Math.random() * 20;
-          const duration = Math.random() * 10 + 15;
-          const color = colors[i % colors.length];
-          
-          return (
-            <div
-              key={i}
-              className="absolute rounded-full"
-              style={{
-                width: `${size}px`,
-                height: `${size}px`,
-                left: `${left}%`,
-                top: `${top}%`,
-                backgroundColor: color,
-                boxShadow: `0 0 ${size * 3}px ${color}`,
-                animation: `float ${duration}s infinite ease-in-out`,
-                animationDelay: `${delay}s`,
-                opacity: 0.6,
-              }}
-            />
-          );
-        })}
+        {backgroundStars.map((star) => (
+          <div
+            key={star.key}
+            className="absolute rounded-full"
+            style={{
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              left: `${star.left}%`,
+              top: `${star.top}%`,
+              backgroundColor: star.color,
+              boxShadow: `0 0 ${star.size * 3}px ${star.color}`,
+              animation: `float ${star.duration}s infinite ease-in-out`,
+              animationDelay: `${star.delay}s`,
+              opacity: 0.6,
+            }}
+          />
+        ))}
         
         {/* Larger glowing orbs */}
-        {[...Array(5)].map((_, i) => {
-          const colors = [
-            'rgba(153, 69, 255, 0.3)',   // Purple
-            'rgba(0, 206, 209, 0.3)',    // Cyan
-            'rgba(255, 20, 147, 0.3)',   // Magenta
-          ];
-          const size = Math.random() * 100 + 80;
-          const left = Math.random() * 100;
-          const top = Math.random() * 100;
-          const delay = Math.random() * 10;
-          const duration = Math.random() * 15 + 20;
-          const color = colors[i % colors.length];
-          
-          return (
-            <div
-              key={`orb-${i}`}
-              className="absolute rounded-full blur-3xl"
-              style={{
-                width: `${size}px`,
-                height: `${size}px`,
-                left: `${left}%`,
-                top: `${top}%`,
-                backgroundColor: color,
-                animation: `float ${duration}s infinite ease-in-out`,
-                animationDelay: `${delay}s`,
-                opacity: 0.4,
-              }}
-            />
-          );
-        })}
+        {backgroundOrbs.map((orb) => (
+          <div
+            key={orb.key}
+            className="absolute rounded-full blur-3xl"
+            style={{
+              width: `${orb.size}px`,
+              height: `${orb.size}px`,
+              left: `${orb.left}%`,
+              top: `${orb.top}%`,
+              backgroundColor: orb.color,
+              animation: `float ${orb.duration}s infinite ease-in-out`,
+              animationDelay: `${orb.delay}s`,
+              opacity: 0.4,
+            }}
+          />
+        ))}
       </div>
       
       {/* Timeline Title */}

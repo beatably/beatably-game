@@ -1006,7 +1006,8 @@ app.post('/api/curated/select', (req, res) => {
     const {
       musicPreferences = {},
       difficulty = (config.difficulty || 'normal'),
-      playerCount = 2
+      playerCount = 2,
+      previewMode = false
     } = req.body || {};
 
     const {
@@ -1020,7 +1021,8 @@ app.post('/api/curated/select', (req, res) => {
       genres,
       markets,
       difficulty,
-      playerCount
+      playerCount,
+      previewMode
     });
     res.json(result);
   } catch (e) {

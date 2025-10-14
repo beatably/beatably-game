@@ -444,7 +444,8 @@ function diversifyByArtist(tracks, maxPerArtist = 1) {
  *   genres: string[],
  *   markets: string[] (mapped to geography),
  *   difficulty: 'easy'|'normal'|'hard',
- *   playerCount: number
+ *   playerCount: number,
+ *   previewMode: boolean (optional) - if true, only include songs with preview URLs
  * }
  */
 function selectForGame(criteria = {}) {
@@ -455,6 +456,7 @@ function selectForGame(criteria = {}) {
     markets = [],
     difficulty = 'normal',
     playerCount = 2,
+    previewMode = false,
   } = criteria;
 
   // Map difficulty to difficultyLevel filter
@@ -462,6 +464,12 @@ function selectForGame(criteria = {}) {
   const allowedLevels = diffMap[difficulty] || [2, 3];
 
   let pool = _songs.slice();
+
+  // CRITICAL: Filter out songs without preview URLs ONLY if in preview mode
+  if (previewMode) {
+    pool = pool.filter((s) => s.previewUrl && s.previewUrl.trim() !== '');
+    console.log(`[CuratedDB] Preview mode: Filtered to ${pool.length} songs with preview URLs`);
+  }
 
   // Filter by year
   if (Number.isFinite(yearRange.min)) {

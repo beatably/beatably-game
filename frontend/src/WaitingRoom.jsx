@@ -185,7 +185,11 @@ function WaitingRoom({
         {isCreator && showSettings && (
           <Card className="bg-card border-border mobile-shadow container-card">
             <CardContent className="p-4">
-              <GameSettings settings={settings} onUpdate={onUpdateSettings} />
+              <GameSettings 
+                settings={settings} 
+                onUpdate={onUpdateSettings}
+                isGameStarted={false}
+              />
             </CardContent>
           </Card>
         )}

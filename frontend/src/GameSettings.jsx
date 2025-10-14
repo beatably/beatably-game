@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from './config';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { usePreviewMode } from './contexts/PreviewModeContext';
 
-function GameSettings({ settings, onUpdate }) {
+function GameSettings({ settings, onUpdate, isGameStarted }) {
   const [localSettings, setLocalSettings] = useState(settings || {
     difficulty: "normal",
     // Default win condition if not provided
@@ -90,12 +91,30 @@ function GameSettings({ settings, onUpdate }) {
     onUpdate(updated);
   };
 
+  // Preview mode context
+  const { isFullPlayMode, setFullPlayMode } = usePreviewMode();
+
   // Playing mode change handler (stored at top-level of settings to keep payload small)
   const handlePlayingModeChange = (isBillboardMode) => {
     setUseChartMode(isBillboardMode);
     const updated = { ...localSettings, useChartMode: isBillboardMode };
     setLocalSettings(updated);
     onUpdate(updated);
+  };
+
+  // Full play mode toggle handler
+  const handleFullPlayModeToggle = () => {
+    const newValue = !isFullPlayMode;
+    setFullPlayMode(newValue);
+    
+    // If enabling full play mode and no Spotify token, trigger auth
+    if (newValue && !localStorage.getItem('access_token')) {
+      console.log('[GameSettings] Full Play Mode enabled, triggering Spotify auth');
+      // Save current settings before redirect
+      localStorage.setItem('pending_full_play_mode', 'true');
+      // Redirect to Spotify auth
+      window.location.href = `${API_BASE_URL}/login`;
+    }
   };
 
   // iOS-style carousel physics and animation
@@ -526,6 +545,35 @@ function GameSettings({ settings, onUpdate }) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Full Play Mode Toggle - Below Playing Mode */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-xl font-semibold text-foreground">Full Play Mode</Label>
+          <button
+            onClick={handleFullPlayModeToggle}
+            disabled={isGameStarted}
+            className={`
+              relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+              ${isGameStarted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+              ${isFullPlayMode ? 'bg-primary' : 'bg-gray-600'}
+            `}
+            aria-label={`Toggle Full Play Mode ${isFullPlayMode ? 'off' : 'on'}`}
+          >
+            <span
+              className={`
+                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                ${isFullPlayMode ? 'translate-x-6' : 'translate-x-1'}
+              `}
+            />
+          </button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {isFullPlayMode 
+            ? 'Full songs with Spotify (requires login)'
+            : 'Quick 30-second previews (no login required)'}
+        </p>
       </div>
 
       {/* Difficulty */}

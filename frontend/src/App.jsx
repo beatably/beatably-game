@@ -19,11 +19,22 @@ import WinnerView from "./WinnerView";
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { API_BASE_URL, SOCKET_URL } from './config';
+import { usePreviewMode } from './contexts/PreviewModeContext';
 
 
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
 
 function App() {
+  const { isPreviewMode, setFullPlayMode } = usePreviewMode();
+  
+  // Expose setFullPlayMode globally for auth callback
+  useEffect(() => {
+    window.enableFullPlayMode = setFullPlayMode;
+    return () => {
+      delete window.enableFullPlayMode;
+    };
+  }, [setFullPlayMode]);
+  
   // Spotify authentication
   const [spotifyToken, setSpotifyToken] = useState(localStorage.getItem('access_token') || null);
   // pending creator name saved during OAuth redirect
@@ -32,8 +43,7 @@ function App() {
   );
   // track socket connection status
   const [socketReady, setSocketReady] = useState(false);
-  // Capture access_token coming back from Spotify and, if we had a pending game
-  // creation, continue that flow automatically
+  // Capture access_token coming back from Spotify
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("access_token");
@@ -49,6 +59,17 @@ function App() {
         return;
       }
 
+      // Check if this was from enabling full play mode
+      const pendingFullPlayMode = localStorage.getItem("pending_full_play_mode");
+      if (pendingFullPlayMode) {
+        console.log("[Spotify] Full Play Mode auth completed, enabling full play mode");
+        localStorage.removeItem("pending_full_play_mode");
+        // Enable full play mode via context
+        if (window.enableFullPlayMode) {
+          window.enableFullPlayMode(true);
+        }
+        return;
+      }
 
       // resume a pending "create game" request (saved before redirect)
       const pending = localStorage.getItem("pending_create");
@@ -1092,7 +1113,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         body: JSON.stringify({
           musicPreferences: musicPreferences || gameSettings.musicPreferences,
           difficulty: gameSettings.difficulty,
-          playerCount: players.length || 2
+          playerCount: players.length || 2,
+          previewMode: isPreviewMode
         })
       });
 
@@ -1358,14 +1380,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   };
 
   // Create game handler (calls backend)
-  // Game creator must have a Spotify token; if not, trigger OAuth first
+  // Create game - No Spotify auth required (preview mode is default)
   const handleCreate = (name) => {
-    if (!spotifyToken) {
-      localStorage.setItem("pending_create", name);
-      setPendingCreate(name);               // ensure state updated so post-OAuth effect runs
-      window.location.href = `${API_BASE_URL}/login`;
-      return;
-    }
     const code = randomCode();
     setPlayerName(name);
     setRoomCode(code);

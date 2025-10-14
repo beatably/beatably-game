@@ -3,6 +3,7 @@ import spotifyAuth from "./utils/spotifyAuth";
 import productionPlaybackFix from "./utils/productionPlaybackFix";
 import DeviceSwitchModal from './DeviceSwitchModal';
 import SongGuessModal from './SongGuessModal';
+import { usePreviewMode } from './contexts/PreviewModeContext';
 
 function GameFooter({ 
   currentCard, 
@@ -33,6 +34,21 @@ function GameFooter({
   onConfirmDrop,
   onCancelDrop
 }) {
+  // Preview Mode context
+  const { 
+    isPreviewMode, 
+    isPlaying: previewIsPlaying,
+    currentTime: previewCurrentTime,
+    duration: previewDuration,
+    playPreview,
+    pausePreview,
+    resumePreview,
+    stopPreview
+  } = usePreviewMode();
+  
+  // Determine if we're using preview mode (only creator uses it)
+  const usingPreviewMode = isPreviewMode && isCreator;
+  
   // Track local playing state for UI
   const [localIsPlaying, setLocalIsPlaying] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -57,9 +73,16 @@ function GameFooter({
   const [glowIntensity, setGlowIntensity] = React.useState(0.3);
   
   // Use optimistic state if available, otherwise fall back to actual state
-  const actualIsPlaying = optimisticIsPlaying !== null 
-    ? optimisticIsPlaying 
-    : (isCreator && spotifyDeviceId ? isSpotifyPlaying : localIsPlaying);
+  // In preview mode, use preview playing state
+  const actualIsPlaying = usingPreviewMode 
+    ? previewIsPlaying
+    : (optimisticIsPlaying !== null 
+      ? optimisticIsPlaying 
+      : (isCreator && spotifyDeviceId ? isSpotifyPlaying : localIsPlaying));
+  
+  // Use preview mode progress/duration when active
+  const displayProgress = usingPreviewMode ? previewCurrentTime : progress;
+  const displayDuration = usingPreviewMode ? previewDuration : duration;
   
   // Pulsating animation for paused button
   React.useEffect(() => {
@@ -391,12 +414,14 @@ function GameFooter({
   const handlePlayPauseClick = async () => {
     console.log('[GameFooter] Play button clicked:', {
       isCreator,
+      usingPreviewMode,
       spotifyDeviceId: !!spotifyDeviceId,
       actualIsPlaying,
       isSpotifyPlaying,
       currentSpotifyUri,
       currentCardUri: currentCard?.uri,
-      currentCardTitle: currentCard?.title
+      currentCardTitle: currentCard?.title,
+      previewUrl: currentCard?.previewUrl || currentCard?.preview_url
     });
 
     // Hide "new song loaded" message when play is pressed and mark that play has been pressed
@@ -414,11 +439,32 @@ function GameFooter({
       }
     }
 
+    // PREVIEW MODE: Handle preview playback for creators
+    if (usingPreviewMode) {
+      const previewUrl = currentCard?.previewUrl || currentCard?.preview_url;
+      
+      if (!previewUrl) {
+        console.warn('[PreviewMode] No preview URL available for:', currentCard?.title);
+        return;
+      }
+      
+      if (previewIsPlaying) {
+        pausePreview();
+      } else {
+        if (previewCurrentTime > 0) {
+          await resumePreview();
+        } else {
+          await playPreview(previewUrl);
+        }
+      }
+      return;
+    }
+
     // Check if this is a creator who should have Spotify access
     const hasSpotifyToken = !!localStorage.getItem('access_token');
     
     // If creator has no token at all, immediately trigger re-auth (no buttons)
-    if (isCreator && !hasSpotifyToken) {
+    if (isCreator && !hasSpotifyToken && !isPreviewMode) {
       console.log('[GameFooter] No Spotify token for creator - triggering re-auth');
       handleTokenExpiration();
       return;
@@ -550,7 +596,14 @@ function GameFooter({
 
   // Handle restart button click
   const handleRestartClick = () => {
-    if (isCreator && spotifyDeviceId) {
+    if (usingPreviewMode) {
+      // Stop and restart preview from beginning
+      stopPreview();
+      const previewUrl = currentCard?.previewUrl || currentCard?.preview_url;
+      if (previewUrl) {
+        playPreview(previewUrl);
+      }
+    } else if (isCreator && spotifyDeviceId) {
       restartSpotifyTrack();
     } else {
       setProgress(0);
@@ -587,8 +640,11 @@ function GameFooter({
   const newSongButtonRef = React.useRef(null);
 
 
-  // Format time mm:ss
-  const formatTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
+  // Format time mm:ss (no decimals)
+  const formatTime = (s) => {
+    const seconds = Math.floor(s); // Remove decimals
+    return `${Math.floor(seconds/60)}:${(seconds%60).toString().padStart(2, '0')}`;
+  };
 
   const myPlayer = players?.find(p => p.id === myPlayerId);
   const currentPlayer = players?.find(p => p.id === currentPlayerId);
@@ -608,11 +664,16 @@ function GameFooter({
       setTimeout(() => { skipInFlightRef.current = false; }, 2000);
     }
     
-    // CRITICAL FIX: Pause music immediately when "New Song" is clicked
-    // This works for both creators and guests
-    if (action === 'skip_song' && spotifyDeviceId && isPlayingMusic) {
-      console.log('[GameFooter] Pausing music before new song');
-      pauseSpotifyPlayback();
+    // CRITICAL FIX: Stop music immediately when "New Song" is clicked
+    // This works for both preview mode and Spotify mode
+    if (action === 'skip_song') {
+      if (usingPreviewMode) {
+        console.log('[GameFooter] Stopping preview before new song');
+        stopPreview();
+      } else if (spotifyDeviceId && isPlayingMusic) {
+        console.log('[GameFooter] Pausing Spotify before new song');
+        pauseSpotifyPlayback();
+      }
     }
     
     // If this is a non-creator requesting a new song, send request to server
@@ -666,17 +727,25 @@ function GameFooter({
     };
   }, [socketRef, isCreator]);
 
-  // Broadcast progress updates (creator only) - use Spotify token check instead of isCreator
+  // Broadcast progress updates (creator only) - works in both Spotify and preview mode
   React.useEffect(() => {
-    const hasSpotifyToken = !!localStorage.getItem('access_token');
-    if (!socketRef?.current || !hasSpotifyToken || !roomCode || !spotifyDeviceId) return;
+    // Only creator should broadcast, and only if we have a room and socket
+    if (!socketRef?.current || !isCreator || !roomCode) return;
+    
+    // In Spotify mode, wait for device to be ready; in preview mode, always broadcast
+    if (!usingPreviewMode && !spotifyDeviceId) return;
 
     const broadcastProgress = () => {
-      console.log('[GameFooter] Broadcasting progress:', { progress, duration, isPlaying: actualIsPlaying });
+      console.log('[GameFooter] Broadcasting progress:', { 
+        progress: displayProgress, 
+        duration: displayDuration, 
+        isPlaying: actualIsPlaying,
+        mode: usingPreviewMode ? 'preview' : 'spotify'
+      });
       socketRef.current.emit('progress_update', {
         code: roomCode,
-        progress,
-        duration,
+        progress: displayProgress,
+        duration: displayDuration,
         isPlaying: actualIsPlaying
       });
     };
@@ -691,7 +760,7 @@ function GameFooter({
       // Broadcast pause state immediately
       broadcastProgress();
     }
-  }, [socketRef, roomCode, progress, duration, actualIsPlaying, spotifyDeviceId]);
+  }, [socketRef, roomCode, displayProgress, displayDuration, actualIsPlaying, isCreator, usingPreviewMode, spotifyDeviceId]);
 
   // Enhanced creator detection
   React.useEffect(() => {
@@ -715,12 +784,24 @@ function GameFooter({
       feedback 
     });
     
-    // CRITICAL FIX: Pause music immediately when "Continue" is clicked
-    // This works for both creators and guests
-    if (spotifyDeviceId && isPlayingMusic) {
-      console.log('[GameFooter] Pausing music before continue');
+    // CRITICAL FIX: Stop all music (both preview and Spotify) when continuing to next turn
+    if (usingPreviewMode) {
+      console.log('[GameFooter] Stopping preview mode music before continue');
+      stopPreview();
+    } else if (spotifyDeviceId && isPlayingMusic) {
+      console.log('[GameFooter] Pausing Spotify before continue');
       pauseSpotifyPlayback();
     }
+    
+    // Reset progress and state for next turn
+    setProgress(0);
+    setLocalIsPlaying(false);
+    setIsSpotifyPlaying(false);
+    setShowNewSongMessage(false);
+    setHasPlayedOnce(false);
+    
+    // Clear optimistic state
+    setOptimisticIsPlaying(null);
     
     onContinue();
   };
@@ -946,12 +1027,12 @@ function GameFooter({
               
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center gap-1 text-xs md:text-base text-muted-foreground">
-                <span>{formatTime(progress)}</span>
+                <span>{formatTime(displayProgress)}</span>
                 <div className="relative flex-1 h-2 bg-input rounded-full overflow-hidden">
-                  <div className="absolute left-0 top-0 h-2 bg-primary rounded-full" style={{ width: `${(progress/duration)*100}%` }}></div>
+                  <div className="absolute left-0 top-0 h-2 bg-primary rounded-full" style={{ width: `${(displayProgress/displayDuration)*100}%` }}></div>
                 </div>
-                <span>{formatTime(duration)}</span>
-                {isCreator && (
+                <span>{formatTime(displayDuration)}</span>
+                {isCreator && !isPreviewMode && (
                   <button
                   ref={deviceSwitchButtonRef}
                   onClick={() => {
@@ -1371,6 +1452,23 @@ function GameFooter({
           <button 
             ref={challengeResolvedContinueButtonRef}
             onClick={() => {
+              // CRITICAL FIX: Stop all music when continuing after challenge
+              if (usingPreviewMode) {
+                console.log('[GameFooter] Stopping preview mode music before continue after challenge');
+                stopPreview();
+              } else if (spotifyDeviceId && isPlayingMusic) {
+                console.log('[GameFooter] Pausing Spotify before continue after challenge');
+                pauseSpotifyPlayback();
+              }
+              
+              // Reset progress and state for next turn
+              setProgress(0);
+              setLocalIsPlaying(false);
+              setIsSpotifyPlaying(false);
+              setShowNewSongMessage(false);
+              setHasPlayedOnce(false);
+              setOptimisticIsPlaying(null);
+              
               onContinueAfterChallenge();
               // Immediately blur after click to prevent focus ring
               if (challengeResolvedContinueButtonRef.current) {
