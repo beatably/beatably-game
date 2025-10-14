@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import SongDebugPanel from './SongDebugPanel';
+import { playCorrectGuessSound, playIncorrectGuessSound } from './utils/soundUtils';
 
 const CurvedTimeline = ({ 
   timeline, 
@@ -63,14 +64,22 @@ const CurvedTimeline = ({
     };
   }, [tapTimer]);
 
-  // Trigger confetti for correct answers
+  // Trigger confetti and sound for correct/incorrect answers
   useEffect(() => {
-    // Determine if confetti should be shown
+    // Determine if confetti should be shown and which sound to play
     let shouldShowConfetti = false;
+    let shouldPlayCorrectSound = false;
+    let shouldPlayIncorrectSound = false;
     
-    if (phase === 'reveal' && lastPlaced && lastPlaced.correct) {
-      // Regular reveal phase - show confetti for correct answer
-      shouldShowConfetti = true;
+    if (phase === 'reveal' && lastPlaced) {
+      if (lastPlaced.correct) {
+        // Regular reveal phase - show confetti and play correct sound
+        shouldShowConfetti = true;
+        shouldPlayCorrectSound = true;
+      } else {
+        // Regular reveal phase - play incorrect sound
+        shouldPlayIncorrectSound = true;
+      }
     } else if (phase === 'challenge-resolved' && challenge && challenge.phase === 'resolved') {
       // Challenge resolved - only show confetti for the winning player
       // Check if there are any cards marked as correct
@@ -82,6 +91,20 @@ const CurvedTimeline = ({
       );
       
       shouldShowConfetti = hasCorrectChallengerCard || hasCorrectOriginalCard;
+      
+      // Play sound based on challenge result
+      if (hasCorrectChallengerCard || hasCorrectOriginalCard) {
+        shouldPlayCorrectSound = true;
+      } else {
+        shouldPlayIncorrectSound = true;
+      }
+    }
+    
+    // Play appropriate sound effect
+    if (shouldPlayCorrectSound) {
+      playCorrectGuessSound();
+    } else if (shouldPlayIncorrectSound) {
+      playIncorrectGuessSound();
     }
     
     if (shouldShowConfetti) {

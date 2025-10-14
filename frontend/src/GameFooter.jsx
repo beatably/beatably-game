@@ -93,7 +93,7 @@ function GameFooter({
       const pulseInterval = setInterval(() => {
         if (increasing) {
           intensity += 0.01;
-          if (intensity >= 0.5) increasing = false;
+          if (intensity >= 0.65) increasing = false;
         } else {
           intensity -= 0.01;
           if (intensity <= 0.3) increasing = true;
@@ -960,8 +960,8 @@ function GameFooter({
                 <div
                   style={{
                     filter: actualIsPlaying
-                      ? 'drop-shadow(0 0 20px rgba(8, 175, 154, 1)) drop-shadow(0 5px 12px rgba(8, 175, 154, 0.6))'
-                      : `drop-shadow(0 0 ${17.5 + (glowIntensity - 0.3) * 18.75}px rgba(8, 175, 154, ${glowIntensity})) drop-shadow(0 ${glowIntensity * 5}px ${10 + (glowIntensity - 0.3) * 12.5}px rgba(8, 175, 154, ${0.4 + (glowIntensity - 0.3) * 0.75}))`,
+                      ? 'drop-shadow(0 0 26px rgba(0, 214, 192, 1)) drop-shadow(0 5px 15px rgba(0, 214, 192, 0.6))'
+                      : `drop-shadow(0 0 ${17.5 + (glowIntensity - 0.3) * 24.375}px rgba(0, 214, 192, ${glowIntensity})) drop-shadow(0 ${glowIntensity * 5}px ${10 + (glowIntensity - 0.3) * 16.25}px rgba(0, 214, 192, ${0.4 + (glowIntensity - 0.3) * 0.975}))`,
                     transition: 'none'
                   }}
                 >
@@ -998,9 +998,9 @@ function GameFooter({
                       appearance: 'none',
                       boxShadow: 'none',
                       backgroundColor: actualIsPlaying
-                        ? '#08AF9A'
-                        : `rgba(8, 175, 154, ${0.85 + (glowIntensity - 0.3) * 0.5})`,
-                      borderColor: 'rgba(8, 175, 154, 0.3)',
+                        ? '#00D6C0'
+                        : `rgba(0, 214, 192, ${0.85 + (glowIntensity - 0.3) * 0.5})`,
+                      borderColor: 'rgba(0, 214, 192, 0.3)',
                       transition: 'none'
                     }}
                   >
