@@ -46,6 +46,43 @@ function getCacheDir() {
           const persistentCount = Array.isArray(persistentData) ? persistentData.length : 0;
           console.log('[CuratedDB] Persistent disk database exists with', persistentCount, 'songs');
           
+          // SMART MIGRATION: Check if deployed database is newer/better
+          if (persistentCount > 0 && fs.existsSync(deployedDbFile)) {
+            try {
+              const deployedData = JSON.parse(fs.readFileSync(deployedDbFile, 'utf8'));
+              const deployedCount = Array.isArray(deployedData) ? deployedData.length : 0;
+              
+              // Check if deployed version has preview URLs but persistent doesn't
+              const persistentHasPreview = persistentData.some(s => s.previewUrl);
+              const deployedHasPreview = deployedData.some(s => s.previewUrl);
+              
+              console.log('[CuratedDB] Database comparison:', {
+                persistentCount,
+                deployedCount,
+                persistentHasPreview,
+                deployedHasPreview
+              });
+              
+              // If deployed has preview URLs but persistent doesn't, migrate
+              if (deployedHasPreview && !persistentHasPreview) {
+                console.log('[CuratedDB] Deployed database has preview URLs, persistent does not - migrating...');
+                fs.copyFileSync(deployedDbFile, persistentDbFile);
+                console.log('[CuratedDB] Migration complete - persistent disk now has preview URLs');
+                console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+                return persistentPath;
+              }
+              
+              // If deployed has significantly more songs, migrate
+              if (deployedCount > persistentCount * 1.1) {
+                console.log('[CuratedDB] Deployed database has significantly more songs - migrating...');
+                fs.copyFileSync(deployedDbFile, persistentDbFile);
+                console.log('[CuratedDB] Migration complete');
+              }
+            } catch (comparisonError) {
+              console.warn('[CuratedDB] Failed to compare databases:', comparisonError.message);
+            }
+          }
+          
           // If persistent disk has songs, use it
           if (persistentCount > 0) {
             console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
