@@ -102,18 +102,36 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
     onUpdate(updated);
   };
 
+  // Check for canceled Spotify auth on component mount
+  useEffect(() => {
+    // If user returned without access token but had pending full play mode, they canceled
+    if (localStorage.getItem('pending_full_play_mode') === 'true' && !localStorage.getItem('access_token')) {
+      console.log('[GameSettings] Spotify auth was canceled, resetting full play mode');
+      localStorage.removeItem('pending_full_play_mode');
+      setFullPlayMode(false);
+    }
+  }, [setFullPlayMode]);
+
   // Full play mode toggle handler
   const handleFullPlayModeToggle = () => {
     const newValue = !isFullPlayMode;
-    setFullPlayMode(newValue);
+    
+    // If disabling, just turn it off
+    if (!newValue) {
+      setFullPlayMode(newValue);
+      return;
+    }
     
     // If enabling full play mode and no Spotify token, trigger auth
     if (newValue && !localStorage.getItem('access_token')) {
-      console.log('[GameSettings] Full Play Mode enabled, triggering Spotify auth');
+      console.log('[GameSettings] Use Spotify Account enabled, triggering Spotify auth');
       // Save current settings before redirect
       localStorage.setItem('pending_full_play_mode', 'true');
       // Redirect to Spotify auth
       window.location.href = `${API_BASE_URL}/login`;
+    } else {
+      // Already has token, just enable
+      setFullPlayMode(newValue);
     }
   };
 
@@ -547,35 +565,6 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
         </div>
       </div>
 
-      {/* Full Play Mode Toggle - Below Playing Mode */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-xl font-semibold text-foreground">Full Play Mode</Label>
-          <button
-            onClick={handleFullPlayModeToggle}
-            disabled={isGameStarted}
-            className={`
-              relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-              ${isGameStarted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-              ${isFullPlayMode ? 'bg-primary' : 'bg-gray-600'}
-            `}
-            aria-label={`Toggle Full Play Mode ${isFullPlayMode ? 'off' : 'on'}`}
-          >
-            <span
-              className={`
-                inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                ${isFullPlayMode ? 'translate-x-6' : 'translate-x-1'}
-              `}
-            />
-          </button>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {isFullPlayMode 
-            ? 'Full songs with Spotify (requires login)'
-            : 'Quick 30-second previews (no login required)'}
-        </p>
-      </div>
-
       {/* Difficulty */}
       <div className="space-y-3">
         <Label className="text-xl font-semibold text-foreground">Difficulty</Label>
@@ -679,6 +668,38 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
           </div>
         </div>
       )}
+
+      {/* Use Spotify Account - Last Setting */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-xl font-semibold text-foreground">Use Spotify account</Label>
+          <button
+            onClick={handleFullPlayModeToggle}
+            disabled={isGameStarted}
+            type="button"
+            className={`
+              relative inline-flex h-8 w-[51px] min-w-0 min-h-0 items-center rounded-full 
+              transition-colors duration-200 ease-in-out p-0
+              ${isGameStarted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+              ${isFullPlayMode ? 'bg-[#7D3BED]' : 'bg-gray-400'}
+            `}
+            role="switch"
+            aria-checked={isFullPlayMode}
+            aria-label={`Toggle Spotify account ${isFullPlayMode ? 'off' : 'on'}`}
+          >
+            <span
+              className={`
+                inline-block h-7 w-7 transform rounded-full bg-white shadow-lg 
+                transition-transform duration-200 ease-in-out
+                ${isFullPlayMode ? 'translate-x-[20px]' : 'translate-x-0.5'}
+              `}
+            />
+          </button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          This will enable full-length tracks and playback on other devices. An invite from the Game Developer is required, and you will need to login with your Spotify account.
+        </p>
+      </div>
 
       {/* Reset to Defaults (inline text action) */}
       <div className="flex justify-center">

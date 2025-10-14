@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import SongDebugPanel from './SongDebugPanel';
 
 const CurvedTimeline = ({ 
@@ -61,6 +62,74 @@ const CurvedTimeline = ({
       }
     };
   }, [tapTimer]);
+
+  // Trigger confetti for correct answers
+  useEffect(() => {
+    // Determine if confetti should be shown
+    let shouldShowConfetti = false;
+    
+    if (phase === 'reveal' && lastPlaced && lastPlaced.correct) {
+      // Regular reveal phase - show confetti for correct answer
+      shouldShowConfetti = true;
+    } else if (phase === 'challenge-resolved' && challenge && challenge.phase === 'resolved') {
+      // Challenge resolved - only show confetti for the winning player
+      // Check if there are any cards marked as correct
+      const hasCorrectChallengerCard = timeline.some(card => 
+        card.challengerCard && challenge.result?.challengerCorrect
+      );
+      const hasCorrectOriginalCard = timeline.some(card => 
+        card.originalCard && challenge.result?.originalCorrect
+      );
+      
+      shouldShowConfetti = hasCorrectChallengerCard || hasCorrectOriginalCard;
+    }
+    
+    if (shouldShowConfetti) {
+      // Trigger confetti burst - 0.5x size
+      const count = 200;
+      const defaults = {
+        origin: { y: 0.5 },
+        colors: ['#17F869', '#9945FF', '#00CED1', '#FF1493', '#FFD700', '#FF69B4'],
+        scalar: 0.5 // 0.5x size for all confetti
+      };
+
+      function fire(particleRatio, opts) {
+        confetti({
+          ...defaults,
+          ...opts,
+          particleCount: Math.floor(count * particleRatio),
+          spread: 90
+        });
+      }
+
+      fire(0.25, {
+        spread: 26,
+        startVelocity: 55,
+      });
+      
+      fire(0.2, {
+        spread: 60,
+      });
+      
+      fire(0.35, {
+        spread: 100,
+        decay: 0.91,
+        scalar: 0.4 // 0.5x of 0.8
+      });
+      
+      fire(0.1, {
+        spread: 120,
+        startVelocity: 25,
+        decay: 0.92,
+        scalar: 0.6 // 0.5x of 1.2
+      });
+      
+      fire(0.1, {
+        spread: 120,
+        startVelocity: 45,
+      });
+    }
+  }, [phase, lastPlaced, challenge, timeline]);
 
   // Effect to measure container dimensions and handle resize
   useEffect(() => {
@@ -548,17 +617,10 @@ const CurvedTimeline = ({
     return false;
   };
 
-  // Helper to get vibrant color for year nodes (cycle through neon colors)
+  // Helper to get vibrant color for year nodes (using neon purple for all years)
   const getYearColor = (index) => {
-    const colors = [
-      { bg: 'hsl(217 91% 60%)', border: 'hsl(217 91% 70%)', glow: 'rgba(65, 105, 225, 0.6)' }, // Neon Blue
-      { bg: 'hsl(262 83% 58%)', border: 'hsl(262 83% 68%)', glow: 'rgba(153, 69, 255, 0.6)' }, // Neon Purple
-      { bg: 'hsl(180 100% 50%)', border: 'hsl(180 100% 60%)', glow: 'rgba(0, 206, 209, 0.6)' }, // Neon Cyan
-      { bg: 'hsl(328 100% 54%)', border: 'hsl(328 100% 64%)', glow: 'rgba(255, 20, 147, 0.6)' }, // Neon Magenta
-      { bg: 'hsl(174 72% 56%)', border: 'hsl(174 72% 66%)', glow: 'rgba(32, 178, 170, 0.6)' }, // Neon Teal
-      { bg: 'hsl(330 100% 71%)', border: 'hsl(330 100% 81%)', glow: 'rgba(255, 105, 180, 0.6)' }, // Neon Pink
-    ];
-    return colors[index % colors.length];
+    // Always return neon purple
+    return { bg: 'hsl(262 83% 58%)', border: 'hsl(262 83% 68%)', glow: 'rgba(153, 69, 255, 0.6)' };
   };
 
   // Determine year visual state
@@ -836,11 +898,11 @@ const CurvedTimeline = ({
                 <div
                   className={`w-6 h-6 rounded-full border-2 transition-all duration-200 ${
                     nodeDisabled
-                      ? 'bg-green-500 border-green-400 shadow-lg shadow-green-500/50 opacity-70'
+                      ? 'border-green-400 shadow-lg shadow-green-500/50 opacity-70'
                       : nodeState === 'selected'
-                      ? 'bg-green-500 border-green-400 shadow-lg shadow-green-500/50'
+                      ? 'border-[#FF1493] neon-glow-magenta'
                       : nodeState === 'hovered'
-                      ? 'bg-green-400 border-green-300 shadow-md shadow-green-400/30'
+                      ? 'border-[#9945FF] shadow-md shadow-purple-400/30'
                       : nodeState === 'placed-correct'
                       ? 'bg-green-500 border-green-400 shadow-lg shadow-green-500/50'
                       : nodeState === 'placed-incorrect'
@@ -848,13 +910,18 @@ const CurvedTimeline = ({
                       : 'bg-gray-600 border-gray-500 shadow-md shadow-black/20'
                   }`}
                   style={{
-                    filter: (nodeDisabled || nodeState === 'selected' || nodeState === 'placed-correct' || nodeState === 'placed-incorrect') ? 'url(#glow)' : 'none'
+                    filter: (nodeDisabled || nodeState === 'selected' || nodeState === 'placed-correct' || nodeState === 'placed-incorrect') ? 'url(#glow)' : 'none',
+                    ...(nodeState === 'selected' && !nodeDisabled ? {
+                      background: 'linear-gradient(135deg, #FF1493, #9945FF)',
+                    } : nodeDisabled ? {
+                      background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                    } : {})
                   }}
                 />
                 
                 {/* Selection indicator - only show flashing for non-disabled selected nodes */}
                 {nodeState === 'selected' && !nodeDisabled && (
-                  <div className="absolute inset-0 rounded-full border-2 border-green-300 animate-ping opacity-75" />
+                  <div className="absolute inset-0 rounded-full border-2 border-[#FF1493] animate-ping opacity-75" />
                 )}
                 
                 {/* Node labels for single year scenario */}
@@ -885,7 +952,7 @@ const CurvedTimeline = ({
               const yearColor = getYearColor(item.index);
               className += ' text-white';
               bgStyle.backgroundColor = yearColor.bg;
-              bgStyle.outline = '5px solid rgb(34, 197, 94)';
+              bgStyle.outline = '5px solid #17F869';
               bgStyle.outlineOffset = '0px';
               bgStyle.boxShadow = `0 0 15px ${yearColor.glow}, 0 0 30px ${yearColor.glow}`;
             } else if (yearState === 'red') {
@@ -920,11 +987,40 @@ const CurvedTimeline = ({
               >
                 {/* "You" label for player's own guess during challenge resolution */}
                 {item.card.isYourGuess && (
-                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
                     <span className="text-xs font-semibold bg-none text-white px-2 py-0.5 rounded shadow-md">
                       You
                     </span>
                   </div>
+                )}
+                
+                {/* Wave ripple animations - 1.5x speed */}
+                {(phase === 'reveal' || phase === 'challenge-resolved') && yearState === 'green' && (
+                  <>
+                    <div className="absolute inset-0 rounded-lg" style={{
+                      border: '3px solid #17F869',
+                      animation: 'wave-ripple 3.33s ease-out forwards'
+                    }} />
+                    <div className="absolute inset-0 rounded-lg" style={{
+                      border: '3px solid #17F869',
+                      animation: 'wave-ripple 5s ease-out forwards',
+                      animationDelay: '0.67s'
+                    }} />
+                  </>
+                )}
+                
+                {(phase === 'reveal' || phase === 'challenge-resolved') && yearState === 'red' && (
+                  <>
+                    <div className="absolute inset-0 rounded-lg" style={{
+                      border: '3px solid rgb(239, 68, 68)',
+                      animation: 'wave-ripple 3.33s ease-out forwards'
+                    }} />
+                    <div className="absolute inset-0 rounded-lg" style={{
+                      border: '3px solid rgb(239, 68, 68)',
+                      animation: 'wave-ripple 5s ease-out forwards',
+                      animationDelay: '0.67s'
+                    }} />
+                  </>
                 )}
                 
                 <div
