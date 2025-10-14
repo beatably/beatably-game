@@ -967,7 +967,7 @@ function GameFooter({
                 >
                   <button
                     ref={mainPlayButtonRef}
-                    className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full border-4 flex-shrink-0 no-focus-outline force-no-outline"
+                    className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full flex-shrink-0 no-focus-outline force-no-outline"
                     onClick={() => {
                       handlePlayPauseClick();
                       // Immediately blur after click to prevent focus ring
@@ -993,6 +993,7 @@ function GameFooter({
                     style={{ 
                       WebkitTapHighlightColor: 'transparent',
                       outline: 'none',
+                      border: 'none',
                       WebkitAppearance: 'none',
                       MozAppearance: 'none',
                       appearance: 'none',
@@ -1000,7 +1001,6 @@ function GameFooter({
                       backgroundColor: actualIsPlaying
                         ? '#00D6C0'
                         : `rgba(0, 214, 192, ${0.85 + (glowIntensity - 0.3) * 0.5})`,
-                      borderColor: 'rgba(0, 214, 192, 0.3)',
                       transition: 'none'
                     }}
                   >

@@ -851,20 +851,36 @@ const CurvedTimeline = ({
           </linearGradient>
         </defs>
         
-        {/* Timeline path - only showing blur/shadow effect (no solid line) */}
+        {/* Timeline path - blur/shadow effect with solid line */}
         {generateCurvePath.mainPath && generateCurvePath.mainPath.trim() !== '' && (
-          <path
-            d={generateCurvePath.mainPath}
-            stroke="rgba(153, 69, 255, 0.8)"
-            strokeWidth="20"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              filter: 'blur(8px)',
-              opacity: 0.6
-            }}
-          />
+          <>
+            {/* Blur layer */}
+            <path
+              d={generateCurvePath.mainPath}
+              stroke="rgba(153, 69, 255, 0.8)"
+              strokeWidth="20"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                filter: 'blur(8px)',
+                opacity: 0.6
+              }}
+            />
+            {/* Solid line on top */}
+            <path
+              d={generateCurvePath.mainPath}
+              stroke="url(#pathGradient)"
+              strokeWidth="6"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                filter: 'url(#glow)',
+                opacity: 0.9
+              }}
+            />
+          </>
         )}
         
         {/* Continuation lines from each node - enhanced */}
