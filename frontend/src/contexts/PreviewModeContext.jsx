@@ -12,6 +12,7 @@ export function usePreviewMode() {
 
 export function PreviewModeProvider({ children }) {
   const audioRef = useRef(null);
+  const isUnlockedRef = useRef(false);
   
   // Default to preview mode (full play mode is opt-in via settings)
   const [isFullPlayMode, setIsFullPlayMode] = useState(false);
@@ -32,7 +33,9 @@ export function PreviewModeProvider({ children }) {
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
-      audioRef.current.setAttribute('playsinline', ''); // Important for iOS
+      audioRef.current.setAttribute('playsinline', '');
+      audioRef.current.setAttribute('webkit-playsinline', '');
+      audioRef.current.preload = 'auto';
       
       // Track if we're currently fading out
       const fadeOutTimerRef = { current: null };
@@ -93,6 +96,13 @@ export function PreviewModeProvider({ children }) {
           fadeOutTimerRef.current = null;
         }
       });
+      
+      audioRef.current.addEventListener('error', (e) => {
+        console.error('[PreviewMode] Audio error:', e);
+        setIsPlaying(false);
+      });
+      
+      console.log('[PreviewMode] Audio element initialized');
     }
     
     return () => {
@@ -103,7 +113,7 @@ export function PreviewModeProvider({ children }) {
     };
   }, []);
   
-  // Play preview with fade-in
+  // Play preview with fade-in and iOS Safari unlock
   const playPreview = async (previewUrl) => {
     if (!previewUrl) {
       console.warn('[PreviewMode] No preview URL provided');
@@ -113,6 +123,12 @@ export function PreviewModeProvider({ children }) {
     try {
       console.log('[PreviewMode] Loading preview:', previewUrl);
       
+      // iOS Safari unlock: Must load and attempt play synchronously in user gesture
+      if (!isUnlockedRef.current) {
+        console.log('[PreviewMode] First play - unlocking audio for iOS Safari');
+        isUnlockedRef.current = true;
+      }
+      
       // Load new audio
       audioRef.current.src = previewUrl;
       audioRef.current.load();
@@ -120,7 +136,7 @@ export function PreviewModeProvider({ children }) {
       // Start with volume at 0 for fade-in
       audioRef.current.volume = 0;
       
-      // Play
+      // Play - this MUST be called synchronously in response to user gesture for iOS
       await audioRef.current.play();
       setCurrentPreviewUrl(previewUrl);
       setIsPlaying(true);
@@ -146,6 +162,13 @@ export function PreviewModeProvider({ children }) {
       return true;
     } catch (error) {
       console.error('[PreviewMode] Error playing preview:', error);
+      
+      // If NotAllowedError, audio needs to be unlocked with user gesture
+      if (error.name === 'NotAllowedError') {
+        console.warn('[PreviewMode] Audio blocked - user interaction required');
+        isUnlockedRef.current = false;
+      }
+      
       setIsPlaying(false);
       return false;
     }
