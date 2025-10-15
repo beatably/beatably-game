@@ -8,7 +8,7 @@ import { playClickSound } from "./utils/soundUtils";
 
 const CARD_TYPE = "SONG_CARD";
 
-function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName, roomCode }) {
+function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName, roomCode, myPersistentId }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
@@ -186,7 +186,19 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
 
   // Handle node selection
   const handleNodeSelect = (nodeIndex) => {
-    if (!isMyTurn || (phase !== 'player-turn' && phase !== 'challenge')) return;
+    // PERSISTENT ID FIX: During challenge phase, validate that this player is actually the challenger
+    if (phase === 'challenge') {
+      // Only allow the actual challenger to click nodes
+      if (!challenge?.challengerPersistentId || challenge.challengerPersistentId !== myPersistentId) {
+        console.log('[TimelineBoard] Not the challenger, blocking node selection');
+        return;
+      }
+    } else if (!isMyTurn) {
+      // During normal play, only allow current player
+      return;
+    }
+    
+    if (phase !== 'player-turn' && phase !== 'challenge') return;
     
     playClickSound();
     
@@ -223,6 +235,7 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
           pendingDropIndex={pendingDropIndex}
           currentPlayerName={currentPlayerName}
           roomCode={roomCode}
+          myPersistentId={myPersistentId}
         />
       </div>
       

@@ -101,7 +101,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
           <div
             key={p.id}
             className={`flex flex-col rounded-xl items-center px-1.5 py-1 md:px-2 md:py-1 min-w-[70px] md:min-w-[80px] justify-center relative ${
-              p.id === currentPlayerId 
+              p.persistentId === currentPlayerId 
                 ? "gradient-border-magenta neon-glow-magenta" 
                 : "bg-card/50 border-2 border-border"
             }`}

@@ -16,7 +16,8 @@ const CurvedTimeline = ({
   showFeedback,
   pendingDropIndex,
   currentPlayerName,
-  roomCode
+  roomCode,
+  myPersistentId
 }) => {
   const [hoveredNodeIndex, setHoveredNodeIndex] = useState(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
@@ -590,7 +591,26 @@ const CurvedTimeline = ({
 
   // Handle node click
   const handleNodeClick = (nodeIndex) => {
-    if (!isMyTurn || (phase !== 'player-turn' && phase !== 'challenge')) return;
+    // PERSISTENT ID FIX: Validate challenger during challenge phase
+    if (phase === 'challenge') {
+      console.log('[CurvedTimeline] Challenge phase - validation:', {
+        challengerPersistentId: challenge?.challengerPersistentId,
+        myPersistentId: myPersistentId,
+        match: challenge?.challengerPersistentId === myPersistentId,
+        challengeObject: challenge
+      });
+      
+      // Only allow the actual challenger to click nodes
+      if (!challenge?.challengerPersistentId || challenge.challengerPersistentId !== myPersistentId) {
+        console.log('[CurvedTimeline] Not the challenger, blocking node click');
+        return;
+      }
+    } else if (!isMyTurn) {
+      // During normal play, only allow current player
+      return;
+    }
+    
+    if (phase !== 'player-turn' && phase !== 'challenge') return;
     onNodeSelect(nodeIndex);
   };
 

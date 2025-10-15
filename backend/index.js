@@ -1675,6 +1675,30 @@ const games = {};
 // Store player sessions for reconnection: { sessionId: { playerId, roomCode, playerName, isCreator, timestamp } }
 const playerSessions = {};
 
+// PERSISTENT PLAYER ID SYSTEM
+// Map socket IDs to persistent player IDs: { socketId: persistentId }
+const socketToPlayerMap = {};
+
+// Generate unique persistent player ID
+function generatePersistentPlayerId() {
+  return `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+// Helper function to get persistent ID from socket ID
+function getPersistentId(socketId) {
+  return socketToPlayerMap[socketId] || null;
+}
+
+// Helper function to get socket ID from persistent ID (search through mapping)
+function getSocketId(persistentId) {
+  for (const [socketId, pId] of Object.entries(socketToPlayerMap)) {
+    if (pId === persistentId) {
+      return socketId;
+    }
+  }
+  return null;
+}
+
 // Attempt to load prior state (lobbies/games) from disk on startup
 loadStateFromDisk();
 
@@ -1706,6 +1730,13 @@ io.on('connection', (socket) => {
       session.playerName === playerName;
 
     if (hasValidSession) {
+      // CRITICAL: Update socket-to-persistent-ID mapping
+      const persistentId = session.persistentPlayerId;
+      if (persistentId) {
+        socketToPlayerMap[socket.id] = persistentId;
+        console.log('[PersistentID] Reconnection: mapped socket', socket.id, 'to persistent ID', persistentId);
+      }
+      
       // Update session with new socket ID
       session.playerId = socket.id;
       session.timestamp = Date.now();
@@ -1954,7 +1985,18 @@ io.on('connection', (socket) => {
       callback({ error: "Lobby already exists" });
       return;
     }
-    const player = { id: socket.id, name, isCreator: true, isReady: true };
+    
+    // Generate persistent player ID
+    const persistentId = generatePersistentPlayerId();
+    socketToPlayerMap[socket.id] = persistentId;
+    
+    const player = { 
+      id: socket.id,
+      persistentId: persistentId,  // NEW: Persistent ID
+      name, 
+      isCreator: true, 
+      isReady: true 
+    };
     lobbies[code] = {
       players: [player],
       settings: settings || { difficulty: "normal" },
@@ -1967,12 +2009,15 @@ io.on('connection', (socket) => {
       playerSessions[sessionId] = {
         sessionId,
         playerId: socket.id,
+        persistentPlayerId: persistentId,  // NEW: Store persistent ID in session
         roomCode: code,
         playerName: name,
         isCreator: true,
         timestamp: Date.now()
       };
     }
+    
+    console.log('[PersistentID] Created lobby with persistent player ID:', { socketId: socket.id, persistentId, name });
     
     callback({ lobby: lobbies[code], player, sessionId });
     io.to(code).emit('lobby_update', lobbies[code]);
@@ -2000,9 +2045,22 @@ io.on('connection', (socket) => {
       callback({ error: "Lobby is full (maximum 4 players)" });
       return;
     }
-    const player = { id: socket.id, name, isCreator: false, isReady: true };
+    
+    // Generate persistent player ID
+    const persistentId = generatePersistentPlayerId();
+    socketToPlayerMap[socket.id] = persistentId;
+    
+    const player = { 
+      id: socket.id,
+      persistentId: persistentId,  // NEW: Persistent ID
+      name, 
+      isCreator: false, 
+      isReady: true 
+    };
     lobby.players.push(player);
     socket.join(code);
+    
+    console.log('[PersistentID] Player joined with persistent ID:', { socketId: socket.id, persistentId, name });
     console.log('[Backend] Player joined room:', code, 'Socket rooms:', Array.from(socket.rooms));
     console.log('[Backend] Updated lobby players:', lobby.players.map(p => ({ id: p.id, name: p.name })));
     callback({ lobby, player });
@@ -2110,7 +2168,7 @@ io.on('connection', (socket) => {
       console.log('[Backend] No lobby found for code:', code);
       return;
     }
-    console.log('[Backend] Lobby players:', lobby.players.map(p => ({ id: p.id, name: p.name })));
+    console.log('[Backend] Lobby players:', lobby.players.map(p => ({ id: p.id, persistentId: p.persistentId, name: p.name })));
     lobby.status = "playing";
 
     // Shuffle the song pool for fairness
@@ -2131,17 +2189,19 @@ io.on('connection', (socket) => {
     
     // Each player gets their own timeline starting with one random card
     const timelines = {};
-    const playerOrder = lobby.players.map((p) => p.id);
+    // NEW: Use persistent IDs for player order instead of socket IDs
+    const playerOrder = lobby.players.map((p) => p.persistentId);
     
     // Give each player a unique starting card for their timeline
     const usedStartCards = new Set();
-    playerOrder.forEach((playerId, index) => {
+    playerOrder.forEach((persistentId, index) => {
       let startCard;
       do {
         startCard = shuffledSongs[Math.floor(Math.random() * shuffledSongs.length)];
       } while (usedStartCards.has(startCard.id));
       usedStartCards.add(startCard.id);
-      timelines[playerId] = [startCard];
+      // NEW: Use persistent ID as key for timelines
+      timelines[persistentId] = [startCard];
     });
 
     // Create shared deck excluding the starting cards
@@ -2165,6 +2225,7 @@ io.on('connection', (socket) => {
       songGuess: null, // { playerId, title, artist, phase: 'waiting'|'resolved' }
       players: lobby.players.map((p, idx) => ({
         id: p.id,
+        persistentId: p.persistentId,  // NEW: Include persistent ID in player object
         name: p.name,
         score: 1, // Start with 1 point for the initial card
         tokens: 3,
@@ -2176,7 +2237,7 @@ io.on('connection', (socket) => {
       })),
       currentPlayerIdx: 0,
       phase: "player-turn", // player-turn, reveal, challenge, song-guess, game-over
-      playerOrder: lobby.players.map((p) => p.id),
+      playerOrder: playerOrder,  // NEW: Use persistent IDs for player order
       winCondition: winCondition, // First to N cards in timeline wins (configurable)
       // CRITICAL FIX: Track played cards to prevent cycling back to already-played cards
       playedCards: new Set(), // Track which cards have been played
@@ -2203,7 +2264,7 @@ io.on('connection', (socket) => {
 
   // Handle card placement (turn-based, only current player can act)
   socket.on('place_card', ({ code, index }) => {
-    console.log('[Backend] Received place_card:', { code, index, playerId: socket.id });
+    console.log('[Backend] Received place_card:', { code, index, socketId: socket.id });
     console.log('[Backend] Socket rooms:', Array.from(socket.rooms));
     console.log('[Backend] Available games:', Object.keys(games));
     console.log('[Backend] Available lobbies:', Object.keys(lobbies));
@@ -2222,16 +2283,24 @@ io.on('connection', (socket) => {
     }
     console.log('[Backend] Game found, current player order:', game.playerOrder);
     console.log('[Backend] Current player index:', game.currentPlayerIdx);
-    const playerId = socket.id;
-    const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-    console.log('[Backend] Player validation:', { playerId, currentPlayerId, match: playerId === currentPlayerId });
-    if (playerId !== currentPlayerId) {
-      console.log('[Backend] Not current player:', { playerId, currentPlayerId });
+    
+    // PERSISTENT ID FIX: Use persistent IDs for comparison
+    const persistentId = getPersistentId(socket.id);
+    const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
+    console.log('[Backend] Player validation:', { 
+      socketId: socket.id, 
+      persistentId, 
+      currentPersistentId, 
+      match: persistentId === currentPersistentId 
+    });
+    
+    if (persistentId !== currentPersistentId) {
+      console.log('[Backend] Not current player:', { persistentId, currentPersistentId });
       return;
     }
     console.log('[Backend] All validations passed, processing card placement...');
 
-    const timeline = game.timelines[playerId] || [];
+    const timeline = game.timelines[persistentId] || [];
     const currentCard = game.sharedDeck[game.currentCardIndex];
     if (!currentCard) return;
 
@@ -2283,7 +2352,7 @@ io.on('connection', (socket) => {
     game.lastPlaced = { 
       id: currentCard.id, 
       correct, 
-      playerId: playerId,
+      playerId: persistentId,  // PERSISTENT ID FIX: Use persistent ID
       index: index,
       phase: 'placed' // placed, challenged, resolved
     };
@@ -2306,7 +2375,7 @@ io.on('connection', (socket) => {
         lastPlaced: game.lastPlaced,
         removingId: null,
         currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: currentPlayerId,
+        currentPlayerId: currentPersistentId,  // PERSISTENT ID FIX: Use persistent ID
       });
     });
 
@@ -2387,10 +2456,10 @@ io.on('connection', (socket) => {
     console.log('[Backend] Current player:', game.playerOrder[game.currentPlayerIdx]);
     console.log('[Backend] Feedback:', game.feedback);
     
-    const playerId = socket.id;
-    const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+    // PERSISTENT ID FIX: currentPlayerId from playerOrder is already a persistent ID
+    const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
     // Allow any player to continue, not just the current player
-    console.log('[Backend] Processing continue_game from player:', playerId, 'current player:', currentPlayerId);
+    console.log('[Backend] Processing continue_game, current player persistent ID:', currentPersistentId);
 
     // Emit music stop event to all players (creator will handle it)
     io.to(code).emit('stop_music', { reason: 'continue_to_next_turn' });
@@ -2415,7 +2484,7 @@ io.on('connection', (socket) => {
         }
         
         // Ensure no accidental commit exists; keep committed timelines unchanged
-        gameInTimeout.timelines[currentPlayerId] = (gameInTimeout.timelines[currentPlayerId] || []).filter((c) => c.id !== gameInTimeout.lastPlaced?.id);
+        gameInTimeout.timelines[currentPersistentId] = (gameInTimeout.timelines[currentPersistentId] || []).filter((c) => c.id !== gameInTimeout.lastPlaced?.id);
         gameInTimeout.removingId = null;
         gameInTimeout.lastPlaced = null;
         gameInTimeout.feedback = null;
@@ -2501,11 +2570,11 @@ io.on('connection', (socket) => {
     }
     
     // For correct placement: now COMMIT the card to the player's timeline
-    const playerTimelineCommitted = game.timelines[currentPlayerId] || [];
+    const playerTimelineCommitted = game.timelines[currentPersistentId] || [];
     // Insert at the recorded index
     const commitTimeline = [...playerTimelineCommitted];
     commitTimeline.splice(game.lastPlaced.index, 0, game.sharedDeck[game.currentCardIndex]);
-    game.timelines[currentPlayerId] = commitTimeline;
+    game.timelines[currentPersistentId] = commitTimeline;
 
     // Now advance turn
     if (!advanceTurn(game, code)) {
@@ -2601,8 +2670,9 @@ io.on('connection', (socket) => {
     const game = games[code];
     if (!game) return;
     
-    const playerId = socket.id;
-    const playerIdx = game.players.findIndex(p => p.id === playerId);
+    // PERSISTENT ID FIX: Get persistent ID from socket ID
+    const persistentId = getPersistentId(socket.id);
+    const playerIdx = game.players.findIndex(p => p.persistentId === persistentId);
     if (playerIdx === -1 || game.players[playerIdx].tokens <= 0) return;
     
     // Spend token
@@ -2617,13 +2687,14 @@ io.on('connection', (socket) => {
         // Skip current song but stay with same player
         game.currentCardIndex = (game.currentCardIndex + 1) % game.sharedDeck.length;
         // Don't advance currentPlayerIdx - same player gets the next song
-        const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+        // PERSISTENT ID FIX: currentPlayerId in playerOrder is already a persistent ID
+        const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
         const nextCard = game.sharedDeck[game.currentCardIndex];
         
         // Broadcast update
         game.players.forEach((p) => {
           io.to(p.id).emit('game_update', {
-            timeline: game.timelines[currentPlayerId],
+            timeline: game.timelines[currentPersistentId],
             deck: [nextCard],
             players: game.players,
             phase: "player-turn",
@@ -2631,7 +2702,7 @@ io.on('connection', (socket) => {
             lastPlaced: null,
             removingId: null,
             currentPlayerIdx: game.currentPlayerIdx,
-            currentPlayerId: currentPlayerId,
+            currentPlayerId: currentPersistentId,
           });
         });
         
@@ -2669,14 +2740,15 @@ io.on('connection', (socket) => {
       game.challengeResponses = new Set();
     }
     
-    // Track that this player has responded
+    // Track that this player has responded (using socket ID is fine here)
     game.challengeResponses.add(playerId);
     
-    // Get all players who can challenge (not the current player and have tokens)
-    const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+    // PERSISTENT ID FIX: Get current persistent ID from playerOrder
+    const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
+    // Find eligible challengers by comparing persistent IDs
     const eligibleChallengers = game.players.filter(p => 
-      p.id !== currentPlayerId && p.tokens > 0
-    ).map(p => p.id);
+      p.persistentId !== currentPersistentId && p.tokens > 0
+    ).map(p => p.id); // Return socket IDs for response tracking
     
     // Check if all eligible challengers have responded
     const allResponded = eligibleChallengers.every(id => game.challengeResponses.has(id));
@@ -2690,7 +2762,8 @@ io.on('connection', (socket) => {
       const currentCard = game.sharedDeck[game.currentCardIndex];
       
     // Broadcast reveal state with visual-only timeline (non-committed)
-    const revealTimeline = [...game.timelines[currentPlayerId]];
+    const currentPersistentIdForReveal = game.playerOrder[game.currentPlayerIdx];
+    const revealTimeline = [...game.timelines[currentPersistentIdForReveal]];
     // Insert the placed card visually for reveal only
     revealTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true });
     
@@ -2706,7 +2779,7 @@ io.on('connection', (socket) => {
         lastPlaced: game.lastPlaced,
         removingId: null,
         currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: currentPlayerId,
+        currentPlayerId: currentPersistentIdForReveal,
       });
     });
     } else {
@@ -2717,7 +2790,8 @@ io.on('connection', (socket) => {
       
 // CRITICAL: Include the newly placed card visually while showing challenge progress
       {
-        const originalTimeline = game.timelines[currentPlayerId] || [];
+        const currentPersistentIdForChallenge = game.playerOrder[game.currentPlayerIdx];
+        const originalTimeline = game.timelines[currentPersistentIdForChallenge] || [];
         const displayTimeline = [...originalTimeline];
         const currentCardForDisplay = game.sharedDeck[game.currentCardIndex];
         if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCardForDisplay) {
@@ -2750,7 +2824,7 @@ io.on('connection', (socket) => {
             lastPlaced: game.lastPlaced,
             removingId: null,
             currentPlayerIdx: game.currentPlayerIdx,
-            currentPlayerId: currentPlayerId,
+            currentPlayerId: currentPersistentId,  // PERSISTENT ID FIX: Use currentPersistentId which is defined in this handler
             challengeWindow: {
               respondedCount,
               totalEligible,
@@ -2770,9 +2844,13 @@ io.on('connection', (socket) => {
     const playerId = socket.id;
     const playerIdx = game.players.findIndex(p => p.id === playerId);
     
-    // Check if player has tokens and is not the current player
-    const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-    if (playerIdx === -1 || game.players[playerIdx].tokens <= 0 || playerId === currentPlayerId) return;
+    // PERSISTENT ID FIX: Check if player has tokens and is not the current player
+    const persistentId = getPersistentId(playerId);
+    const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
+    if (playerIdx === -1 || game.players[playerIdx].tokens <= 0 || persistentId === currentPersistentId) return;
+    
+    // Define currentPlayerId for timeline access
+    const currentPlayerId = currentPersistentId;
     
     // Check if challenge is already in progress
     if (game.challenge) return;
@@ -2782,8 +2860,9 @@ io.on('connection', (socket) => {
     
     // Set up challenge state
     game.challenge = {
-      challengerId: playerId,
-      originalPlayerId: currentPlayerId,
+      challengerId: playerId, // Socket ID (for backwards compatibility)
+      challengerPersistentId: persistentId, // Persistent ID for comparisons
+      originalPlayerId: currentPlayerId, // This is already a persistent ID
       cardId: game.lastPlaced?.id,
       originalIndex: game.lastPlaced?.index,
       phase: 'challenger-turn'
@@ -2824,18 +2903,21 @@ io.on('connection', (socket) => {
         console.log('[DEBUG] challenge (initiate_challenge) logging failed', e && e.message);
       }
 
+      // Keep currentPlayerId as original player's persistent ID
+      // Frontend will use challenge.challengerPersistentId to determine who can interact
+      
       game.players.forEach((p) => {
         io.to(p.id).emit('game_update', {
           timeline: displayTimeline, // show visual timeline including placed card
           deck: [game.sharedDeck[game.currentCardIndex]], // Same card
           players: game.players,
           phase: "challenge",
-          challenge: game.challenge,
+          challenge: game.challenge,  // Contains challengerPersistentId for frontend to identify who can place
           feedback: null,
           lastPlaced: game.lastPlaced,
           removingId: null,
           currentPlayerIdx: game.currentPlayerIdx,
-          currentPlayerId: playerId, // Challenger is now active
+          currentPlayerId: currentPlayerId, // Keep as original player's persistent ID
         });
       });
     }
@@ -2865,12 +2947,16 @@ io.on('connection', (socket) => {
     }
     console.log('[CHALLENGE] Processing challenge_place_card...');
     
-    const originalPlayerId = game.challenge.originalPlayerId;
-    const originalTimeline = game.timelines[originalPlayerId] || [];
+    // PERSISTENT ID FIX: Get persistent IDs for timeline access, socket IDs for broadcasts
+    const challengerPersistentId = getPersistentId(playerId);
+    const originalPersistentId = game.challenge.originalPlayerId;
+    const originalTimeline = game.timelines[originalPersistentId] || [];
     const currentCard = game.sharedDeck[game.currentCardIndex];
     
     console.log('[CHALLENGE] Current state:', {
-      originalPlayerId,
+      challengerSocketId: playerId,
+      challengerPersistentId,
+      originalPersistentId,
       originalTimeline: originalTimeline.map(c => ({ id: c.id, year: c.year })),
       currentCard: { id: currentCard?.id, year: currentCard?.year, title: currentCard?.title },
       originalIndex: game.challenge.originalIndex,
@@ -2894,7 +2980,7 @@ io.on('connection', (socket) => {
       adjustedIndex = index - 1;
     }
     
-    // Place challenger's card in the original player's timeline
+    // Place challenger's card in timeline for correctness checking (not committed yet)
     let newTimeline = [...timelineWithoutOriginal];
     newTimeline.splice(adjustedIndex, 0, currentCard);
 
@@ -2996,7 +3082,7 @@ io.on('connection', (socket) => {
       challengerCorrect,
       originalCorrect,
       challengerId: playerId,
-      originalPlayerId,
+      originalPersistentId,  // FIXED: Use the correct variable name
       cardYear: currentCard.year,
       cardId: currentCard.id
     });
@@ -3005,7 +3091,7 @@ io.on('connection', (socket) => {
       // Challenger wins - card goes to challenger's timeline in correct chronological position
       challengeWon = true;
       console.log('[Backend] Challenge outcome: Challenger wins (challenger correct, original wrong)');
-      const challengerTimeline = game.timelines[playerId] || [];
+      const challengerTimeline = game.timelines[challengerPersistentId] || [];
       
       // Find correct position in challenger's timeline
       let insertIndex = challengerTimeline.length;
@@ -3019,28 +3105,28 @@ io.on('connection', (socket) => {
       // Insert card at correct position
       const newChallengerTimeline = [...challengerTimeline];
       newChallengerTimeline.splice(insertIndex, 0, currentCard);
-      game.timelines[playerId] = newChallengerTimeline;
-      game.timelines[originalPlayerId] = timelineWithoutOriginal; // Remove from original
+      game.timelines[challengerPersistentId] = newChallengerTimeline;
+      game.timelines[originalPersistentId] = timelineWithoutOriginal; // Remove from original
       game.players[game.players.findIndex(p => p.id === playerId)].score += 1;
     } else if (!challengerCorrect && originalCorrect) {
       // Original player wins - keep original placement
       challengeWon = false;
       console.log('[Backend] Challenge outcome: Original player wins (challenger wrong, original correct)');
-      // Put the card back in original position
-      game.timelines[originalPlayerId].splice(game.challenge.originalIndex, 0, currentCard);
+      // PERSISTENT ID FIX: Use persistent ID for timeline access
+      game.timelines[originalPersistentId].splice(game.challenge.originalIndex, 0, currentCard);
     } else if (challengerCorrect && originalCorrect) {
       // Both correct - original player keeps it (went first)
       challengeWon = false;
       console.log('[Backend] Challenge outcome: Both correct, original player keeps card');
-      // Put the card back in original position
-      game.timelines[originalPlayerId].splice(game.challenge.originalIndex, 0, currentCard);
+      // PERSISTENT ID FIX: Use persistent ID for timeline access
+      game.timelines[originalPersistentId].splice(game.challenge.originalIndex, 0, currentCard);
     } else {
       // CRITICAL FIX: Both wrong - nobody gets the card, remove from all timelines
       challengeWon = false;
       console.log('[Backend] Challenge outcome: Both wrong, nobody gets the card');
-      game.timelines[originalPlayerId] = timelineWithoutOriginal; // Remove from original
-      // Ensure card is not in challenger's timeline either
-      game.timelines[playerId] = (game.timelines[playerId] || []).filter(c => c.id !== currentCard.id);
+      game.timelines[originalPersistentId] = timelineWithoutOriginal; // Remove from original
+      // PERSISTENT ID FIX: Ensure card is not in challenger's timeline either
+      game.timelines[challengerPersistentId] = (game.timelines[challengerPersistentId] || []).filter(c => c.id !== currentCard.id);
     }
     
     // Set challenge result
@@ -3056,13 +3142,16 @@ io.on('connection', (socket) => {
 
     // Broadcast challenge result with display timeline showing both cards
     // Mark cards with player-specific ownership for UI labels
+    // PERSISTENT ID FIX: Get socket ID from persistent ID for player comparison
+    const originalSocketId = getSocketId(originalPersistentId);
+    
     game.players.forEach((p) => {
       // Create a player-specific timeline where each card knows if it belongs to this player
       const playerSpecificTimeline = displayTimeline.map(card => {
         const cardCopy = { ...card };
         
         // Mark which card is "yours" for this specific player
-        if (card.originalCard && p.id === originalPlayerId) {
+        if (card.originalCard && p.id === originalSocketId) {
           cardCopy.isYourGuess = true;
         } else if (card.challengerCard && p.id === playerId) {
           cardCopy.isYourGuess = true;
@@ -3081,7 +3170,7 @@ io.on('connection', (socket) => {
         lastPlaced: game.lastPlaced,
         removingId: null,
         currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: originalPlayerId,
+        currentPlayerId: originalPersistentId,  // PERSISTENT ID FIX: Use persistent ID
       });
     });
   });
@@ -3089,7 +3178,9 @@ io.on('connection', (socket) => {
   // Helper function to update all player scores to match their timeline lengths
   const updatePlayerScores = (game) => {
     game.players.forEach((player) => {
-      const timelineLength = (game.timelines[player.id] || []).length;
+      // PERSISTENT ID FIX: Use persistent ID to access timelines
+      const persistentId = player.persistentId;
+      const timelineLength = (game.timelines[persistentId] || []).length;
       player.score = timelineLength;
     });
   };
@@ -3141,6 +3232,56 @@ io.on('connection', (socket) => {
 
     return false;
   };
+
+  // Handle challengerId update after reconnection
+  socket.on('update_challenger_id', ({ code, oldChallengerId, newChallengerId }) => {
+    console.log('[Backend] Received update_challenger_id:', { code, oldChallengerId, newChallengerId });
+    
+    const game = games[code];
+    if (!game || !game.challenge) {
+      console.log('[Backend] No game or challenge found for update_challenger_id');
+      return;
+    }
+    
+    // Update the challengerId if it matches the old ID
+    if (game.challenge.challengerId === oldChallengerId) {
+      console.log('[Backend] Updating challengerId from', oldChallengerId, 'to', newChallengerId);
+      game.challenge.challengerId = newChallengerId;
+      
+      // Also update currentPlayerId if in challenge phase
+      if (game.phase === 'challenge') {
+        const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
+        
+        // Broadcast updated state to all players
+        const currentCard = game.sharedDeck[game.currentCardIndex];
+        const originalTimeline = game.timelines[game.challenge.originalPlayerId] || [];
+        const displayTimeline = [...originalTimeline];
+        if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCard) {
+          displayTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true, challengeCard: true });
+        }
+        
+        game.players.forEach((p) => {
+          io.to(p.id).emit('game_update', {
+            timeline: displayTimeline,
+            deck: [currentCard],
+            players: game.players,
+            phase: "challenge",
+            challenge: game.challenge,
+            feedback: null,
+            lastPlaced: game.lastPlaced,
+            removingId: null,
+            currentPlayerIdx: game.currentPlayerIdx,
+            currentPlayerId: newChallengerId, // Updated to new challenger ID
+          });
+        });
+      }
+    } else {
+      console.log('[Backend] ChallengerId mismatch, not updating:', {
+        current: game.challenge.challengerId,
+        expected: oldChallengerId
+      });
+    }
+  });
 
   // Continue after challenge resolution - anyone can continue
   socket.on('continue_after_challenge', ({ code }) => {
@@ -3453,8 +3594,13 @@ io.on('connection', (socket) => {
     if (!game || game.phase !== 'song-guess') return;
     
     const playerId = socket.id;
-    const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-    if (playerId !== currentPlayerId) return; // Only current player can guess
+    // PERSISTENT ID FIX: Get persistent IDs for comparison
+    const persistentId = getPersistentId(playerId);
+    const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
+    if (persistentId !== currentPersistentId) return; // Only current player can guess
+    
+    // Define currentPlayerId for timeline access
+    const currentPlayerId = currentPersistentId;
     
     const currentCard = game.sharedDeck[game.currentCardIndex];
     if (!currentCard) return;
@@ -3563,8 +3709,13 @@ io.on('connection', (socket) => {
     if (!game || game.phase !== 'song-guess') return;
     
     const playerId = socket.id;
-    const currentPlayerId = game.playerOrder[game.currentPlayerIdx];
-    if (playerId !== currentPlayerId) return; // Only current player can skip
+    // PERSISTENT ID FIX: Get persistent IDs for comparison
+    const persistentId = getPersistentId(playerId);
+    const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
+    if (persistentId !== currentPersistentId) return; // Only current player can skip
+    
+    // Define currentPlayerId for timeline access
+    const currentPlayerId = currentPersistentId;
     
     // Move to challenge window after skipping song guess
     game.phase = "challenge-window";
@@ -4251,6 +4402,91 @@ app.get('/api/debug/games/:code/songs', (req, res) => {
   });
 });
 
+// Frontend log storage (in-memory)
+const frontendLogs = [];
+const MAX_FRONTEND_LOGS = 200;
+
+// POST endpoint to receive frontend logs
+app.post('/api/debug/frontend-logs', (req, res) => {
+  try {
+    const { level, message, timestamp, playerInfo, data } = req.body || {};
+    const logEntry = {
+      timestamp: timestamp || new Date().toISOString(),
+      level: level || 'log',
+      message: message || '',
+      playerInfo: playerInfo || {},
+      data: data || null,
+      receivedAt: new Date().toISOString()
+    };
+    
+    frontendLogs.push(logEntry);
+    
+    // Keep only last MAX_FRONTEND_LOGS entries
+    if (frontendLogs.length > MAX_FRONTEND_LOGS) {
+      frontendLogs.shift();
+    }
+    
+    res.json({ ok: true, totalLogs: frontendLogs.length });
+  } catch (error) {
+    console.error('[FrontendLogs] Error storing log:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// GET endpoint to retrieve frontend logs
+app.get('/api/debug/frontend-logs', (req, res) => {
+  try {
+    const { player, level, limit, search } = req.query;
+    
+    let filtered = [...frontendLogs];
+    
+    // Filter by player name
+    if (player) {
+      filtered = filtered.filter(log => 
+        log.playerInfo?.playerName?.toLowerCase().includes(player.toLowerCase())
+      );
+    }
+    
+    // Filter by log level
+    if (level) {
+      filtered = filtered.filter(log => log.level === level);
+    }
+    
+    // Filter by search term in message
+    if (search) {
+      filtered = filtered.filter(log => 
+        log.message?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    // Apply limit
+    const limitNum = parseInt(limit) || filtered.length;
+    filtered = filtered.slice(-limitNum);
+    
+    res.json({
+      ok: true,
+      total: frontendLogs.length,
+      filtered: filtered.length,
+      logs: filtered
+    });
+  } catch (error) {
+    console.error('[FrontendLogs] Error retrieving logs:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// DELETE endpoint to clear frontend logs
+app.delete('/api/debug/frontend-logs', (req, res) => {
+  try {
+    const count = frontendLogs.length;
+    frontendLogs.length = 0;
+    res.json({ ok: true, message: 'Logs cleared', clearedCount: count });
+  } catch (error) {
+    console.error('[FrontendLogs] Error clearing logs:', error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 app.get('/debug', (req, res) => {
   const rooms = {};
   io.sockets.adapter.rooms.forEach((sockets, room) => {
@@ -4263,7 +4499,10 @@ app.get('/debug', (req, res) => {
     debugEndpoints: [
       '/api/debug/songs - View last fetched songs',
       '/api/debug/games - View all games and their song stats',
-      '/api/debug/games/:code/songs - View specific game songs'
+      '/api/debug/games/:code/songs - View specific game songs',
+      '/api/debug/frontend-logs - View frontend console logs from both players',
+      'POST /api/debug/frontend-logs - Submit frontend logs',
+      'DELETE /api/debug/frontend-logs - Clear frontend logs'
     ]
   });
 });

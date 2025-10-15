@@ -19,7 +19,6 @@ function GameFooter({
   onUseToken,
   onGuessSong,
   challenge,
-  onChallengeResponse,
   onInitiateChallenge,
   onContinueAfterChallenge,
   onSkipChallenge,
@@ -646,8 +645,12 @@ function GameFooter({
     return `${Math.floor(seconds/60)}:${(seconds%60).toString().padStart(2, '0')}`;
   };
 
-  const myPlayer = players?.find(p => p.id === myPlayerId);
-  const currentPlayer = players?.find(p => p.id === currentPlayerId);
+  // Helper functions for finding players
+  const findPlayerByPersistentId = (persistentId) => players?.find(p => p.persistentId === persistentId);
+  const findPlayerBySocketId = (socketId) => players?.find(p => p.id === socketId);
+  
+  const myPlayer = findPlayerBySocketId(myPlayerId);
+  const currentPlayer = findPlayerByPersistentId(currentPlayerId);
 
 
   const handleTokenAction = (action, targetPlayerId = null) => {
@@ -1099,72 +1102,6 @@ function GameFooter({
           )}
         </div>
       </div>
-      {/* Challenge section */}
-      {challenge && challenge.targetId === myPlayerId && (
-        <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
-          <div className="text-white font-bold mb-2">
-            {players?.find(p => p.id === challenge.challengerId)?.name} challenges your placement!
-          </div>
-          <div className="flex gap-2 justify-center">
-            <button 
-              ref={challengeRejectButtonRef}
-              onClick={() => {
-                onChallengeResponse(false);
-                // Immediately blur after click to prevent focus ring
-                if (challengeRejectButtonRef.current) {
-                  setTimeout(() => {
-                    challengeRejectButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (challengeRejectButtonRef.current) {
-                  challengeRejectButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (challengeRejectButtonRef.current) {
-                  challengeRejectButtonRef.current.blur();
-                }
-              }}
-              className="w-full h-12 px-4 border border-border font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
-              style={{ background: 'transparent', WebkitTapHighlightColor: 'transparent' }}
-            >
-              Reject (Keep card)
-            </button>
-            <button 
-              ref={challengeAcceptButtonRef}
-              onClick={() => {
-                onChallengeResponse(true);
-                // Immediately blur after click to prevent focus ring
-                if (challengeAcceptButtonRef.current) {
-                  setTimeout(() => {
-                    challengeAcceptButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (challengeAcceptButtonRef.current) {
-                  challengeAcceptButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (challengeAcceptButtonRef.current) {
-                  challengeAcceptButtonRef.current.blur();
-                }
-              }}
-              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline"
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              Accept (Remove card)
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Song Guess Modal */}
       <SongGuessModal
@@ -1279,7 +1216,7 @@ function GameFooter({
       {phase === 'song-guess' && !isMyTurn && (
         <div className="w-full max-w-md p-3 text-center mb-2" style={{ background: 'transparent' }}>
           <div className="text-white mb-4">
-            {players?.find(p => p.id === currentPlayerId)?.name} is deciding whether to guess the song...
+            {findPlayerByPersistentId(currentPlayerId)?.name} is deciding whether to guess the song...
           </div>
         </div>
       )}
@@ -1370,11 +1307,11 @@ function GameFooter({
                   onClick={() => {
                     onSkipChallenge();
                     // Immediately blur after click to prevent focus ring
-                    if (challengeWindowOkButtonRef.current) {
-                      setTimeout(() => {
+                    setTimeout(() => {
+                      if (challengeWindowOkButtonRef.current) {
                         challengeWindowOkButtonRef.current.blur();
-                      }, 0);
-                    }
+                      }
+                    }, 0);
                   }}
                   onTouchStart={() => {
                     // Prevent focus on touch start
@@ -1406,24 +1343,40 @@ function GameFooter({
       })()}
 
       {/* Challenge in progress section */}
-      {phase === 'challenge' && challenge && (
-        <div className="w-full max-w-md p-3 text-center mb-8" style={{ background: 'transparent' }}>
-          <div className="text-white font-bold mb-2">
-            {challenge.challengerId === myPlayerId ? 
-              "You are challenging the placement!" : 
-              `${players?.find(p => p.id === challenge.challengerId)?.name} is challenging the placement!`
-            }
-          </div>
-          {pendingDropIndex === null && (
-            <div className="text-white text-sm">
-              {challenge.challengerId === myPlayerId ? 
-                "Select a place on timeline where you think the song belongs" : 
-                "Waiting for challenger to place their guess..."
+      {phase === 'challenge' && challenge && (() => {
+        // PERSISTENT ID FIX: Compare persistent IDs, not socket IDs
+        const myPersistentId = myPlayer?.persistentId;
+        const challengerPersistentId = challenge.challengerPersistentId || challenge.challengerId;
+        const isMe = myPersistentId && challengerPersistentId && myPersistentId === challengerPersistentId;
+        
+        console.log('[GameFooter] Challenge UI check:', {
+          challengerId: challenge.challengerId,
+          challengerPersistentId: challenge.challengerPersistentId,
+          myPlayerId,
+          myPersistentId,
+          isMe,
+          phase,
+          challengerName: challenge.challengerName
+        });
+        return (
+          <div className="w-full max-w-md p-3 text-center mb-8" style={{ background: 'transparent' }}>
+            <div className="text-white font-bold mb-2">
+              {isMe ? 
+                "You are challenging the placement!" : 
+                `${challenge.challengerName || findPlayerByPersistentId(challenge.challengerPersistentId || challenge.challengerId)?.name || 'A player'} is challenging the placement!`
               }
             </div>
-          )}
-        </div>
-      )}
+            {pendingDropIndex === null && (
+              <div className="text-white text-sm">
+                {challenge.challengerId === myPlayerId ? 
+                  "Select a place on timeline where you think the song belongs" : 
+                  "Waiting for challenger to place their guess..."
+                }
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Challenge resolved section */}
       {phase === 'challenge-resolved' && challenge && feedback && (
@@ -1433,14 +1386,14 @@ function GameFooter({
           </div>
           <div className="text-white text-sm mb-8">
             {challenge.result?.challengeWon ? 
-              `${players?.find(p => p.id === challenge.challengerId)?.name} won the challenge!` :
+              `${findPlayerByPersistentId(challenge.challengerId)?.name} won the challenge!` :
               !challenge.result?.challengerCorrect && challenge.result?.originalCorrect ?
-                `${players?.find(p => p.id === challenge.originalPlayerId)?.name} placed it correctly!` :
+                `${findPlayerByPersistentId(challenge.originalPlayerId)?.name} placed it correctly!` :
                 challenge.result?.challengerCorrect && challenge.result?.originalCorrect ?
-                  `Both players placed it correctly, but ${players?.find(p => p.id === challenge.originalPlayerId)?.name} went first!` :
+                  `Both players placed it correctly, but ${findPlayerByPersistentId(challenge.originalPlayerId)?.name} went first!` :
                   !challenge.result?.challengerCorrect && !challenge.result?.originalCorrect ?
                     `Both players placed it incorrectly! No one gets the card.` :
-                    `${players?.find(p => p.id === challenge.challengerId)?.name} placed it correctly, but ${players?.find(p => p.id === challenge.originalPlayerId)?.name} went first!`
+                    `${findPlayerByPersistentId(challenge.challengerId)?.name} placed it correctly, but ${findPlayerByPersistentId(challenge.originalPlayerId)?.name} went first!`
             }
           </div>
           <button 
@@ -1564,7 +1517,7 @@ function GameFooter({
 
       {/* Feedback section */}
       <div className="w-full max-w-md flex flex-col items-center">
-        {showFeedback && feedback ? (
+        {showFeedback && feedback && phase !== 'challenge-resolved' ? (
           <div className="w-full p-3 text-center mb-2" style={{ background: 'transparent' }}>
             <div className="font-bold mb-4">
               {feedback.correct ? 
@@ -1628,7 +1581,7 @@ function GameFooter({
               </>
             ) : (
               <div className="text-foreground text-md md:text-2xl font-bold mb-1">
-                {isMyTurn ? "Select a place in the timeline above" : `${players?.find(p => p.id === currentPlayerId)?.name}'s turn`}
+                {isMyTurn ? "Select a place in the timeline above" : `${findPlayerByPersistentId(currentPlayerId)?.name}'s turn`}
               </div>
             )}
             

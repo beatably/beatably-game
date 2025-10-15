@@ -12,6 +12,7 @@ import SessionRestore from "./SessionRestore";
 import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
+import debugLogger from './utils/debugLogger';
 import viewportManager from "./utils/viewportUtils";
 import deviceAwarePlayback from "./utils/deviceAwarePlayback";
 import './App.css';
@@ -172,6 +173,35 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [playerId, setPlayerId] = useState(""); // local socket id
   const [roomCode, setRoomCode] = useState("");
   const [isCreator, setIsCreator] = useState(false);
+  
+  // Initialize debug logging based on URL parameter or localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const debugParam = params.get('debug');
+    
+    if (debugParam === 'true') {
+      localStorage.setItem('debug_logging', 'true');
+      debugLogger.enable();
+      console.log('[DebugLogger] Enabled via URL parameter');
+    } else if (debugParam === 'false') {
+      localStorage.removeItem('debug_logging');
+      debugLogger.disable();
+      console.log('[DebugLogger] Disabled via URL parameter');
+    }
+  }, []);
+  
+  // Update debug logger with player info when available
+  useEffect(() => {
+    if (playerName && roomCode) {
+      debugLogger.updatePlayerInfo({
+        playerName,
+        playerId: socketRef.current?.id,
+        roomCode,
+        isCreator,
+        view
+      });
+    }
+  }, [playerName, roomCode, playerId, isCreator, view]);
   const [gameSettings, setGameSettings] = useState({
     difficulty: "normal",
     winCondition: 10,
@@ -529,6 +559,31 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             if (response && response.success) {
               joinedRef.current = true;
               if (sid) setSessionId(sid);
+              
+              // CRITICAL FIX: Restore essential session data when auto-rejoining
+              if (saved) {
+                console.log('[Socket] Auto-rejoin: Restoring session data:', {
+                  roomCode: saved.roomCode,
+                  playerName: saved.playerName,
+                  isCreator: saved.isCreator
+                });
+                
+                // Restore roomCode (needed for all socket events)
+                if (saved.roomCode) {
+                  setRoomCode(saved.roomCode);
+                }
+                
+                // Restore playerName
+                if (saved.playerName) {
+                  setPlayerName(saved.playerName);
+                }
+                
+                // Restore isCreator flag
+                if (saved.isCreator !== undefined) {
+                  setIsCreator(saved.isCreator === true);
+                }
+              }
+              
               if (response.view === 'waiting' && response.lobby) {
                 setPlayers(response.lobby.players);
                 setGameSettings(response.lobby.settings || gameSettings);
@@ -542,10 +597,79 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                 setPhase(gameState.phase);
                 setFeedback(gameState.feedback);
                 setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
-                setLastPlaced(gameState.lastPlaced);
-                setRemovingId(gameState.removingId);
-                setChallenge(gameState.challenge);
-                setCurrentPlayerId(gameState.currentPlayerId);
+                
+                // CRITICAL FIX: Prioritize saved session UI state over backend state
+                // Backend doesn't always maintain UI indicators across phases/refreshes
+                // Use nullish coalescing to handle both null and undefined properly
+                console.log('[Socket] Auto-rejoin: Restoring UI state from saved session:', {
+                  savedLastPlaced: saved?.lastPlaced,
+                  backendLastPlaced: gameState.lastPlaced,
+                  savedChallenge: saved?.challenge,
+                  backendChallenge: gameState.challenge
+                });
+                
+                setLastPlaced((saved && saved.lastPlaced !== undefined) ? saved.lastPlaced : (gameState.lastPlaced ?? null));
+                setRemovingId((saved && saved.removingId !== undefined) ? saved.removingId : (gameState.removingId ?? null));
+                
+              // For challenge, we need to reconstruct player names from the players array
+              let restoredChallenge = (saved && saved.challenge !== undefined) ? saved.challenge : (gameState.challenge ?? null);
+              console.log('[Socket] Auto-rejoin: Challenge reconstruction:', {
+                hasChallenge: !!restoredChallenge,
+                challengerId: restoredChallenge?.challengerId,
+                originalPlayerId: restoredChallenge?.originalPlayerId,
+                playersCount: gameState.players?.length
+              });
+              
+              if (restoredChallenge && gameState.players) {
+                // PERSISTENT ID FIX: Use persistentId for lookups
+                // Ensure challenger name is populated
+                if (restoredChallenge.challengerId && !restoredChallenge.challengerName) {
+                  const challenger = gameState.players.find(p => p.persistentId === restoredChallenge.challengerId);
+                  console.log('[Socket] Auto-rejoin: Looking for challenger:', restoredChallenge.challengerId, 'found:', challenger?.name);
+                  if (challenger) {
+                    restoredChallenge = { ...restoredChallenge, challengerName: challenger.name };
+                  }
+                }
+                // Ensure target name is populated (check both targetId and originalPlayerId)
+                const targetPlayerId = restoredChallenge.targetId || restoredChallenge.originalPlayerId;
+                if (targetPlayerId && !restoredChallenge.targetName) {
+                  const target = gameState.players.find(p => p.persistentId === targetPlayerId);
+                  console.log('[Socket] Auto-rejoin: Looking for target:', targetPlayerId, 'found:', target?.name);
+                  if (target) {
+                    restoredChallenge = { ...restoredChallenge, targetName: target.name };
+                  }
+                }
+              }
+                console.log('[Socket] Auto-rejoin: Final challenge after reconstruction:', restoredChallenge);
+                
+                // CRITICAL FIX: If this player was the challenger before refresh,
+                // update challengerId to their new socket ID so UI displays correctly
+                const wasChallenger = restoredChallenge && saved && saved.playerId === restoredChallenge.challengerId;
+                if (wasChallenger && socketRef.current) {
+                  console.log('[Socket] Auto-rejoin: Was challenger, updating challengerId to new socket ID');
+                  restoredChallenge = { ...restoredChallenge, challengerId: socketRef.current.id };
+                  
+                  // CRITICAL: Inform backend about the challengerId update
+                  console.log('[Socket] Auto-rejoin: Notifying backend of challengerId update');
+                  socketRef.current.emit('update_challenger_id', {
+                    code: saved.roomCode,
+                    oldChallengerId: saved.playerId,
+                    newChallengerId: socketRef.current.id
+                  });
+                }
+                
+                setChallenge(restoredChallenge);
+                
+                // CRITICAL FIX: If this player was the current player before refresh,
+                // update currentPlayerId to their new socket ID so buttons remain clickable
+                const wasCurrentPlayer = saved && saved.playerId === saved.currentPlayerId;
+                if (wasCurrentPlayer && socketRef.current) {
+                  console.log('[Socket] Auto-rejoin: Was current player, updating currentPlayerId to new socket ID');
+                  setCurrentPlayerId(socketRef.current.id);
+                } else {
+                  setCurrentPlayerId(gameState.currentPlayerId);
+                }
+                
                 setView('game');
               }
             }
@@ -645,7 +769,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       myPlayerId: socketRef.current?.id,
       phase: game.phase,
       deckLength: game.deck?.length || 0,
-      winner: game.winner
+      winner: game.winner,
+      backendLastPlaced: game.lastPlaced,
+      backendChallenge: game.challenge
     });
     // TEMP DEBUG: store full game_update payload so you can inspect it in the browser console after reproducing
     try {
@@ -716,10 +842,75 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setFeedback(game.feedback);
         // Only show feedback during reveal phase, not during challenge-window
         setShowFeedback(!!game.feedback && game.phase === 'reveal');
-        setLastPlaced(game.lastPlaced);
+        
+        // CRITICAL FIX: Preserve client-side UI state over backend state in game_update
+        // The backend doesn't always maintain visual indicators (lastPlaced) or player names (challenge)
+        // Only update if backend provides MORE information than what we have locally
+        setLastPlaced(prevLastPlaced => {
+          // Keep local lastPlaced if backend doesn't provide one
+          if (!game.lastPlaced && prevLastPlaced) {
+            console.log('[App] game_update: Preserving local lastPlaced:', prevLastPlaced);
+            return prevLastPlaced;
+          }
+          return game.lastPlaced;
+        });
+        
         setRemovingId(game.removingId);
-        setChallenge(game.challenge);
-        setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
+        
+        setChallenge(prevChallenge => {
+          const newChallenge = game.challenge;
+          
+          // If no new challenge from backend, keep existing
+          if (!newChallenge) return prevChallenge;
+          
+          // Reconstruct player names if missing
+          let enrichedChallenge = { ...newChallenge };
+          
+          if (game.players) {
+            // Ensure challenger name is populated
+            if (enrichedChallenge.challengerId && !enrichedChallenge.challengerName) {
+              const challenger = game.players.find(p => p.id === enrichedChallenge.challengerId);
+              if (challenger) {
+                enrichedChallenge.challengerName = challenger.name;
+                console.log('[App] game_update: Populated challengerName:', challenger.name);
+              }
+            }
+            
+            // Ensure target name is populated (check both targetId and originalPlayerId)
+            const targetPlayerId = enrichedChallenge.targetId || enrichedChallenge.originalPlayerId;
+            if (targetPlayerId && !enrichedChallenge.targetName) {
+              const target = game.players.find(p => p.id === targetPlayerId);
+              if (target) {
+                enrichedChallenge.targetName = target.name;
+                console.log('[App] game_update: Populated targetName:', target.name);
+              }
+            }
+          }
+          
+          // CRITICAL FIX: Update challengerId if this player was the challenger before the game_update
+          // (This handles the case where game_update arrives after reconnection with stale socket IDs)
+          if (prevChallenge && prevChallenge.challengerId === socketRef.current?.id) {
+            console.log('[App] game_update: Preserving challenger identity after reconnection');
+            enrichedChallenge = { ...enrichedChallenge, challengerId: socketRef.current.id };
+          }
+          
+          return enrichedChallenge;
+        });
+        
+        // CRITICAL FIX: Preserve currentPlayerId if this player was the current player before game_update
+        // (This handles the case where game_update arrives after reconnection with stale socket IDs)
+        // Check against saved session data since prevCurrentPlayerId might already be stale
+        const savedSession = sessionManager.hasValidSession && sessionManager.hasValidSession() 
+          ? sessionManager.getSession() 
+          : null;
+        const wasCurrentPlayer = savedSession && savedSession.playerId === savedSession.currentPlayerId;
+        
+        if (wasCurrentPlayer && socketRef.current) {
+          console.log('[App] game_update: Preserving currentPlayerId after reconnection (from session data)');
+          setCurrentPlayerId(socketRef.current.id);
+        } else {
+          setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
+        }
         
         // Increment game round when the current player changes
         if (game.currentPlayerId !== currentPlayerId) {
@@ -1303,12 +1494,14 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           
           if (response.success) {
             console.log('[SessionManager] Successfully reconnected to:', response.view);
+            console.log('[SessionManager] CRITICAL: Restoring isCreator flag:', sessionRestoreData.isCreator);
             
             // Restore app state
             setSessionId(sessionRestoreData.sessionId);
             setPlayerName(sessionRestoreData.playerName);
             setRoomCode(sessionRestoreData.roomCode);
-            setIsCreator(sessionRestoreData.isCreator);
+            // CRITICAL FIX: Ensure isCreator is properly restored
+            setIsCreator(sessionRestoreData.isCreator === true);
             setPlayerId(socketRef.current.id);
             
             if (response.view === 'waiting') {
@@ -1329,10 +1522,60 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               setPhase(gameState.phase);
               setFeedback(gameState.feedback);
               setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
-              setLastPlaced(gameState.lastPlaced);
-              setRemovingId(gameState.removingId);
-              setChallenge(gameState.challenge);
-              setCurrentPlayerId(gameState.currentPlayerId);
+              
+              // CRITICAL FIX: Prioritize saved session UI state over backend state
+              // Backend doesn't always maintain UI indicators across phases/refreshes
+              // Use nullish coalescing to handle both null and undefined properly
+              console.log('[SessionManager] Manual restore: Restoring UI state from saved session:', {
+                savedLastPlaced: sessionRestoreData?.lastPlaced,
+                backendLastPlaced: gameState.lastPlaced,
+                savedChallenge: sessionRestoreData?.challenge,
+                backendChallenge: gameState.challenge
+              });
+              
+              setLastPlaced((sessionRestoreData && sessionRestoreData.lastPlaced !== undefined) ? sessionRestoreData.lastPlaced : (gameState.lastPlaced ?? null));
+              setRemovingId((sessionRestoreData && sessionRestoreData.removingId !== undefined) ? sessionRestoreData.removingId : (gameState.removingId ?? null));
+              
+              // For challenge, we need to reconstruct player names from the players array
+              let restoredChallenge = (sessionRestoreData && sessionRestoreData.challenge !== undefined) ? sessionRestoreData.challenge : (gameState.challenge ?? null);
+              if (restoredChallenge && gameState.players) {
+                // PERSISTENT ID FIX: Use persistentId for lookups
+                // Ensure challenger name is populated
+                if (restoredChallenge.challengerId && !restoredChallenge.challengerName) {
+                  const challenger = gameState.players.find(p => p.persistentId === restoredChallenge.challengerId);
+                  if (challenger) {
+                    restoredChallenge = { ...restoredChallenge, challengerName: challenger.name };
+                  }
+                }
+                // Ensure target name is populated (check both targetId and originalPlayerId)
+                const targetPlayerId = restoredChallenge.targetId || restoredChallenge.originalPlayerId;
+                if (targetPlayerId && !restoredChallenge.targetName) {
+                  const target = gameState.players.find(p => p.persistentId === targetPlayerId);
+                  if (target) {
+                    restoredChallenge = { ...restoredChallenge, targetName: target.name };
+                  }
+                }
+              }
+              
+              // CRITICAL FIX: If this player was the challenger before refresh,
+              // update challengerId to their new socket ID so UI displays correctly
+              const wasChallenger = restoredChallenge && sessionRestoreData && sessionRestoreData.playerId === restoredChallenge.challengerId;
+              if (wasChallenger && socketRef.current) {
+                console.log('[SessionManager] Manual restore: Was challenger, updating challengerId to new socket ID');
+                restoredChallenge = { ...restoredChallenge, challengerId: socketRef.current.id };
+              }
+              
+              setChallenge(restoredChallenge);
+              
+              // CRITICAL FIX: If this player was the current player before refresh,
+              // update currentPlayerId to their new socket ID so buttons remain clickable
+              const wasCurrentPlayer = sessionRestoreData && sessionRestoreData.playerId === sessionRestoreData.currentPlayerId;
+              if (wasCurrentPlayer && socketRef.current) {
+                console.log('[SessionManager] Manual restore: Was current player, updating currentPlayerId to new socket ID');
+                setCurrentPlayerId(socketRef.current.id);
+              } else {
+                setCurrentPlayerId(gameState.currentPlayerId);
+              }
               
               // CRITICAL FIX: Restore game round from session data
               if (sessionRestoreData.gameRound) {
@@ -1583,18 +1826,30 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Handler for pending drop - sets the pending drop index
   const handlePendingDrop = (index) => {
+    // PERSISTENT ID FIX: Use persistent ID comparison for turn validation
+    const myPlayer = players?.find(p => p.id === socketRef.current?.id);
+    const myPersistentId = myPlayer?.persistentId;
+    
+    // CRITICAL FIX: Same logic as isMyTurn - check challenger during challenge phase
+    const isMyTurnCheck = myPersistentId && (
+      (phase === 'challenge' && challenge?.challengerPersistentId === myPersistentId) ||
+      (phase !== 'challenge' && currentPlayerId && myPersistentId === currentPlayerId)
+    );
+    
     console.log("[App] handlePendingDrop called:", {
       index,
       phase,
-      playerId: socketRef.current?.id,
+      mySocketId: socketRef.current?.id,
+      myPersistentId,
       currentPlayerId,
-      isMyTurn: socketRef.current?.id === currentPlayerId,
+      challengerPersistentId: challenge?.challengerPersistentId,
+      isMyTurn: isMyTurnCheck,
       roomCode
     });
     
     // Allow pending drop for both player-turn and challenge phases
     if (phase !== 'player-turn' && phase !== 'challenge') return;
-    if (socketRef.current?.id !== currentPlayerId) return;
+    if (!isMyTurnCheck) return;
     
     setPendingDropIndex(index);
   };
@@ -1727,12 +1982,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     socketRef.current.emit("initiate_challenge", { code: roomCode });
   };
 
-  // Challenge response handler
-  const handleChallengeResponse = (accept) => {
-    if (!socketRef.current || !roomCode) return;
-    socketRef.current.emit("challenge_response", { code: roomCode, accept });
-  };
-
   // Skip challenge handler
   const handleSkipChallenge = () => {
     if (!socketRef.current || !roomCode) return;
@@ -1749,7 +1998,11 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const handleChallengePlaceCard = (index) => {
     if (!socketRef.current || !roomCode) return;
     if (phase !== 'challenge') return;
-    if (challenge?.challengerId !== socketRef.current.id) return;
+    
+    // PERSISTENT ID FIX: Use persistent ID comparison for challenge validation
+    const myPlayer = players?.find(p => p.id === socketRef.current?.id);
+    const myPersistentId = myPlayer?.persistentId;
+    if (challenge?.challengerPersistentId !== myPersistentId) return;
     
     socketRef.current.emit("challenge_place_card", { code: roomCode, index });
   };
@@ -2227,23 +2480,35 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   }
   if (view === 'game') {
     const currentCard = deck && deck.length > 0 ? deck[0] : null;
-    const isMyTurn = socketRef.current?.id === currentPlayerId;
+    
+    // PERSISTENT ID FIX: Find my persistent ID and compare with currentPlayerId
+    const myPlayer = players?.find(p => p.id === socketRef.current?.id);
+    const myPersistentId = myPlayer?.persistentId;
+    
+    // CRITICAL FIX: During challenge phase, the challenger should be able to interact, not just the current player
+    const isMyTurn = myPersistentId && (
+      (phase === 'challenge' && challenge?.challengerPersistentId === myPersistentId) ||
+      (phase !== 'challenge' && currentPlayerId && myPersistentId === currentPlayerId)
+    );
+    
+    // PERSISTENT ID FIX: Use persistentId for player lookup
     const currentPlayerName = players && players.length > 0 && currentPlayerId
-      ? (players.find((p) => p.id === currentPlayerId)?.name || "Unknown")
+      ? (players.find((p) => p.persistentId === currentPlayerId)?.name || "Unknown")
       : "Unknown";
     
     // During challenge phase, we need to show the original timeline owner's name
     // instead of the challenger's name
     const timelineOwnerName = (() => {
       if (phase === 'challenge' && challenge) {
+        // PERSISTENT ID FIX: Use persistentId for lookups
         // Try targetId first
         if (challenge.targetId) {
-          const targetPlayer = players.find(p => p.id === challenge.targetId);
+          const targetPlayer = players.find(p => p.persistentId === challenge.targetId);
           return targetPlayer?.name || "Unknown";
         }
         // Try originalPlayerId as fallback
         if (challenge.originalPlayerId) {
-          const originalPlayer = players.find(p => p.id === challenge.originalPlayerId);
+          const originalPlayer = players.find(p => p.persistentId === challenge.originalPlayerId);
           return originalPlayer?.name || "Unknown";
         }
       }
@@ -2304,6 +2569,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               onPendingDrop={handlePendingDrop}
               currentPlayerName={timelineOwnerName}
               roomCode={roomCode}
+              myPersistentId={myPersistentId}
             />
           </div>
           <GameFooter
@@ -2325,7 +2591,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                 ? { ...challenge, challengeWindow: window.latestChallengeWindow }
                 : challenge
             }
-            onChallengeResponse={handleChallengeResponse}
             onInitiateChallenge={handleInitiateChallenge}
             onContinueAfterChallenge={handleContinueAfterChallenge}
             onSkipChallenge={handleSkipChallenge}

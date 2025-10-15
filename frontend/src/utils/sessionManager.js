@@ -132,7 +132,7 @@ class SessionManager {
       roomCode: appState.roomCode,
       playerName: appState.playerName,
       playerId: appState.playerId,
-      isCreator: appState.isCreator,
+      isCreator: appState.isCreator || false, // CRITICAL: Ensure isCreator is always set
       
       // Game state
       view: appState.view,
