@@ -957,53 +957,48 @@ function GameFooter({
                   </div>
                 </button>
                 
-                <div
-                  style={{
-                    filter: actualIsPlaying
-                      ? 'drop-shadow(0 0 26px rgba(0, 214, 192, 1)) drop-shadow(0 5px 15px rgba(0, 214, 192, 0.6))'
-                      : `drop-shadow(0 0 ${17.5 + (glowIntensity - 0.3) * 24.375}px rgba(0, 214, 192, ${glowIntensity})) drop-shadow(0 ${glowIntensity * 5}px ${10 + (glowIntensity - 0.3) * 16.25}px rgba(0, 214, 192, ${0.4 + (glowIntensity - 0.3) * 0.975}))`,
+                <button
+                  ref={mainPlayButtonRef}
+                  className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full flex-shrink-0 no-focus-outline force-no-outline"
+                  onClick={() => {
+                    handlePlayPauseClick();
+                    // Immediately blur after click to prevent focus ring
+                    if (mainPlayButtonRef.current) {
+                      setTimeout(() => {
+                        mainPlayButtonRef.current.blur();
+                      }, 0);
+                    }
+                  }}
+                  onTouchStart={() => {
+                    // Prevent focus on touch start
+                    if (mainPlayButtonRef.current) {
+                      mainPlayButtonRef.current.blur();
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    // Blur the button after touch to remove persistent focus highlight
+                    if (mainPlayButtonRef.current) {
+                      mainPlayButtonRef.current.blur();
+                    }
+                  }}
+                  aria-label={actualIsPlaying ? "Pause" : "Play"}
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    outline: 'none',
+                    border: 'none',
+                    WebkitAppearance: 'none',
+                    overflow: 'visible',
+                    MozAppearance: 'none',
+                    appearance: 'none',
+                    backgroundColor: actualIsPlaying
+                      ? '#00D6C0'
+                      : `rgba(0, 214, 192, ${0.55 + (glowIntensity - 0.3) * 0.9})`,
+                    boxShadow: actualIsPlaying
+                      ? 'inset 0 0 20px rgba(255, 255, 255, 0.3), inset 0 0 40px rgba(0, 214, 192, 0.5)'
+                      : `inset 0 0 ${10 + (glowIntensity - 0.3) * 20}px rgba(255, 255, 255, ${glowIntensity * 0.4}), inset 0 0 ${30 + (glowIntensity - 0.3) * 30}px rgba(0, 214, 192, ${glowIntensity * 0.6})`,
                     transition: 'none'
                   }}
                 >
-                  <button
-                    ref={mainPlayButtonRef}
-                    className="w-12 h-12 md:w-20 md:h-20 flex items-center justify-center rounded-full flex-shrink-0 no-focus-outline force-no-outline"
-                    onClick={() => {
-                      handlePlayPauseClick();
-                      // Immediately blur after click to prevent focus ring
-                      if (mainPlayButtonRef.current) {
-                        setTimeout(() => {
-                          mainPlayButtonRef.current.blur();
-                        }, 0);
-                      }
-                    }}
-                    onTouchStart={() => {
-                      // Prevent focus on touch start
-                      if (mainPlayButtonRef.current) {
-                        mainPlayButtonRef.current.blur();
-                      }
-                    }}
-                    onTouchEnd={() => {
-                      // Blur the button after touch to remove persistent focus highlight
-                      if (mainPlayButtonRef.current) {
-                        mainPlayButtonRef.current.blur();
-                      }
-                    }}
-                    aria-label={actualIsPlaying ? "Pause" : "Play"}
-                    style={{ 
-                      WebkitTapHighlightColor: 'transparent',
-                      outline: 'none',
-                      border: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      appearance: 'none',
-                      boxShadow: 'none',
-                      backgroundColor: actualIsPlaying
-                        ? '#00D6C0'
-                        : `rgba(0, 214, 192, ${0.85 + (glowIntensity - 0.3) * 0.5})`,
-                      transition: 'none'
-                    }}
-                  >
                   {actualIsPlaying ? (
                     <div className="text-white text-2xl md:text-4xl font-bold">
                       <svg className="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="white" viewBox="0 0 24 24">
@@ -1017,8 +1012,7 @@ function GameFooter({
                      </svg>
                     </div>
                   )}
-                  </button>
-                </div>
+                </button>
               </>
             ) : (
               /* Spacer for non-creators to maintain layout */

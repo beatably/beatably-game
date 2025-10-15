@@ -863,21 +863,21 @@ const CurvedTimeline = ({
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
-                filter: 'blur(8px)',
-                opacity: 0.6
+                filter: 'blur(4px)',
+                opacity: 0.15
               }}
             />
             {/* Solid line on top */}
             <path
               d={generateCurvePath.mainPath}
               stroke="url(#pathGradient)"
-              strokeWidth="6"
+              strokeWidth="0"
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
                 filter: 'url(#glow)',
-                opacity: 0.9
+                opacity: 0.1
               }}
             />
           </>
