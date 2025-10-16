@@ -325,43 +325,6 @@
     "updatedAt": "2025-10-14T08:49:03.097Z"
   },
   {
-    "id": "cur_1757879348189_7pxoss",
-    "spotifyUri": "spotify:track:6lmTHZl66UP4DDfsAcBzO8",
-    "title": "Rockin' Around the Christmas Tree - Re-Recorded Version",
-    "artist": "Brenda Lee",
-    "year": 2025,
-    "genre": "electronic",
-    "geography": "US",
-    "difficultyLevel": 2,
-    "popularity": 0,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273a0c52cab0af6fe3a44a112cb",
-    "previewUrl": "https://p.scdn.co/mp3-preview/d4935c75af1a87c0faf31e06755ae2eba518119f",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "admin-import",
-    "addedDate": "2025-09-14T19:49:08.189Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 2,
-      "peakPos": 1,
-      "weeksOnChart": 64,
-      "chartDate": "2025-01-04"
-    },
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "electronic",
-      "rock",
-      "pop",
-      "indie"
-    ],
-    "hasPreview": true,
-    "updatedAt": "2025-10-14T08:49:03.113Z"
-  },
-  {
     "id": "cur_1757879348189_94e60o",
     "spotifyUri": "spotify:track:0wFMrcVYdUtGEAbIaGYmHu",
     "title": "Too Sweet - Hozier Quartet Cover",
@@ -857,40 +820,6 @@
     ],
     "hasPreview": true,
     "updatedAt": "2025-10-14T08:49:03.334Z"
-  },
-  {
-    "id": "cur_1757879348197_ac37kt",
-    "spotifyUri": "spotify:track:0LBTaaiRBbdWbQRMZZPhGV",
-    "title": "Last Christmas Fart",
-    "artist": "Gerry Martens and the Wonder Whams",
-    "year": 2025,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 2,
-    "popularity": 0,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273ece5c96aa0a6a7d1f911ccad",
-    "previewUrl": "https://p.scdn.co/mp3-preview/70c3bd2e79c396b20bcd0b5e94408f7f3700ddcf",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "admin-import",
-    "addedDate": "2025-09-14T19:49:08.197Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 3,
-      "peakPos": 3,
-      "weeksOnChart": 45,
-      "chartDate": "2025-01-04"
-    },
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true,
-    "updatedAt": "2025-10-14T08:49:03.349Z"
   },
   {
     "id": "cur_1757879348197_6m5cx3",
@@ -1810,42 +1739,6 @@
     "updatedAt": "2025-10-14T08:49:03.766Z"
   },
   {
-    "id": "cur_1757879348206_qzi9wv",
-    "spotifyUri": "spotify:track:2SU1wA1uYwpHY3oU50NGfW",
-    "title": "It’s Beginning to Look a Lot Like Christmas",
-    "artist": "Michael Bublé",
-    "year": 2025,
-    "genre": "electronic",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 0,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273c3545d4927d8b3efd7e997e0",
-    "previewUrl": "https://p.scdn.co/mp3-preview/5865db4cf3df266f5ddc4433a50fbea755a0e272",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "admin-import",
-    "addedDate": "2025-09-14T19:49:08.206Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 12,
-      "peakPos": 12,
-      "weeksOnChart": 24,
-      "chartDate": "2025-01-04"
-    },
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "electronic",
-      "pop",
-      "indie"
-    ],
-    "hasPreview": true,
-    "updatedAt": "2025-10-14T08:49:03.781Z"
-  },
-  {
     "id": "cur_1757879348207_qno60v",
     "spotifyUri": "spotify:track:3riRdhyMDfEQz5nKrxfbwv",
     "title": "MUTT (feat. Chris Brown) [CB REMIX]",
@@ -2096,43 +1989,6 @@
     ],
     "hasPreview": true,
     "updatedAt": "2025-10-14T08:49:04.050Z"
-  },
-  {
-    "id": "cur_1757879348210_a1656r",
-    "spotifyUri": "spotify:track:2Nq30kBPlyug9BkmFoVrvE",
-    "title": "Christmas (Baby, Please Come Home) [feat. Darlene Love]",
-    "artist": "Cher",
-    "year": 2025,
-    "genre": "electronic",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 0,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b27368b7e62ba719848e06c436f8",
-    "previewUrl": "https://p.scdn.co/mp3-preview/a828f5069bd03b60a71a0a83363df1dff62e6159",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "admin-import",
-    "addedDate": "2025-09-14T19:49:08.210Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 15,
-      "peakPos": 15,
-      "weeksOnChart": 26,
-      "chartDate": "2025-01-04"
-    },
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "electronic",
-      "rock",
-      "pop",
-      "indie"
-    ],
-    "hasPreview": true,
-    "updatedAt": "2025-10-14T08:49:04.068Z"
   },
   {
     "id": "cur_1757879348211_vca3fg",
@@ -2638,40 +2494,6 @@
     ],
     "hasPreview": true,
     "updatedAt": "2025-10-14T08:49:04.308Z"
-  },
-  {
-    "id": "cur_1757879348220_qqtcez",
-    "spotifyUri": "spotify:track:442ESZImE3Obf6od6UsSDO",
-    "title": "Please Come Home for Christmas - 2013 Remaster",
-    "artist": "Eagles",
-    "year": 2025,
-    "genre": "rock",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 0,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b27368b7e62ba719848e06c436f8",
-    "previewUrl": "https://p.scdn.co/mp3-preview/4c94216ac75a700a32ba7811bd2a6cee0a391aae",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "admin-import",
-    "addedDate": "2025-09-14T19:49:08.220Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 29,
-      "peakPos": 18,
-      "weeksOnChart": 17,
-      "chartDate": "2025-01-04"
-    },
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "rock"
-    ],
-    "hasPreview": true,
-    "updatedAt": "2025-10-14T08:49:04.326Z"
   },
   {
     "id": "cur_1757879348220_isg5k1",
@@ -16503,43 +16325,6 @@
     ],
     "genres": [
       "rock"
-    ],
-    "hasPreview": true
-  },
-  {
-    "id": "cur_1757942245014_1fvnz3",
-    "spotifyUri": "spotify:track:7uwxlZu8ZWRFPNzbsPnNyZ",
-    "title": "Rockin' Around The Christmas Tree",
-    "artist": "Brenda Lee",
-    "year": 2023,
-    "genre": "electronic",
-    "geography": "US",
-    "difficultyLevel": 2,
-    "popularity": 12,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273ea8050e62e8759e2089bfc8d",
-    "previewUrl": "https://p.scdn.co/mp3-preview/33e9722a83c3054e6c6346aa416e59008fd97d64",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T09:49:25.634Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 1,
-      "peakPos": 1,
-      "weeksOnChart": 54,
-      "chartDate": "2023-12-09"
-    },
-    "updatedAt": "2025-10-14T08:49:10.919Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "electronic",
-      "rock",
-      "pop",
-      "indie"
     ],
     "hasPreview": true
   },
@@ -35448,40 +35233,6 @@
     "hasPreview": true
   },
   {
-    "id": "cur_1757943470523_ughql4",
-    "spotifyUri": "spotify:track:7oY23408e0z2bbwAG84wIs",
-    "title": "Last Christmas - Pudding Mix",
-    "artist": "Wham!",
-    "year": 2024,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 2,
-    "popularity": 30,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273702ae563cf2f266ca8676335",
-    "previewUrl": "https://p.scdn.co/mp3-preview/d5e0cd0e0d8d1968f40f412d77fd5fa287a9df42",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T08:45:37.203Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 3,
-      "peakPos": 3,
-      "weeksOnChart": 42,
-      "chartDate": "2024-12-14"
-    },
-    "updatedAt": "2025-10-14T10:51:25.639Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
     "id": "cur_1757943473135_1z1jk3",
     "spotifyUri": "spotify:track:7H22uQMwKWl43uagzO4Pnn",
     "title": "Last Night",
@@ -40537,40 +40288,6 @@
       "chartDate": "2016-12-10"
     },
     "updatedAt": "2025-10-14T10:51:27.948Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
-    "id": "cur_1757943779311_ufcwtk",
-    "spotifyUri": "spotify:track:1aYOfZ030kGa1v9NKh8IvO",
-    "title": "A Holly Jolly Christmas",
-    "artist": "Burl Ives",
-    "year": 2020,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 2,
-    "popularity": 0,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b2735802b6e0b5cd8169ea0972bc",
-    "previewUrl": "https://p.scdn.co/mp3-preview/ae6b685d0a41ed05649cf6b93143aa113b7b92d6",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T08:50:40.941Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 4,
-      "peakPos": 4,
-      "weeksOnChart": 15,
-      "chartDate": "2020-01-04"
-    },
-    "updatedAt": "2025-10-14T10:51:27.963Z",
     "markets": [
       "US"
     ],
@@ -64056,38 +63773,6 @@
     "hasPreview": true
   },
   {
-    "id": "cur_1757944817010_gri9j2",
-    "spotifyUri": "spotify:track:1VJRxqJhpEIpnHon7ssp1p",
-    "title": "Babblarnas vaggvisa",
-    "artist": "Babblarna",
-    "year": 2017,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 64,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273475bf34098ee12a02d9a714b",
-    "previewUrl": "https://p.scdn.co/mp3-preview/8c1dfae3e18945a101bf32571f8542106f9f6f47",
-    "tags": [],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T11:19:25.409Z",
-    "verified": false,
-    "isBillboardChart": false,
-    "chartInfo": {
-      "rank": null,
-      "peakPos": null,
-      "weeksOnChart": null,
-      "chartDate": null
-    },
-    "updatedAt": "2025-10-14T10:51:38.216Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
     "id": "cur_1757944817022_wxwou1",
     "spotifyUri": "spotify:track:1aEU7mcRDTYBB4ASpqbjYE",
     "title": "Hon dansar vidare i livet",
@@ -64682,39 +64367,6 @@
     "hasPreview": true
   },
   {
-    "id": "cur_1757944818053_92jk0x",
-    "spotifyUri": "spotify:track:7Gki6gLMitPDlWwib9DXN7",
-    "title": "Videvisan (Sov Du Lilla Vide Ung)",
-    "artist": "Pernilla Andersson",
-    "year": 2008,
-    "genre": "pop",
-    "geography": "SE",
-    "difficultyLevel": 4,
-    "popularity": 35,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273a88d2af2171cf08119f241de",
-    "previewUrl": "https://p.scdn.co/mp3-preview/81a5191d466035996cca258b2fa4b3076490164c",
-    "tags": [],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T11:19:20.559Z",
-    "verified": false,
-    "isBillboardChart": false,
-    "chartInfo": {
-      "rank": null,
-      "peakPos": null,
-      "weeksOnChart": null,
-      "chartDate": null
-    },
-    "updatedAt": "2025-10-14T10:51:38.495Z",
-    "markets": [
-      "US",
-      "SE"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
     "id": "cur_1757944818059_4i2jp1",
     "spotifyUri": "spotify:track:5rxgVaZ0RdQdFAuFLsXXUl",
     "title": "Popular Mechanics For Lovers",
@@ -65248,38 +64900,6 @@
     "hasPreview": true
   },
   {
-    "id": "cur_1757944820031_6x57a0",
-    "spotifyUri": "spotify:track:0j2JcSeuF8ElJTrC8g6493",
-    "title": "Djurens vaggvisa",
-    "artist": "Humlan Djojj",
-    "year": 2020,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 73,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273976c6bead0b037097e8fd858",
-    "previewUrl": "https://p.scdn.co/mp3-preview/dd9a5e3a9e00224660654dcf99c5aad2c4c422e1",
-    "tags": [],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T11:18:17.240Z",
-    "verified": false,
-    "isBillboardChart": false,
-    "chartInfo": {
-      "rank": null,
-      "peakPos": null,
-      "weeksOnChart": null,
-      "chartDate": null
-    },
-    "updatedAt": "2025-10-14T10:51:38.749Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
     "id": "cur_1757944820044_gy4h14",
     "spotifyUri": "spotify:track:5jlAu4lHHVzheutRcbDklk",
     "title": "Stjärnorna",
@@ -65303,38 +64923,6 @@
       "chartDate": null
     },
     "updatedAt": "2025-10-14T10:51:38.763Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
-    "id": "cur_1757944820055_sinf6q",
-    "spotifyUri": "spotify:track:5MxHurfskrN1RvkKez2ofd",
-    "title": "Godnattvisan",
-    "artist": "Humlan Djojj",
-    "year": 2020,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 63,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273976c6bead0b037097e8fd858",
-    "previewUrl": "https://p.scdn.co/mp3-preview/78e965dc9f9e6126408b0a2b67f09f65c30af6dc",
-    "tags": [],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T11:18:17.196Z",
-    "verified": false,
-    "isBillboardChart": false,
-    "chartInfo": {
-      "rank": null,
-      "peakPos": null,
-      "weeksOnChart": null,
-      "chartDate": null
-    },
-    "updatedAt": "2025-10-14T10:51:38.778Z",
     "markets": [
       "US"
     ],
@@ -65400,38 +64988,6 @@
       "chartDate": null
     },
     "updatedAt": "2025-10-14T10:51:38.807Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "pop"
-    ],
-    "hasPreview": true
-  },
-  {
-    "id": "cur_1757944820079_4oqfpm",
-    "spotifyUri": "spotify:track:3GygspQIcYy5OnRiw245Qh",
-    "title": "Babblarnas vaggvisa",
-    "artist": "Babblarna",
-    "year": 2023,
-    "genre": "pop",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 64,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b273c4a9b2f7b917402f799b1ecd",
-    "previewUrl": "https://p.scdn.co/mp3-preview/8c1dfae3e18945a101bf32571f8542106f9f6f47",
-    "tags": [],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T11:18:17.259Z",
-    "verified": false,
-    "isBillboardChart": false,
-    "chartInfo": {
-      "rank": null,
-      "peakPos": null,
-      "weeksOnChart": null,
-      "chartDate": null
-    },
-    "updatedAt": "2025-10-14T10:51:38.822Z",
     "markets": [
       "US"
     ],
