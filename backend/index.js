@@ -1747,18 +1747,52 @@ io.on('connection', (socket) => {
     let lobby = lobbies[roomCode];
     let game = games[roomCode];
     
-    // If no active room found in memory, this might be after a server restart
-    // The state should have been loaded from disk, but let's verify the room exists
+    // CRITICAL FIX: If lobby exists and player was a member, allow reconnection even without valid session
+    if (lobby && !hasValidSession) {
+      const existingPlayer = lobby.players.find(p => p.name === playerName);
+      if (existingPlayer) {
+        console.log('[Sessions] Found existing player in lobby without valid session, allowing rejoin');
+        // Create/update session for this player
+        if (!playerSessions[sessionId]) {
+          playerSessions[sessionId] = {
+            sessionId,
+            playerId: socket.id,
+            persistentPlayerId: existingPlayer.persistentId,
+            roomCode,
+            playerName,
+            isCreator: existingPlayer.isCreator,
+            timestamp: Date.now()
+          };
+        }
+        // Update socket mapping
+        if (existingPlayer.persistentId) {
+          socketToPlayerMap[socket.id] = existingPlayer.persistentId;
+        }
+      }
+    }
+    
+    // CRITICAL FIX: Only create minimal lobby if NO lobby exists at all
+    // This prevents overwriting existing lobbies with other players
     if (!lobby && !game) {
-      console.log('[Sessions] No active room found in memory, checking if this is a valid room code');
+      console.log('[Sessions] No active room found in memory');
       
-      // For now, we'll create a minimal lobby structure to allow reconnection
-      // This handles the case where the server restarted and state loading didn't work perfectly
+      // Only create minimal lobby structure for valid sessions as last resort
+      // This handles server restarts but should NOT overwrite existing lobbies
       if (hasValidSession) {
-        console.log('[Sessions] Creating minimal lobby structure for valid session');
+        console.log('[Sessions] Creating minimal lobby structure for valid session (server restart scenario)');
+        
+        // CRITICAL FIX: Get or generate persistent ID for the player
+        const persistentId = session.persistentPlayerId || generatePersistentPlayerId();
+        
+        // Update socket mapping
+        if (persistentId) {
+          socketToPlayerMap[socket.id] = persistentId;
+        }
+        
         lobby = {
           players: [{
             id: socket.id,
+            persistentId: persistentId,
             name: playerName,
             isCreator: session.isCreator,
             isReady: true
@@ -1775,6 +1809,12 @@ io.on('connection', (socket) => {
           status: "waiting"
         };
         lobbies[roomCode] = lobby;
+        
+        // Update session with persistent ID
+        if (!session.persistentPlayerId) {
+          session.persistentPlayerId = persistentId;
+        }
+        
         schedulePersist();
       } else {
         console.log('[Sessions] No valid session and no room found:', roomCode);
@@ -1902,23 +1942,42 @@ io.on('connection', (socket) => {
     const reconnectToLobby = (lobby, isStateless = false) => {
       const existingPlayerIndex = lobby.players.findIndex(p => p.name === playerName);
       let isCreator = false;
+      let persistentId = null;
       
       if (existingPlayerIndex !== -1) {
         isCreator = !!lobby.players[existingPlayerIndex].isCreator;
+        persistentId = lobby.players[existingPlayerIndex].persistentId;
         lobby.players[existingPlayerIndex].id = socket.id;
+        
+        // CRITICAL FIX: Update socket-to-persistent-ID mapping for lobby reconnections
+        if (persistentId) {
+          socketToPlayerMap[socket.id] = persistentId;
+          console.log('[Sessions] Restored persistent ID mapping for lobby reconnection:', { 
+            socketId: socket.id, 
+            persistentId, 
+            playerName, 
+            isCreator 
+          });
+        }
+        
         console.log('[Sessions] Updated existing player in lobby:', { playerName, isCreator });
       } else {
         // Check if this should be the creator
         const shouldBeCreator = lobby.players.length === 0 || (hasValidSession && session.isCreator);
         isCreator = shouldBeCreator;
         
+        // Generate persistent ID for new player
+        persistentId = generatePersistentPlayerId();
+        socketToPlayerMap[socket.id] = persistentId;
+        
         lobby.players.push({
           id: socket.id,
+          persistentId: persistentId,  // CRITICAL FIX: Include persistent ID for new players
           name: playerName,
           isCreator,
           isReady: true
         });
-        console.log('[Sessions] Added new player to lobby:', { playerName, isCreator });
+        console.log('[Sessions] Added new player to lobby:', { playerName, isCreator, persistentId });
       }
 
       socket.join(roomCode);
@@ -1929,6 +1988,7 @@ io.on('connection', (socket) => {
           playerSessions[sessionId] = {
             sessionId,
             playerId: socket.id,
+            persistentPlayerId: persistentId,  // CRITICAL FIX: Include persistent ID in recreated session
             roomCode,
             playerName,
             isCreator,
@@ -3898,13 +3958,14 @@ io.on('connection', (socket) => {
         const hasActiveGame = games[code];
         
         if (hasActiveGame && isCreatorLeaving) {
-          // CRITICAL FIX: Don't immediately clean up games when host disconnects
+          // CRITICAL FIX: Don't immediately clean up games OR notify when host disconnects
           // Instead, give them time to reconnect (e.g., during page refresh)
           console.log('[Disconnect] Host disconnected from active game, allowing reconnection window');
           
-          // Set a longer timeout for game cleanup to allow for reconnection
+          // Set a SHORT timeout before notifying other players
+          // This handles quick refreshes without kicking everyone out
           setTimeout(() => {
-            // Check if the host has reconnected by looking for a session with the same name
+            // Check if the host has reconnected
             const hostSession = Object.values(playerSessions).find(session => 
               session.roomCode === code && 
               session.playerName === leavingPlayer.name && 
@@ -3912,7 +3973,7 @@ io.on('connection', (socket) => {
             );
             
             if (!hostSession) {
-              // Host hasn't reconnected, clean up
+              // Host hasn't reconnected after grace period, notify and clean up
               console.log('[Disconnect] Host did not reconnect, cleaning up game:', code);
               if (games[code]) {
                 io.to(code).emit('host_left', {
@@ -3928,30 +3989,52 @@ io.on('connection', (socket) => {
             } else {
               console.log('[Disconnect] Host reconnected, keeping game alive:', code);
             }
-          }, 600000); // 10 minute window for reconnection
-        } else {
+          }, 5000); // 5 second grace period for reconnection
+        } else if (isCreatorLeaving) {
           // Handle normal lobby disconnections (no active game)
-          lobby.players = lobby.players.filter(p => p.id !== socket.id);
+          console.log('[Disconnect] Host disconnected from lobby (no active game), allowing reconnection window');
           
-          if (isCreatorLeaving && lobby.players.length > 0) {
-            // Notify remaining players that host has left
-            io.to(code).emit('host_left', {
-              message: 'The host has left the game. You will be returned to the lobby.',
-              hostName: leavingPlayer.name
-            });
+          // CRITICAL FIX: Give host time to reconnect before notifying others
+          setTimeout(() => {
+            // Check if the host has reconnected
+            const hostSession = Object.values(playerSessions).find(session => 
+              session.roomCode === code && 
+              session.playerName === leavingPlayer.name && 
+              session.isCreator
+            );
             
-            // Clean up the lobby after a short delay
-            setTimeout(() => {
-              delete lobbies[code];
-              schedulePersist();
-            }, 1000);
-          } else if (lobby.players.length === 0) {
-            delete lobbies[code];
-            schedulePersist();
-          } else {
-            io.to(code).emit('lobby_update', lobby);
-            schedulePersist();
-          }
+            if (!hostSession && lobbies[code]) {
+              // Host hasn't reconnected, remove them and notify
+              const currentLobby = lobbies[code];
+              currentLobby.players = currentLobby.players.filter(p => p.name !== leavingPlayer.name);
+              
+              if (currentLobby.players.length > 0) {
+                // Notify remaining players that host has left
+                io.to(code).emit('host_left', {
+                  message: 'The host has left the game. You will be returned to the lobby.',
+                  hostName: leavingPlayer.name
+                });
+                
+                // Clean up the lobby after notification
+                setTimeout(() => {
+                  delete lobbies[code];
+                  schedulePersist();
+                }, 1000);
+              } else {
+                // No players left
+                delete lobbies[code];
+                schedulePersist();
+              }
+            } else {
+              console.log('[Disconnect] Host reconnected to lobby:', code);
+            }
+          }, 5000); // 5 second grace period for reconnection
+        } else if (lobby.players.length === 0) {
+          delete lobbies[code];
+          schedulePersist();
+        } else {
+          io.to(code).emit('lobby_update', lobby);
+          schedulePersist();
         }
       }
     }

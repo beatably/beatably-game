@@ -1368,7 +1368,7 @@ function GameFooter({
             </div>
             {pendingDropIndex === null && (
               <div className="text-white text-sm">
-                {challenge.challengerId === myPlayerId ? 
+                {isMe ? 
                   "Select a place on timeline where you think the song belongs" : 
                   "Waiting for challenger to place their guess..."
                 }
@@ -1386,61 +1386,69 @@ function GameFooter({
           </div>
           <div className="text-white text-sm mb-8">
             {challenge.result?.challengeWon ? 
-              `${findPlayerByPersistentId(challenge.challengerId)?.name} won the challenge!` :
+              `${findPlayerByPersistentId(challenge.challengerPersistentId)?.name} won the challenge!` :
               !challenge.result?.challengerCorrect && challenge.result?.originalCorrect ?
                 `${findPlayerByPersistentId(challenge.originalPlayerId)?.name} placed it correctly!` :
                 challenge.result?.challengerCorrect && challenge.result?.originalCorrect ?
                   `Both players placed it correctly, but ${findPlayerByPersistentId(challenge.originalPlayerId)?.name} went first!` :
                   !challenge.result?.challengerCorrect && !challenge.result?.originalCorrect ?
                     `Both players placed it incorrectly! No one gets the card.` :
-                    `${findPlayerByPersistentId(challenge.challengerId)?.name} placed it correctly, but ${findPlayerByPersistentId(challenge.originalPlayerId)?.name} went first!`
+                    `${findPlayerByPersistentId(challenge.challengerPersistentId)?.name} placed it correctly, but ${findPlayerByPersistentId(challenge.originalPlayerId)?.name} went first!`
             }
           </div>
-          <button 
-            ref={challengeResolvedContinueButtonRef}
-            onClick={() => {
-              // CRITICAL FIX: Stop all music when continuing after challenge
-              if (usingPreviewMode) {
-                console.log('[GameFooter] Stopping preview mode music before continue after challenge');
-                stopPreview();
-              } else if (spotifyDeviceId && isPlayingMusic) {
-                console.log('[GameFooter] Pausing Spotify before continue after challenge');
-                pauseSpotifyPlayback();
-              }
-              
-              // Reset progress and state for next turn
-              setProgress(0);
-              setLocalIsPlaying(false);
-              setIsSpotifyPlaying(false);
-              setShowNewSongMessage(false);
-              setHasPlayedOnce(false);
-              setOptimisticIsPlaying(null);
-              
-              onContinueAfterChallenge();
-              // Immediately blur after click to prevent focus ring
-              if (challengeResolvedContinueButtonRef.current) {
-                setTimeout(() => {
+          
+          {/* Continue button - only creator can click */}
+          {isCreator ? (
+            <button 
+              ref={challengeResolvedContinueButtonRef}
+              onClick={() => {
+                // CRITICAL FIX: Stop all music when continuing after challenge
+                if (usingPreviewMode) {
+                  console.log('[GameFooter] Stopping preview mode music before continue after challenge');
+                  stopPreview();
+                } else if (spotifyDeviceId && isPlayingMusic) {
+                  console.log('[GameFooter] Pausing Spotify before continue after challenge');
+                  pauseSpotifyPlayback();
+                }
+                
+                // Reset progress and state for next turn
+                setProgress(0);
+                setLocalIsPlaying(false);
+                setIsSpotifyPlaying(false);
+                setShowNewSongMessage(false);
+                setHasPlayedOnce(false);
+                setOptimisticIsPlaying(null);
+                
+                onContinueAfterChallenge();
+                // Immediately blur after click to prevent focus ring
+                if (challengeResolvedContinueButtonRef.current) {
+                  setTimeout(() => {
+                    challengeResolvedContinueButtonRef.current.blur();
+                  }, 0);
+                }
+              }}
+              onTouchStart={() => {
+                // Prevent focus on touch start
+                if (challengeResolvedContinueButtonRef.current) {
                   challengeResolvedContinueButtonRef.current.blur();
-                }, 0);
-              }
-            }}
-            onTouchStart={() => {
-              // Prevent focus on touch start
-              if (challengeResolvedContinueButtonRef.current) {
-                challengeResolvedContinueButtonRef.current.blur();
-              }
-            }}
-            onTouchEnd={() => {
-              // Blur the button after touch to remove persistent focus highlight
-              if (challengeResolvedContinueButtonRef.current) {
-                challengeResolvedContinueButtonRef.current.blur();
-              }
-            }}
-            className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button mt-3 no-focus-outline"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            Continue to Next Turn
-          </button>
+                }
+              }}
+              onTouchEnd={() => {
+                // Blur the button after touch to remove persistent focus highlight
+                if (challengeResolvedContinueButtonRef.current) {
+                  challengeResolvedContinueButtonRef.current.blur();
+                }
+              }}
+              className="w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button mt-3 no-focus-outline"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              Continue to Next Turn
+            </button>
+          ) : (
+            <div className="mt-3 px-6 py-2 text-white rounded">
+              Waiting for host to start next turn...
+            </div>
+          )}
         </div>
       )}
 
