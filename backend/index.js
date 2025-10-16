@@ -342,7 +342,12 @@ app.get('/login', (req, res) => {
 // CORS configuration for production
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URI, 'https://beatably-frontend.netlify.app']
+    ? [
+        process.env.FRONTEND_URI, 
+        'https://beatably-frontend.netlify.app',
+        'https://beatably.app',
+        'https://www.beatably.app'
+      ].filter(Boolean) // Remove any undefined values
     : ['http://127.0.0.1:5173', 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -1660,7 +1665,12 @@ const server = http.createServer(app);
 const io = new Server(server, { 
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.FRONTEND_URI, 'https://beatably-frontend.netlify.app']
+      ? [
+          process.env.FRONTEND_URI, 
+          'https://beatably-frontend.netlify.app',
+          'https://beatably.app',
+          'https://www.beatably.app'
+        ].filter(Boolean) // Remove any undefined values
       : ['http://127.0.0.1:5173', 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST']
