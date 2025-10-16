@@ -62,16 +62,18 @@ export function PreviewModeProvider({ children }) {
         // Desktop fade-out using RAF
         if (!isIOSRef.current) {
           const timeRemaining = audioRef.current.duration - audioRef.current.currentTime;
-          if (timeRemaining <= 5 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
+          if (timeRemaining <= 8 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
             console.log('[PreviewMode] Starting fade-out (desktop)');
-            const fadeOutDuration = 5000;
+            const fadeOutDuration = 8000; // 8 seconds for smoother fade
             const startTime = performance.now();
             const startValue = audioRef.current.volume;
             
             const fadeOut = (currentTime) => {
               const elapsed = currentTime - startTime;
               const progress = Math.min(elapsed / fadeOutDuration, 1);
-              const value = startValue * (1 - progress);
+              // Exponential curve: (1-progress)^2 for more natural fade
+              const exponentialProgress = (1 - progress) * (1 - progress);
+              const value = startValue * exponentialProgress;
               audioRef.current.volume = Math.max(0, value);
               
               if (progress < 1 && audioRef.current.currentTime < audioRef.current.duration) {
@@ -96,13 +98,15 @@ export function PreviewModeProvider({ children }) {
         if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
           const ctx = audioContextRef.current;
           const gain = gainNodeRef.current;
-          const fadeOutStart = Math.max(0, audioRef.current.duration - 5);
+          const fadeOutDuration = 8; // 8 seconds for smoother, more gradual fade
+          const fadeOutStart = Math.max(0, audioRef.current.duration - fadeOutDuration);
           const when = ctx.currentTime + Math.max(0, fadeOutStart - audioRef.current.currentTime);
           
           console.log('[PreviewMode] iOS - Scheduling fade-out at', when, 'for duration', audioRef.current.duration);
           gain.gain.cancelScheduledValues(when);
           gain.gain.setValueAtTime(gain.gain.value, when);
-          gain.gain.linearRampToValueAtTime(0.0001, when + 5.0);
+          // Use exponential ramp for more natural volume perception
+          gain.gain.exponentialRampToValueAtTime(0.0001, when + fadeOutDuration);
         }
       });
       
@@ -224,9 +228,10 @@ export function PreviewModeProvider({ children }) {
         
         // CRITICAL: Start from epsilon (0.0001), not 0 - prevents iOS "stuck at zero" bug
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(1, now + 1.0);
+        // Use exponential ramp for more natural, smooth fade-in (1.5s for gentler start)
+        gain.gain.exponentialRampToValueAtTime(1, now + 1.5);
         
-        console.log('[PreviewMode] iOS - Scheduled fade-in from 0.0001 to 1 over 1s');
+        console.log('[PreviewMode] iOS - Scheduled exponential fade-in from 0.0001 to 1 over 1.5s');
       } else {
         audioRef.current.volume = 0;
       }
@@ -237,15 +242,17 @@ export function PreviewModeProvider({ children }) {
       setIsPlaying(true);
       isUnlockedRef.current = true;
       
-      // Desktop: fade with RAF
+      // Desktop: fade with RAF using exponential curve for natural volume perception
       if (!isIOSRef.current) {
         const startTime = performance.now();
-        const fadeInDuration = 1000;
+        const fadeInDuration = 1500; // 1.5 seconds for gentler fade-in
         
         const fadeIn = (currentTime) => {
           const elapsed = currentTime - startTime;
           const progress = Math.min(elapsed / fadeInDuration, 1);
-          audioRef.current.volume = progress;
+          // Exponential curve: progress^2 for more gradual start
+          const exponentialProgress = progress * progress;
+          audioRef.current.volume = exponentialProgress;
           
           if (progress < 1) {
             fadeAnimationRef.current = requestAnimationFrame(fadeIn);
