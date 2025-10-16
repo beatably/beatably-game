@@ -107,8 +107,8 @@ export function PreviewModeProvider({ children }) {
           console.log('[PreviewMode] iOS - Scheduling fade-out at', when, 'for duration', audioRef.current.duration);
           gain.gain.cancelScheduledValues(when);
           gain.gain.setValueAtTime(gain.gain.value, when);
-          // Exponential ramp creates smooth, natural-sounding fade-out
-          gain.gain.exponentialRampToValueAtTime(0.0001, when + fadeOutDuration);
+          // Linear ramp to match desktop behavior (smooth, consistent fade)
+          gain.gain.linearRampToValueAtTime(0.0001, when + fadeOutDuration);
         }
       });
       
@@ -230,10 +230,10 @@ export function PreviewModeProvider({ children }) {
         
         // CRITICAL: Start from epsilon (0.0001), not 0 - prevents iOS "stuck at zero" bug
         gain.gain.setValueAtTime(0.0001, now);
-        // Use exponential ramp for smooth, natural fade-in
-        gain.gain.exponentialRampToValueAtTime(1, now + 0.8);
+        // Use linear ramp to match desktop behavior (smooth, consistent fade)
+        gain.gain.linearRampToValueAtTime(1, now + 1.5);
         
-        console.log('[PreviewMode] iOS - Scheduled exponential fade-in from 0.0001 to 1 over 0.8s');
+        console.log('[PreviewMode] iOS - Scheduled linear fade-in from 0.0001 to 1 over 1.5s');
       } else {
         audioRef.current.volume = 0;
       }
@@ -247,7 +247,7 @@ export function PreviewModeProvider({ children }) {
       // Desktop: fade with RAF using gentle easing curve
       if (!isIOSRef.current) {
         const startTime = performance.now();
-        const fadeInDuration = 800; // 0.8 seconds - quick but smooth
+        const fadeInDuration = 1500; // 1.5 seconds
         
         const fadeIn = (currentTime) => {
           const elapsed = currentTime - startTime;
