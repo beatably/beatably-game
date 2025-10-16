@@ -65,23 +65,14 @@ export function PreviewModeProvider({ children }) {
           const fadeOutInterval = fadeOutDuration / fadeOutSteps;
           
           if (isIOSSafariRef.current && gainNodeRef.current) {
-            // Use Web Audio API on iOS
+            // iOS: Use Web Audio API's native fade methods
+            const currentTime = audioContextRef.current.currentTime;
             const startGain = gainNodeRef.current.gain.value;
-            const gainDecrement = startGain / fadeOutSteps;
-            let currentGain = startGain;
-            
-            fadeTimerRef.current = setInterval(() => {
-              currentGain -= gainDecrement;
-              if (currentGain <= 0 || audioRef.current.currentTime >= audioRef.current.duration) {
-                gainNodeRef.current.gain.value = 0;
-                clearInterval(fadeTimerRef.current);
-                fadeTimerRef.current = null;
-              } else {
-                gainNodeRef.current.gain.value = Math.max(0, currentGain);
-              }
-            }, fadeOutInterval);
+            gainNodeRef.current.gain.setValueAtTime(startGain, currentTime);
+            gainNodeRef.current.gain.linearRampToValueAtTime(0, currentTime + 5); // 5 second fade
+            console.log('[PreviewMode] iOS Safari - Using Web Audio API native fade-out');
           } else {
-            // Use volume property on desktop browsers
+            // Desktop: Use volume property fade-out
             const startVolume = audioRef.current.volume;
             const volumeDecrement = startVolume / fadeOutSteps;
             let currentVolume = startVolume;
@@ -202,13 +193,17 @@ export function PreviewModeProvider({ children }) {
       audioRef.current.src = previewUrl;
       audioRef.current.load();
       
-      // Start with volume/gain at 0 for fade-in
+      // Use Web Audio API native fades on iOS, volume property on desktop
       if (isIOSSafariRef.current && gainNodeRef.current) {
-        gainNodeRef.current.gain.value = 0;
-        console.log('[PreviewMode] Using Web Audio API - Gain set to 0 for fade-in, AudioContext state:', audioContextRef.current.state);
+        // iOS: Use Web Audio API's native fade methods (more reliable than setInterval)
+        const currentTime = audioContextRef.current.currentTime;
+        gainNodeRef.current.gain.setValueAtTime(0, currentTime);
+        gainNodeRef.current.gain.linearRampToValueAtTime(1, currentTime + 1); // 1 second fade
+        console.log('[PreviewMode] iOS Safari - Using Web Audio API native fade-in');
       } else {
+        // Desktop: Use volume property fade-in
         audioRef.current.volume = 0;
-        console.log('[PreviewMode] Using volume property - Volume set to 0 for fade-in');
+        console.log('[PreviewMode] Desktop - Starting fade-in');
       }
       
       // Play - this MUST be called synchronously in response to user gesture for iOS
@@ -217,40 +212,28 @@ export function PreviewModeProvider({ children }) {
       setCurrentPreviewUrl(previewUrl);
       setIsPlaying(true);
       
-      // Fade in over 1 second
-      const fadeInDuration = 1000; // 1 second
-      const fadeInSteps = 20;
-      const fadeInInterval = fadeInDuration / fadeInSteps;
-      const increment = 1 / fadeInSteps;
-      
-      let current = 0;
-      let stepCount = 0;
-      fadeTimerRef.current = setInterval(() => {
-        current += increment;
-        stepCount++;
-        if (current >= 1) {
-          if (isIOSSafariRef.current && gainNodeRef.current) {
-            gainNodeRef.current.gain.value = 1;
-            console.log('[PreviewMode] Fade-in complete at step', stepCount, '- Final gain:', gainNodeRef.current.gain.value);
-          } else {
+      // Only fade in on desktop browsers (not iOS - iOS uses Web Audio API native fades above)
+      if (!isIOSSafariRef.current) {
+        const fadeInDuration = 1000; // 1 second
+        const fadeInSteps = 20;
+        const fadeInInterval = fadeInDuration / fadeInSteps;
+        const increment = 1 / fadeInSteps;
+        
+        let current = 0;
+        fadeTimerRef.current = setInterval(() => {
+          current += increment;
+          if (current >= 1) {
             audioRef.current.volume = 1;
-            console.log('[PreviewMode] Fade-in complete at step', stepCount, '- Final volume:', audioRef.current.volume);
-          }
-          clearInterval(fadeTimerRef.current);
-          fadeTimerRef.current = null;
-        } else {
-          if (isIOSSafariRef.current && gainNodeRef.current) {
-            gainNodeRef.current.gain.value = current;
-            if (stepCount === 1 || stepCount === 10 || stepCount === 20) {
-              console.log('[PreviewMode] Fade-in step', stepCount, '- Current gain:', gainNodeRef.current.gain.value);
-            }
+            clearInterval(fadeTimerRef.current);
+            fadeTimerRef.current = null;
+            console.log('[PreviewMode] Desktop fade-in complete');
           } else {
             audioRef.current.volume = current;
           }
-        }
-      }, fadeInInterval);
+        }, fadeInInterval);
+      }
       
-      console.log('[PreviewMode] Preview playing with fade-in, isIOSSafari:', isIOSSafariRef.current);
+      console.log('[PreviewMode] Preview playing, isIOSSafari:', isIOSSafariRef.current);
       return true;
     } catch (error) {
       console.error('[PreviewMode] Error playing preview:', error);

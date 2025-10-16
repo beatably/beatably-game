@@ -884,7 +884,7 @@ const CurvedTimeline = ({
               width: `${orb.size}px`,
               height: `${orb.size}px`,
               left: `${orb.left}%`,
-              top: `${orb.top}%`,
+              top: `${orb.top}%`, 
               backgroundColor: orb.color,
               animation: `float ${orb.duration}s infinite ease-in-out`,
               animationDelay: `${orb.delay}s`,
