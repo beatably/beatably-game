@@ -106,7 +106,8 @@ export function PreviewModeProvider({ children }) {
           
           console.log('[PreviewMode] iOS - Scheduling fade-out at', when, 'for duration', audioRef.current.duration);
           gain.gain.cancelScheduledValues(when);
-          gain.gain.setValueAtTime(gain.gain.value, when);
+          // CRITICAL: Set to 1.0 at fade-out start, not current value (which might be mid-fade-in)
+          gain.gain.setValueAtTime(1.0, when);
           // Linear ramp to match desktop behavior (smooth, consistent fade)
           gain.gain.linearRampToValueAtTime(0.0001, when + fadeOutDuration);
         }
