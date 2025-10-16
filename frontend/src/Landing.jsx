@@ -148,13 +148,9 @@ function Landing({ onCreate, onJoin }) {
 
   return (
     <div
-      className="flex flex-col items-center justify-end relative text-foreground px-6 landing-container"
+      className="flex flex-col items-center justify-between relative text-foreground px-6 landing-container"
       style={{
         backgroundColor: "#000000",
-        backgroundImage: "url('/img/bg-image-2.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center top",
-        backgroundRepeat: "no-repeat",
         // Use single height declaration to avoid conflicts
         minHeight: "100dvh",
         // Allow vertical scrolling when keyboard appears
@@ -168,93 +164,24 @@ function Landing({ onCreate, onJoin }) {
         paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
       }}
     >
-      {/* Optimized gradient background - performance-friendly for iOS Safari */}
-      <div className="absolute inset-0 z-0 overflow-hidden" style={{ contain: 'layout style paint' }}>
-        {/* Multi-layer gradient background */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            background: `
-              radial-gradient(ellipse at 20% 30%, rgba(153, 69, 255, 0.15) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 70%, rgba(0, 206, 209, 0.15) 0%, transparent 50%),
-              radial-gradient(ellipse at 50% 50%, rgba(255, 20, 147, 0.1) 0%, transparent 60%),
-              linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 100%)
-            `
-          }}
-        />
-        
-        {/* Reduced animated stars for better iOS performance - only 25 stars */}
-        {[...Array(25)].map((_, i) => {
-          const colors = [
-            'rgba(0, 206, 209, 0.8)',    // Cyan
-            'rgba(153, 69, 255, 0.8)',   // Purple
-            'rgba(255, 20, 147, 0.8)',   // Magenta
-            'rgba(255, 105, 180, 0.8)',  // Pink
-            'rgba(32, 178, 170, 0.8)',   // Teal
-            'rgba(65, 105, 225, 0.8)',   // Blue
-          ];
-          const size = Math.random() * 3 + 2; // 2-5px
-          const left = Math.random() * 100;
-          const top = Math.random() * 100;
-          const delay = Math.random() * 20;
-          const duration = Math.random() * 10 + 15;
-          const color = colors[i % colors.length];
-          
-          return (
-            <div
-              key={i}
-              className="absolute rounded-full"
-              style={{
-                width: `${size}px`,
-                height: `${size}px`,
-                left: `${left}%`,
-                top: `${top}%`,
-                backgroundColor: color,
-                animation: `float ${duration}s infinite ease-in-out`,
-                animationDelay: `${delay}s`,
-                opacity: 0.8,
-                willChange: 'transform',
-              }}
-            />
-          );
-        })}
-        
-        {/* Simplified glowing orbs - only 3 orbs without heavy blur */}
-        {[...Array(3)].map((_, i) => {
-          const colors = [
-            'rgba(153, 69, 255, 0.08)',   // Purple
-            'rgba(0, 206, 209, 0.08)',    // Cyan
-            'rgba(255, 20, 147, 0.08)',   // Magenta
-          ];
-          const size = Math.random() * 150 + 120; // 120-270px
-          const left = Math.random() * 100;
-          const top = Math.random() * 100;
-          const delay = Math.random() * 10;
-          const duration = Math.random() * 15 + 20;
-          const color = colors[i % colors.length];
-          
-          return (
-            <div
-              key={`orb-${i}`}
-              className="absolute rounded-full"
-              style={{
-                width: `${size}px`,
-                height: `${size}px`,
-                left: `${left}%`,
-                top: `${top}%`,
-                backgroundColor: color,
-                animation: `float ${duration}s infinite ease-in-out`,
-                animationDelay: `${delay}s`,
-                opacity: 0.3,
-                filter: 'blur(40px)',
-                willChange: 'transform',
-              }}
-            />
-          );
-        })}
-      </div>
+      {/* Background Video */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        poster="/img/first_frame.jpg"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ zIndex: 0 }}
+      >
+        <source src="/videos/sound-wave-video.mp4" type="video/mp4" />
+      </video>
+
+      {/* Gradient Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/100 to-transparent z-[1]" />
+
       {/* Minimal Header */}
-      <div className="text-center mb-6 sm:mb-8 relative z-10">
+      <div className="text-center pt-8 sm:pt-12 relative z-10">
         <img
           src={beatablyLogo}
           alt="Beatably Logo"
@@ -262,14 +189,11 @@ function Landing({ onCreate, onJoin }) {
         />
       </div>
 
-      <div className="w-full max-w-sm space-y-3 sm:space-y-4 relative z-10">
+      <div className="w-full max-w-sm space-y-3 sm:space-y-4 relative z-10 pb-8 sm:pb-12">
         {!joining ? (
           <>
             {/* Name Input */}
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm text-muted-foreground">
-                Your Name
-              </Label>
               <Input
                 id="name"
                 className="bg-input border-border text-foreground h-11 focus:ring-primary"

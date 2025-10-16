@@ -41294,42 +41294,6 @@
     "hasPreview": true
   },
   {
-    "id": "cur_1757943824745_vou0i8",
-    "spotifyUri": "spotify:track:0955p8WINxqa51hFVTFmeT",
-    "title": "Bye Bye Bye",
-    "artist": "*NSYNC",
-    "year": 2024,
-    "genre": "electronic",
-    "geography": "US",
-    "difficultyLevel": 3,
-    "popularity": 14,
-    "albumArt": "https://i.scdn.co/image/ab67616d0000b2737cfd293ff7ae31b384cfbeea",
-    "previewUrl": "https://p.scdn.co/mp3-preview/161d6b8cfeb94609aee323195a6452cdb90181ca",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T08:51:25.941Z",
-    "verified": true,
-    "isBillboardChart": true,
-    "chartInfo": {
-      "rank": 45,
-      "peakPos": 4,
-      "weeksOnChart": 24,
-      "chartDate": "2024-08-17"
-    },
-    "updatedAt": "2025-10-14T10:51:28.291Z",
-    "markets": [
-      "US"
-    ],
-    "genres": [
-      "electronic",
-      "pop",
-      "indie"
-    ],
-    "hasPreview": true
-  },
-  {
     "id": "cur_1757943826501_9gs0lk",
     "spotifyUri": "spotify:track:6ug9fUi5oLLgQgOF1G8WkM",
     "title": "California Breeze",

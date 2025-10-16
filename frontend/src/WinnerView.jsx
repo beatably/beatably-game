@@ -33,20 +33,10 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black via-[#001F0B] to-black overflow-hidden"
-      style={{
-        // subtle animated gradient background
-        backgroundSize: '400% 400%',
-        animation: 'gradientShift 18s ease infinite'
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden"
     >
       <style>
         {`
-          @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-          }
           @keyframes dropConfetti {
             0% { transform: translateY(-120vh) rotate(0deg); opacity: 0; }
             10% { opacity: 1; }
@@ -64,7 +54,6 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
           }
         `}
       </style>
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true"></div>
       
       {/* Confetti particles */}
       <div className="absolute inset-0">
@@ -91,12 +80,12 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
             🏆
           </div>
           <div
-            className="absolute inset-0 blur-2xl rounded-full bg-yellow-400/30 -z-10"
+            className="absolute inset-0 blur-2xl rounded-full bg-primary/20 -z-10"
             style={{ animation: 'glowPulse 2.8s ease-in-out infinite' }}
           />
         </div>
 
-        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 drop-shadow-lg">
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-foreground drop-shadow-lg">
           {winnerData?.name ? `${winnerData.name} wins!` : 'Victory Achieved!'}
         </h1>
 
@@ -116,10 +105,10 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
                   return (
                     <div
                       key={player.id}
-                      className={`flex items-center justify-between px-4 py-3 ${isWinner ? 'bg-yellow-400/10' : ''}`}
+                      className={`flex items-center justify-between px-4 py-3 ${isWinner ? 'bg-primary/10' : ''}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`text-sm font-bold ${index === 0 ? 'text-yellow-300' : 'text-muted-foreground'}`}>#{index + 1}</span>
+                        <span className={`text-sm font-bold ${index === 0 ? 'text-primary' : 'text-muted-foreground'}`}>#{index + 1}</span>
                         <span className={`text-foreground ${isWinner ? 'font-semibold' : ''}`}>{player.name}</span>
                       </div>
                       <span className="text-muted-foreground text-sm">{player.score || 0} cards</span>
