@@ -17,7 +17,8 @@ export function PreviewModeProvider({ children }) {
   const gainNodeRef = useRef(null);
   const isUnlockedRef = useRef(false);
   const fadeTimerRef = useRef(null);
-  const isIOSSafariRef = useRef(false);
+  const fadeAnimationRef = useRef(null);
+  const isIOSRef = useRef(false);
   
   // Default to preview mode (full play mode is opt-in via settings)
   const [isFullPlayMode, setIsFullPlayMode] = useState(false);
@@ -29,13 +30,11 @@ export function PreviewModeProvider({ children }) {
   // Derive preview mode from full play mode state
   const isPreviewMode = !isFullPlayMode;
   
-  // Detect iOS Safari
+  // Detect iOS
   useEffect(() => {
     const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-    const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-    isIOSSafariRef.current = isIOS || (isSafari && 'ontouchstart' in window);
-    console.log('[PreviewMode] iOS Safari detected:', isIOSSafariRef.current);
+    isIOSRef.current = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    console.log('[PreviewMode] iOS detected:', isIOSRef.current);
   }, []);
   
   // Log initial state
@@ -43,51 +42,51 @@ export function PreviewModeProvider({ children }) {
     console.log('[PreviewMode] Initialized - Preview Mode:', isPreviewMode, 'Full Play Mode:', isFullPlayMode);
   }, []);
   
-  // Initialize audio element and conditionally Web Audio API for iOS
+  // Initialize audio element
   useEffect(() => {
     if (!audioRef.current) {
-      // Create Audio element
       audioRef.current = new Audio();
       audioRef.current.setAttribute('playsinline', '');
       audioRef.current.setAttribute('webkit-playsinline', '');
       audioRef.current.preload = 'auto';
       
-      // Event listeners  
+      // Track if we're currently fading out
+      const fadeOutTimerRef = { current: null };
+      
+      // Event listeners
       audioRef.current.addEventListener('timeupdate', () => {
         setCurrentTime(audioRef.current.currentTime);
         
         // Start fade-out 5 seconds before the end
         const timeRemaining = audioRef.current.duration - audioRef.current.currentTime;
-        if (timeRemaining <= 5 && timeRemaining > 0 && !fadeTimerRef.current) {
+        if (timeRemaining <= 5 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
           console.log('[PreviewMode] Starting fade-out');
-          const fadeOutDuration = 5000; // 5 seconds
-          const fadeOutSteps = 50;
-          const fadeOutInterval = fadeOutDuration / fadeOutSteps;
+          const fadeOutDuration = 5000;
+          const startTime = performance.now();
+          const startValue = isIOSRef.current && gainNodeRef.current ? gainNodeRef.current.gain.value : audioRef.current.volume;
           
-          if (isIOSSafariRef.current && gainNodeRef.current) {
-            // iOS: Use Web Audio API's native fade methods
-            const currentTime = audioContextRef.current.currentTime;
-            const startGain = gainNodeRef.current.gain.value;
-            gainNodeRef.current.gain.setValueAtTime(startGain, currentTime);
-            gainNodeRef.current.gain.linearRampToValueAtTime(0, currentTime + 5); // 5 second fade
-            console.log('[PreviewMode] iOS Safari - Using Web Audio API native fade-out');
-          } else {
-            // Desktop: Use volume property fade-out
-            const startVolume = audioRef.current.volume;
-            const volumeDecrement = startVolume / fadeOutSteps;
-            let currentVolume = startVolume;
+          const fadeOut = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / fadeOutDuration, 1);
+            const value = startValue * (1 - progress);
             
-            fadeTimerRef.current = setInterval(() => {
-              currentVolume -= volumeDecrement;
-              if (currentVolume <= 0 || audioRef.current.currentTime >= audioRef.current.duration) {
-                audioRef.current.volume = 0;
-                clearInterval(fadeTimerRef.current);
-                fadeTimerRef.current = null;
-              } else {
-                audioRef.current.volume = Math.max(0, currentVolume);
-              }
-            }, fadeOutInterval);
-          }
+            if (isIOSRef.current && gainNodeRef.current) {
+              gainNodeRef.current.gain.value = Math.max(0, value);
+            } else {
+              audioRef.current.volume = Math.max(0, value);
+            }
+            
+            if (progress < 1 && audioRef.current.currentTime < audioRef.current.duration) {
+              fadeAnimationRef.current = requestAnimationFrame(fadeOut);
+            } else {
+              fadeAnimationRef.current = null;
+              fadeOutTimerRef.current = null;
+              console.log('[PreviewMode] Fade-out complete');
+            }
+          };
+          
+          fadeOutTimerRef.current = true; // Mark that fade-out has started
+          fadeAnimationRef.current = requestAnimationFrame(fadeOut);
         }
       });
       
@@ -98,13 +97,14 @@ export function PreviewModeProvider({ children }) {
       audioRef.current.addEventListener('ended', () => {
         setIsPlaying(false);
         setCurrentTime(0);
-        // Clear any ongoing fade timer
-        if (fadeTimerRef.current) {
-          clearInterval(fadeTimerRef.current);
-          fadeTimerRef.current = null;
+        // Clear any ongoing fade
+        if (fadeAnimationRef.current) {
+          cancelAnimationFrame(fadeAnimationRef.current);
+          fadeAnimationRef.current = null;
         }
+        fadeOutTimerRef.current = null;
         // Reset volume/gain for next play
-        if (isIOSSafariRef.current && gainNodeRef.current) {
+        if (isIOSRef.current && gainNodeRef.current) {
           gainNodeRef.current.gain.value = 1;
         } else {
           audioRef.current.volume = 1;
@@ -113,19 +113,20 @@ export function PreviewModeProvider({ children }) {
       
       audioRef.current.addEventListener('play', () => {
         setIsPlaying(true);
-        // Resume AudioContext if suspended (iOS requirement)
-        if (isIOSSafariRef.current && audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        // Resume AudioContext if needed
+        if (isIOSRef.current && audioContextRef.current?.state === 'suspended') {
           audioContextRef.current.resume();
         }
       });
       
       audioRef.current.addEventListener('pause', () => {
         setIsPlaying(false);
-        // Clear any ongoing fade timer when paused
-        if (fadeTimerRef.current) {
-          clearInterval(fadeTimerRef.current);
-          fadeTimerRef.current = null;
+        // Clear any ongoing fade when paused
+        if (fadeAnimationRef.current) {
+          cancelAnimationFrame(fadeAnimationRef.current);
+          fadeAnimationRef.current = null;
         }
+        fadeOutTimerRef.current = null;
       });
       
       audioRef.current.addEventListener('error', (e) => {
@@ -137,20 +138,20 @@ export function PreviewModeProvider({ children }) {
     }
     
     return () => {
-      if (fadeTimerRef.current) {
-        clearInterval(fadeTimerRef.current);
+      if (fadeAnimationRef.current) {
+        cancelAnimationFrame(fadeAnimationRef.current);
       }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
       }
-      if (isIOSSafariRef.current && audioContextRef.current && audioContextRef.current.state === 'running') {
+      if (isIOSRef.current && audioContextRef.current?.state === 'running') {
         audioContextRef.current.suspend();
       }
     };
   }, []);
   
-  // Play preview with fade-in (Web Audio API on iOS, volume property on desktop)
+  // Play preview with fade-in (Web Audio API for iOS, requestAnimationFrame for smooth fades)
   const playPreview = async (previewUrl) => {
     if (!previewUrl) {
       console.warn('[PreviewMode] No preview URL provided');
@@ -160,31 +161,32 @@ export function PreviewModeProvider({ children }) {
     try {
       console.log('[PreviewMode] Loading preview:', previewUrl);
       
-      // Clear any existing fade timer
+      // Cancel any ongoing fade animation
+      if (fadeAnimationRef.current) {
+        cancelAnimationFrame(fadeAnimationRef.current);
+        fadeAnimationRef.current = null;
+      }
       if (fadeTimerRef.current) {
         clearInterval(fadeTimerRef.current);
         fadeTimerRef.current = null;
       }
       
-      // Initialize Web Audio API only on iOS Safari (where volume property is locked)
-      if (isIOSSafariRef.current && !audioContextRef.current) {
-        console.log('[PreviewMode] Initializing Web Audio API for iOS Safari');
+      // Initialize Web Audio API for iOS (volume property is read-only on iOS)
+      if (isIOSRef.current && !audioContextRef.current) {
+        console.log('[PreviewMode] Initializing Web Audio API for iOS');
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioContextRef.current = new AudioContext();
-        console.log('[PreviewMode] AudioContext state:', audioContextRef.current.state);
         gainNodeRef.current = audioContextRef.current.createGain();
         gainNodeRef.current.connect(audioContextRef.current.destination);
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
         sourceNodeRef.current.connect(gainNodeRef.current);
-        console.log('[PreviewMode] Web Audio API setup complete');
       }
       
-      // iOS Safari unlock: Must load and attempt play synchronously in user gesture
+      // iOS Safari unlock
       if (!isUnlockedRef.current) {
         console.log('[PreviewMode] First play - unlocking audio');
         isUnlockedRef.current = true;
-        // Resume AudioContext on first user interaction (iOS requirement)
-        if (isIOSSafariRef.current && audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        if (isIOSRef.current && audioContextRef.current?.state === 'suspended') {
           await audioContextRef.current.resume();
         }
       }
@@ -193,57 +195,49 @@ export function PreviewModeProvider({ children }) {
       audioRef.current.src = previewUrl;
       audioRef.current.load();
       
-      // Use Web Audio API native fades on iOS, volume property on desktop
-      if (isIOSSafariRef.current && gainNodeRef.current) {
-        // iOS: Use Web Audio API's native fade methods (more reliable than setInterval)
-        const currentTime = audioContextRef.current.currentTime;
-        gainNodeRef.current.gain.setValueAtTime(0, currentTime);
-        gainNodeRef.current.gain.linearRampToValueAtTime(1, currentTime + 1); // 1 second fade
-        console.log('[PreviewMode] iOS Safari - Using Web Audio API native fade-in');
+      // Set initial volume/gain
+      if (isIOSRef.current && gainNodeRef.current) {
+        gainNodeRef.current.gain.value = 0;
       } else {
-        // Desktop: Use volume property fade-in
         audioRef.current.volume = 0;
-        console.log('[PreviewMode] Desktop - Starting fade-in');
       }
       
-      // Play - this MUST be called synchronously in response to user gesture for iOS
+      // Play
       await audioRef.current.play();
-      console.log('[PreviewMode] Audio play() called successfully');
       setCurrentPreviewUrl(previewUrl);
       setIsPlaying(true);
       
-      // Only fade in on desktop browsers (not iOS - iOS uses Web Audio API native fades above)
-      if (!isIOSSafariRef.current) {
-        const fadeInDuration = 1000; // 1 second
-        const fadeInSteps = 20;
-        const fadeInInterval = fadeInDuration / fadeInSteps;
-        const increment = 1 / fadeInSteps;
-        
-        let current = 0;
-        fadeTimerRef.current = setInterval(() => {
-          current += increment;
-          if (current >= 1) {
-            audioRef.current.volume = 1;
-            clearInterval(fadeTimerRef.current);
-            fadeTimerRef.current = null;
-            console.log('[PreviewMode] Desktop fade-in complete');
-          } else {
-            audioRef.current.volume = current;
-          }
-        }, fadeInInterval);
-      }
+      // Fade in using requestAnimationFrame (more reliable than setInterval on iOS)
+      const startTime = performance.now();
+      const fadeInDuration = 1000;
       
-      console.log('[PreviewMode] Preview playing, isIOSSafari:', isIOSSafariRef.current);
+      const fadeIn = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / fadeInDuration, 1);
+        
+        if (isIOSRef.current && gainNodeRef.current) {
+          gainNodeRef.current.gain.value = progress;
+        } else {
+          audioRef.current.volume = progress;
+        }
+        
+        if (progress < 1) {
+          fadeAnimationRef.current = requestAnimationFrame(fadeIn);
+        } else {
+          fadeAnimationRef.current = null;
+          console.log('[PreviewMode] Fade-in complete');
+        }
+      };
+      
+      fadeAnimationRef.current = requestAnimationFrame(fadeIn);
+      console.log('[PreviewMode] Preview playing with fade-in');
       return true;
     } catch (error) {
       console.error('[PreviewMode] Error playing preview:', error);
-      
-      // If NotAllowedError, audio needs to be unlocked with user gesture
       if (error.name === 'NotAllowedError') {
         console.warn('[PreviewMode] Audio blocked - user interaction required');
         isUnlockedRef.current = false;
       }
-      
       setIsPlaying(false);
       return false;
     }
