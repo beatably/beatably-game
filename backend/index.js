@@ -4395,10 +4395,47 @@ app.get('/api/admin/usage-stats', requireAdmin, (req, res) => {
   try {
     const { dateFrom, dateTo } = req.query;
     const stats = analytics.getStats({ dateFrom, dateTo });
+    console.log('[Admin] Usage stats retrieved:', {
+      totalGames: stats.overview?.totalGames,
+      completedGames: stats.overview?.completedGames,
+      uniquePlayers: stats.overview?.uniquePlayers
+    });
     res.json({ ok: true, ...stats });
   } catch (e) {
-    console.error('[Admin] Usage stats failed:', e?.message);
+    console.error('[Admin] Usage stats failed:', e?.message, e?.stack);
     res.status(500).json({ ok: false, error: e?.message || 'Stats failed' });
+  }
+});
+
+// Debug endpoint to test analytics recording
+app.post('/api/admin/test-analytics', requireAdmin, (req, res) => {
+  try {
+    console.log('[Admin] Testing analytics recording...');
+    
+    // Test session recording
+    const testSession = analytics.recordSessionStart({
+      roomCode: 'TEST',
+      playerCount: 2,
+      playerNames: ['TestPlayer1', 'TestPlayer2'],
+      difficulty: 'normal',
+      musicMode: 'test',
+      winCondition: 10
+    });
+    
+    console.log('[Admin] Test session created:', testSession);
+    
+    // Get current stats
+    const stats = analytics.getStats();
+    
+    res.json({ 
+      ok: true, 
+      message: 'Analytics test completed',
+      testSession,
+      currentStats: stats.overview
+    });
+  } catch (e) {
+    console.error('[Admin] Test analytics failed:', e?.message, e?.stack);
+    res.status(500).json({ ok: false, error: e?.message || 'Test failed', stack: e?.stack });
   }
 });
 
