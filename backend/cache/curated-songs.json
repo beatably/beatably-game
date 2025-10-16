@@ -7467,14 +7467,14 @@
     "artist": "Ms. Lauryn Hill",
     "year": 1998,
     "genre": "pop",
-    "geography": "SE",
+    "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 75,
+    "popularity": 76,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b273e08b1250db5f75643f1508c9",
-    "previewUrl": "https://p.scdn.co/mp3-preview/feb1c988c1940d63a3af836f2965f04177dc24c9",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:11:59.813Z",
+    "addedDate": "2025-10-16T18:17:33.571Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -7483,9 +7483,9 @@
       "weeksOnChart": 1,
       "chartDate": "1998-11-14"
     },
-    "updatedAt": "2025-10-14T08:49:06.735Z",
+    "updatedAt": "2025-10-16T18:17:33.571Z",
     "markets": [
-      "SE"
+      "US"
     ],
     "genres": [
       "pop"
@@ -10532,14 +10532,14 @@
     "artist": "Aerosmith",
     "year": 1998,
     "genre": "rock",
-    "geography": "SE",
+    "geography": "US",
     "difficultyLevel": 2,
     "popularity": 74,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b273da8d92affd796f7e20af7375",
-    "previewUrl": "https://p.scdn.co/mp3-preview/f02930ba19b2760c7df9abfbd7aca5ba1ea99be9",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:12:00.133Z",
+    "addedDate": "2025-10-16T18:17:33.635Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -10548,9 +10548,8 @@
       "weeksOnChart": 1,
       "chartDate": "1998-09-05"
     },
-    "updatedAt": "2025-10-14T08:49:08.074Z",
+    "updatedAt": "2025-10-16T18:17:33.635Z",
     "markets": [
-      "SE",
       "US"
     ],
     "genres": [
@@ -11318,14 +11317,14 @@
     "artist": "R. Kelly",
     "year": 1998,
     "genre": "electronic",
-    "geography": "SE",
+    "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 51,
+    "popularity": 52,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2731a81e3abee4b067492baaf44",
-    "previewUrl": "https://p.scdn.co/mp3-preview/ce7d4b14ac14e9d1a11b4285723d92f71748fd47",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:12:00.289Z",
+    "addedDate": "2025-10-16T18:17:33.655Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -11334,9 +11333,8 @@
       "weeksOnChart": 1,
       "chartDate": "1998-12-05"
     },
-    "updatedAt": "2025-10-14T08:49:08.444Z",
+    "updatedAt": "2025-10-16T18:17:33.655Z",
     "markets": [
-      "SE",
       "US"
     ],
     "genres": [
@@ -14754,17 +14752,17 @@
     "id": "cur_1757942122855_p8s9zu",
     "spotifyUri": "spotify:track:6W2DOcyRflabRkzJDfRXPB",
     "title": "My Heart Will Go On (Dialogue Mix) - includes \"Titanic\" film dialogue",
-    "artist": "James Horner",
+    "artist": "Céline Dion",
     "year": 1998,
-    "genre": "indie",
-    "geography": "SE",
+    "genre": "electronic",
+    "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 30,
+    "popularity": 28,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b27358352071f201e1a9fc644361",
-    "previewUrl": "https://p.scdn.co/mp3-preview/bb26265f79009ddb1a9a76699be8c7b8f321c8da",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:12:00.524Z",
+    "addedDate": "2025-10-16T18:17:33.689Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -14773,12 +14771,15 @@
       "weeksOnChart": 1,
       "chartDate": "1998-02-28"
     },
-    "updatedAt": "2025-10-14T08:49:10.058Z",
+    "updatedAt": "2025-10-16T18:17:33.689Z",
     "markets": [
-      "SE",
-      "US"
+      "US",
+      "CA"
     ],
     "genres": [
+      "electronic",
+      "rock",
+      "pop",
       "indie"
     ],
     "hasPreview": true
@@ -19117,14 +19118,14 @@
     "artist": "Brandy",
     "year": 1998,
     "genre": "electronic",
-    "geography": "SE",
+    "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 74,
+    "popularity": 76,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2730e51dd1d3dc50fc541942c7c",
-    "previewUrl": "https://p.scdn.co/mp3-preview/5634b0d8556704d10618540c8b86f2721ca6a04d",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:12:00.916Z",
+    "addedDate": "2025-10-16T18:17:33.723Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -19133,9 +19134,8 @@
       "weeksOnChart": 2,
       "chartDate": "1998-06-06"
     },
-    "updatedAt": "2025-10-14T08:49:12.119Z",
+    "updatedAt": "2025-10-16T18:17:33.723Z",
     "markets": [
-      "SE",
       "US"
     ],
     "genres": [
@@ -19152,14 +19152,14 @@
     "artist": "Monica",
     "year": 1998,
     "genre": "electronic",
-    "geography": "SE",
+    "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 46,
+    "popularity": 47,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b273fb8bcea0096e616a864189fa",
-    "previewUrl": "https://p.scdn.co/mp3-preview/95557da47cf7d9db9ad20c3a14b2980f30dcc7f6",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:12:00.933Z",
+    "addedDate": "2025-10-16T18:17:33.739Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -19168,9 +19168,8 @@
       "weeksOnChart": 8,
       "chartDate": "1998-10-03"
     },
-    "updatedAt": "2025-10-14T08:49:12.135Z",
+    "updatedAt": "2025-10-16T18:17:33.739Z",
     "markets": [
-      "SE",
       "US"
     ],
     "genres": [
@@ -25498,14 +25497,12 @@
     "genre": "electronic",
     "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 63,
+    "popularity": 65,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b27391d080c66f2425c23c6eadf8",
-    "previewUrl": "https://p.scdn.co/mp3-preview/cab312d8ac7ac13730ba81a0372853e76db560b9",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T10:25:07.403Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.755Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -25514,7 +25511,7 @@
       "weeksOnChart": 3,
       "chartDate": "1998-04-04"
     },
-    "updatedAt": "2025-10-14T08:49:14.847Z",
+    "updatedAt": "2025-10-16T18:17:33.755Z",
     "markets": [
       "US"
     ],
@@ -31617,14 +31614,12 @@
     "genre": "pop",
     "geography": "US",
     "difficultyLevel": 2,
-    "popularity": 52,
+    "popularity": 51,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2738096e88dab9ff1a66541eb0f",
-    "previewUrl": "https://p.scdn.co/mp3-preview/5779fe100ff155bdfcc70b633a5ef78e74e4bd41",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T10:32:09.871Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.824Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -31633,7 +31628,7 @@
       "weeksOnChart": 8,
       "chartDate": "1998-11-21"
     },
-    "updatedAt": "2025-10-14T08:49:17.856Z",
+    "updatedAt": "2025-10-16T18:17:33.824Z",
     "markets": [
       "US"
     ],
@@ -37041,12 +37036,10 @@
     "difficultyLevel": 2,
     "popularity": 51,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2738e1909b730c3f8fc483f6047",
-    "previewUrl": "https://p.scdn.co/mp3-preview/433b7349b31eaa290f6ccb0df4721e0879dbe007",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T08:46:58.035Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.859Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -37055,7 +37048,7 @@
       "weeksOnChart": 18,
       "chartDate": "1998-03-28"
     },
-    "updatedAt": "2025-10-14T10:51:26.352Z",
+    "updatedAt": "2025-10-16T18:17:33.859Z",
     "markets": [
       "US"
     ],
@@ -48727,12 +48720,10 @@
     "difficultyLevel": 2,
     "popularity": 44,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2737b324d12be10d334017c166e",
-    "previewUrl": "https://p.scdn.co/mp3-preview/2c58d44b9993040abe40aba2477ab8418e51e2bf",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T08:59:14.882Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.877Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -48741,7 +48732,7 @@
       "weeksOnChart": 13,
       "chartDate": "1998-05-16"
     },
-    "updatedAt": "2025-10-14T10:51:31.429Z",
+    "updatedAt": "2025-10-16T18:17:33.877Z",
     "markets": [
       "US"
     ],
@@ -50560,16 +50551,14 @@
     "artist": "Edwin McCain",
     "year": 1998,
     "genre": "rock",
-    "geography": "CA",
+    "geography": "US",
     "difficultyLevel": 2,
     "popularity": 36,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2738a3763ded60195482cbc0a87",
-    "previewUrl": "https://p.scdn.co/mp3-preview/39993d6cf4d88a1f5803bb2ef47b096d76690bb7",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T09:01:21.930Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.894Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -50578,7 +50567,7 @@
       "weeksOnChart": 2,
       "chartDate": "1998-10-03"
     },
-    "updatedAt": "2025-10-14T10:51:32.186Z",
+    "updatedAt": "2025-10-16T18:17:33.894Z",
     "markets": [
       "US",
       "CA"
@@ -52430,12 +52419,10 @@
     "difficultyLevel": 2,
     "popularity": 61,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b27391d080c66f2425c23c6eadf8",
-    "previewUrl": "https://p.scdn.co/mp3-preview/b96547084952b1926df53e5caa95f22963f13b1f",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T09:03:20.238Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.911Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -52444,7 +52431,7 @@
       "weeksOnChart": 1,
       "chartDate": "1998-07-11"
     },
-    "updatedAt": "2025-10-14T10:51:32.978Z",
+    "updatedAt": "2025-10-16T18:17:33.911Z",
     "markets": [
       "US"
     ],
@@ -56031,12 +56018,10 @@
     "difficultyLevel": 2,
     "popularity": 41,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b273b180f37661895107a253e3c5",
-    "previewUrl": "https://p.scdn.co/mp3-preview/b49bdd0adff1bd960c96e0809469a93cae71fcac",
-    "tags": [
-      "billboard"
-    ],
-    "addedBy": "script:populate",
-    "addedDate": "2025-09-16T09:07:12.129Z",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.929Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -56045,7 +56030,7 @@
       "weeksOnChart": 6,
       "chartDate": "1998-09-12"
     },
-    "updatedAt": "2025-10-14T10:51:34.501Z",
+    "updatedAt": "2025-10-16T18:17:33.929Z",
     "markets": [
       "US"
     ],
@@ -124201,9 +124186,9 @@
     "artist": "Barenaked Ladies",
     "year": 1998,
     "genre": "rock",
-    "geography": "SE",
+    "geography": "US",
     "markets": [
-      "SE",
+      "US",
       "CA"
     ],
     "genres": [
@@ -124214,10 +124199,10 @@
     "difficultyLevel": 2,
     "popularity": 69,
     "albumArt": "https://i.scdn.co/image/ab67616d0000b2737d2055190ae60ffa4c74d13c",
-    "previewUrl": "https://p.scdn.co/mp3-preview/07d07770b7271de52eeacc2e4892205b47b91594",
+    "previewUrl": null,
     "tags": [],
     "addedBy": "admin-import",
-    "addedDate": "2025-09-17T09:12:00.595Z",
+    "addedDate": "2025-10-16T18:17:33.705Z",
     "verified": true,
     "isBillboardChart": true,
     "chartInfo": {
@@ -124227,7 +124212,7 @@
       "chartDate": "1998-10-17"
     },
     "hasPreview": true,
-    "updatedAt": "2025-10-16T13:02:03.556Z"
+    "updatedAt": "2025-10-16T18:17:33.705Z"
   },
   {
     "id": "cur_1758100320609_r9929c",
@@ -125136,5 +125121,507 @@
     },
     "hasPreview": true,
     "updatedAt": "2025-10-16T13:02:04.032Z"
+  },
+  {
+    "id": "cur_1760638653610_d7eppe",
+    "spotifyUri": "spotify:track:7kAJSFiLBfAld1loUptSDi",
+    "title": "Honey",
+    "artist": "Mariah Carey",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 3,
+    "popularity": 24,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b27333571e2d86192b4b424f0ad1",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.610Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 37,
+      "peakPos": 1,
+      "weeksOnChart": 18,
+      "chartDate": "1998-01-10"
+    }
+  },
+  {
+    "id": "cur_1760638653672_s4rafq",
+    "spotifyUri": "spotify:track:1AhuzbShhpb3m2OFhCGweS",
+    "title": "My All - Classic Radio Club Mix",
+    "artist": "Mariah Carey",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 32,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b2730639d433a00ceb1783750b36",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.672Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 1,
+      "peakPos": 1,
+      "weeksOnChart": 3,
+      "chartDate": "1998-05-23"
+    }
+  },
+  {
+    "id": "cur_1760638653773_dqs9gp",
+    "spotifyUri": "spotify:track:7JOYNlQyQ5PHefeAji6iR4",
+    "title": "How Do I Live - Mr. Mig Dance Radio Edit",
+    "artist": "LeAnn Rimes",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 0,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b27361b6c1c300811c0527b81f8a",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.773Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 2,
+      "peakPos": 2,
+      "weeksOnChart": 32,
+      "chartDate": "1998-01-24"
+    }
+  },
+  {
+    "id": "cur_1760638653791_hi1c6m",
+    "spotifyUri": "spotify:track:0OdiAlnSN0k39jarFqVTY8",
+    "title": "Nobody's Supposed to Be Here - Dance Mix",
+    "artist": "Deborah Cox",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 43,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b27392c79e319a1a5519ebf669d4",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.791Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 2,
+      "peakPos": 2,
+      "weeksOnChart": 10,
+      "chartDate": "1998-12-05"
+    }
+  },
+  {
+    "id": "cur_1760638653807_2px7jp",
+    "spotifyUri": "spotify:track:3jFSIacWpvXqr8oYXa0xI4",
+    "title": "You're Still The One - Soul Solution Extended Club Mix",
+    "artist": "Shania Twain",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US",
+      "CA"
+    ],
+    "genres": [
+      "electronic",
+      "rock",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 10,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b2732c00825290c9febece1aff01",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.807Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 2,
+      "peakPos": 2,
+      "weeksOnChart": 12,
+      "chartDate": "1998-05-02"
+    }
+  },
+  {
+    "id": "cur_1760638653841_48ndfy",
+    "spotifyUri": "spotify:track:6wAV49hRfOiCTHztORMy8Y",
+    "title": "Crush",
+    "artist": "Jennifer Paige",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 55,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b27334bfa7108f9a2be5f9270fa5",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.841Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 3,
+      "peakPos": 3,
+      "weeksOnChart": 10,
+      "chartDate": "1998-09-05"
+    }
+  },
+  {
+    "id": "cur_1760638653946_9tybbu",
+    "spotifyUri": "spotify:track:4Wtk0YYWUcx1JYicaq5Jd0",
+    "title": "It's All About Me",
+    "artist": "Mýa",
+    "year": 1998,
+    "genre": "pop",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 50,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273ad4fbe52a8e8959f753d022e",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.946Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 6,
+      "peakPos": 6,
+      "weeksOnChart": 10,
+      "chartDate": "1998-05-16"
+    }
+  },
+  {
+    "id": "cur_1760638653966_72ke41",
+    "spotifyUri": "spotify:track:35KcXRWo7BTYdJiyMOy2Zu",
+    "title": "Swing My Way - Remix",
+    "artist": "K.P. & Envyi",
+    "year": 1998,
+    "genre": "hip-hop",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "hip-hop",
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 37,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273603b20a86215fb9924572b54",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.966Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 6,
+      "peakPos": 6,
+      "weeksOnChart": 12,
+      "chartDate": "1998-03-14"
+    }
+  },
+  {
+    "id": "cur_1760638653983_axpgje",
+    "spotifyUri": "spotify:track:5I0Pt0YFaShP1OoXPyUnX8",
+    "title": "Time After Time",
+    "artist": "INOJ",
+    "year": 1998,
+    "genre": "pop",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 47,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273adea3d14a533f4f93e080d97",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:33.983Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 6,
+      "peakPos": 6,
+      "weeksOnChart": 6,
+      "chartDate": "1998-09-26"
+    }
+  },
+  {
+    "id": "cur_1760638654002_gv0h3f",
+    "spotifyUri": "spotify:track:7MQywXGHEev7JmwwIzMcao",
+    "title": "Love Like This",
+    "artist": "Faith Evans",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "hip-hop",
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 65,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273dc6f817ae16962058fa565ae",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.002Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 7,
+      "peakPos": 7,
+      "weeksOnChart": 5,
+      "chartDate": "1998-12-12"
+    }
+  },
+  {
+    "id": "cur_1760638654020_42w2jm",
+    "spotifyUri": "spotify:track:6Zyk31Yyk7AUU1TTJn7plb",
+    "title": "The Arms of the One Who Loves You",
+    "artist": "Xscape",
+    "year": 1998,
+    "genre": "pop",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 35,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273571a9bb2e9e3c2b923c067ce",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.020Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 7,
+      "peakPos": 7,
+      "weeksOnChart": 5,
+      "chartDate": "1998-05-30"
+    }
+  },
+  {
+    "id": "cur_1760638654038_nklkzd",
+    "spotifyUri": "spotify:track:3yLdW8mZtd7sMtEcPp6xJC",
+    "title": "They Don't Know",
+    "artist": "Jon B.",
+    "year": 1998,
+    "genre": "pop",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "pop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 22,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273572c6485f404b0b5c00f3ba8",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.038Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 7,
+      "peakPos": 7,
+      "weeksOnChart": 21,
+      "chartDate": "1998-06-20"
+    }
+  },
+  {
+    "id": "cur_1760638654055_4h8v0z",
+    "spotifyUri": "spotify:track:5EYWGM3Ns3iYew8ws0FatB",
+    "title": "This Kiss",
+    "artist": "Faith Hill",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 67,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b27315069968c52552cc2f222391",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.055Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 7,
+      "peakPos": 7,
+      "weeksOnChart": 30,
+      "chartDate": "1998-10-10"
+    }
+  },
+  {
+    "id": "cur_1760638654073_wcecph",
+    "spotifyUri": "spotify:track:70L4pGAmYv0pTADrgsIxpI",
+    "title": "Lullaby",
+    "artist": "Shawn Mullins",
+    "year": 1998,
+    "genre": "rock",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "rock",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 51,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273ad4a9576a5b5d51aac4204ff",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.073Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 8,
+      "peakPos": 8,
+      "weeksOnChart": 2,
+      "chartDate": "1998-12-12"
+    }
+  },
+  {
+    "id": "cur_1760638654091_vou5m3",
+    "spotifyUri": "spotify:track:33i1NxhGadaXhPgJaiD6ad",
+    "title": "Déjà Vu (Uptown Baby)",
+    "artist": "Lord Tariq",
+    "year": 1998,
+    "genre": "hip-hop",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "hip-hop"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 34,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b273a0fba7bc71015b1cab3578cb",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.091Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 9,
+      "peakPos": 9,
+      "weeksOnChart": 16,
+      "chartDate": "1998-03-28"
+    }
+  },
+  {
+    "id": "cur_1760638654109_bj1bql",
+    "spotifyUri": "spotify:track:6tBD4yjOf9P8rWwUlXdJFm",
+    "title": "Have You Ever",
+    "artist": "Brandy",
+    "year": 1998,
+    "genre": "electronic",
+    "geography": "US",
+    "markets": [
+      "US"
+    ],
+    "genres": [
+      "electronic",
+      "pop",
+      "indie"
+    ],
+    "difficultyLevel": 2,
+    "popularity": 63,
+    "albumArt": "https://i.scdn.co/image/ab67616d0000b2730e51dd1d3dc50fc541942c7c",
+    "previewUrl": null,
+    "tags": [],
+    "addedBy": "admin-import",
+    "addedDate": "2025-10-16T18:17:34.109Z",
+    "verified": true,
+    "isBillboardChart": true,
+    "chartInfo": {
+      "rank": 9,
+      "peakPos": 9,
+      "weeksOnChart": 4,
+      "chartDate": "1998-12-26"
+    }
   }
 ]

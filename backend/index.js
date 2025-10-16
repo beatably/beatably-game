@@ -9,6 +9,7 @@ if (process.env.NODE_ENV !== 'production') {
 const axios = require('axios');
 const querystring = require('querystring');
 const curatedDb = require('./curatedDb');
+const analytics = require('./analytics');
 
 // Initialize curated database at startup to trigger migration if needed
 console.log('[Startup] ===== CURATED DATABASE INITIALIZATION START =====');
@@ -2283,6 +2284,20 @@ io.on('connection', (socket) => {
       : 10;
     console.log('[Backend] Using winCondition:', winCondition);
 
+    // Record analytics for game start
+    const musicMode = (realSongs && realSongs.length > 0 && realSongs[0]?.source) 
+      ? (realSongs[0].source === 'curated' ? 'curated' : realSongs[0].debugSource || 'spotify')
+      : 'unknown';
+    
+    analytics.recordSessionStart({
+      roomCode: code,
+      playerCount: lobby.players.length,
+      playerNames: lobby.players.map(p => p.name),
+      difficulty: lobby.settings?.difficulty || 'normal',
+      musicMode: musicMode,
+      winCondition: winCondition
+    });
+
     games[code] = {
       timelines, // { [playerId]: [cards] } - each player has their own timeline
       sharedDeck, // All players draw from the same deck
@@ -2374,6 +2389,9 @@ io.on('connection', (socket) => {
     const currentCard = game.sharedDeck[game.currentCardIndex];
     if (!currentCard) return;
 
+    // Record round played for analytics
+    analytics.recordRound(code);
+    
     // Place card in timeline
     let newTimeline = [...timeline];
     newTimeline.splice(index, 0, currentCard);
@@ -3304,6 +3322,17 @@ io.on('connection', (socket) => {
         game.phase = "game-over";
         game.winner = winnerPlayer;
         console.log('[WinCheck] Winner decided at end-of-round:', { winner: game.winner?.name, score: maxScore });
+        
+        // Record game completion for analytics
+        const roomCode = Object.keys(games).find(code => games[code] === game);
+        if (roomCode) {
+          analytics.recordSessionEnd({
+            roomCode,
+            winnerName: winnerPlayer?.name,
+            completedNormally: true
+          });
+        }
+        
         return true;
       }
       // Tie at/above target at end-of-round -> keep playing further rounds until a leader exists
@@ -3317,6 +3346,17 @@ io.on('connection', (socket) => {
       game.phase = "game-over";
       game.winner = winners[0] || null;
       console.log('[WinCheck] Deck exhausted. Winner:', game.winner?.name, 'score:', endMax);
+      
+      // Record game completion for analytics
+      const roomCode = Object.keys(games).find(code => games[code] === game);
+      if (roomCode) {
+        analytics.recordSessionEnd({
+          roomCode,
+          winnerName: game.winner?.name,
+          completedNormally: true
+        });
+      }
+      
       return true;
     }
 
@@ -4344,6 +4384,69 @@ app.post('/api/admin/clear-all', requireAdmin, (req, res) => {
     });
   } catch (e) {
     console.error('[Admin] Clear all failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Clear failed' });
+  }
+});
+
+// --- Usage Analytics Admin Endpoints ---
+
+// Get aggregated usage statistics
+app.get('/api/admin/usage-stats', requireAdmin, (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const stats = analytics.getStats({ dateFrom, dateTo });
+    res.json({ ok: true, ...stats });
+  } catch (e) {
+    console.error('[Admin] Usage stats failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Stats failed' });
+  }
+});
+
+// Get paginated list of game sessions
+app.get('/api/admin/game-sessions', requireAdmin, (req, res) => {
+  try {
+    const { limit, offset, dateFrom, dateTo } = req.query;
+    const result = analytics.getSessions({
+      limit: Number(limit) || 50,
+      offset: Number(offset) || 0,
+      dateFrom,
+      dateTo
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('[Admin] Game sessions failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Sessions failed' });
+  }
+});
+
+// Get paginated list of error logs
+app.get('/api/admin/error-logs', requireAdmin, (req, res) => {
+  try {
+    const { limit, offset, errorType, dateFrom, dateTo } = req.query;
+    const result = analytics.getErrors({
+      limit: Number(limit) || 100,
+      offset: Number(offset) || 0,
+      errorType,
+      dateFrom,
+      dateTo
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('[Admin] Error logs failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Error logs failed' });
+  }
+});
+
+// Clear old analytics data
+app.delete('/api/admin/analytics-data', requireAdmin, (req, res) => {
+  try {
+    const { olderThanDays } = req.query;
+    const result = analytics.clearOldData({
+      olderThanDays: Number(olderThanDays) || 90
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('[Admin] Clear analytics failed:', e?.message);
     res.status(500).json({ ok: false, error: e?.message || 'Clear failed' });
   }
 });

@@ -210,7 +210,8 @@
     </div>
     <div class="row" style="justify-content:flex-end;">
       <button id="bulkImportBtn">Bulk Import</button>
-      <button id="analyticsBtn" class="secondary">Analytics</button>
+      <button id="analyticsBtn" class="secondary">Song Analytics</button>
+      <button id="usageAnalyticsBtn" class="secondary">Usage Analytics</button>
       <button id="signOutBtn" class="secondary">Sign out</button>
     </div>
   </header>
@@ -405,7 +406,7 @@
       </div>
     </div>
 
-    <!-- Analytics view -->
+    <!-- Song Analytics view -->
     <div id="analyticsView" style="display:none;">
       <div class="row" style="justify-content:space-between; margin-bottom:8px;">
         <div class="actions">
@@ -475,6 +476,137 @@
       </div>
     </div>
 
+    <!-- Usage Analytics view -->
+    <div id="usageAnalyticsView" style="display:none;">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <div class="actions">
+          <button id="backFromUsageBtn" class="secondary">&larr; Back to Admin</button>
+        </div>
+        <div>
+          <h3 style="margin:0;">Usage Analytics</h3>
+        </div>
+        <div class="row" style="gap:8px; align-items:center;">
+          <button id="refreshUsageBtn">Refresh</button>
+          <button id="clearOldDataBtn" class="danger small">Clear Old Data (90+ days)</button>
+        </div>
+      </div>
+
+      <!-- Overview Cards -->
+      <div class="grid">
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">TOTAL GAMES</div>
+          <div id="usageTotalGames" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">UNIQUE PLAYERS</div>
+          <div id="usageUniquePlayers" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">AVG DURATION</div>
+          <div id="usageAvgDuration" style="font-size:28px; font-weight:600;">0:00</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">AVG ROUNDS</div>
+          <div id="usageAvgRounds" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">TOTAL ROUNDS</div>
+          <div id="usageTotalRounds" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">COMPLETION RATE</div>
+          <div id="usageCompletionRate" style="font-size:28px; font-weight:600;">0%</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">TOTAL ERRORS</div>
+          <div id="usageTotalErrors" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px;">COMPLETED GAMES</div>
+          <div id="usageCompletedGames" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid">
+        <div class="card col-12"><canvas id="gamesOverTimeChart" height="80"></canvas></div>
+        <div class="card col-4"><canvas id="playerCountChart" height="200"></canvas></div>
+        <div class="card col-4"><canvas id="difficultyDistChart" height="200"></canvas></div>
+        <div class="card col-4"><canvas id="musicModeChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="errorTypesChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="completionChart" height="200"></canvas></div>
+      </div>
+
+      <!-- Recent Sessions Table -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <strong>Recent Game Sessions</strong>
+            <div id="sessionsCount" class="muted"></div>
+          </div>
+          <div class="actions">
+            <button id="exportSessionsBtn" class="secondary small">Export CSV</button>
+          </div>
+        </div>
+        <div style="overflow:auto; margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Room Code</th>
+                <th>Start Time</th>
+                <th>Duration</th>
+                <th class="num">Players</th>
+                <th>Player Names</th>
+                <th class="num">Rounds</th>
+                <th>Winner</th>
+                <th>Difficulty</th>
+                <th>Music Mode</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsTbody">
+              <tr><td colspan="10" class="muted">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Error Logs Table -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <strong>Recent Errors</strong>
+            <div id="errorsCount" class="muted"></div>
+          </div>
+          <div class="actions">
+            <select id="errorTypeFilter" class="tight">
+              <option value="">All Types</option>
+              <option value="gameplay">Gameplay</option>
+              <option value="connection">Connection</option>
+              <option value="playback">Playback</option>
+            </select>
+            <button id="refreshErrorsBtn" class="secondary small">Refresh</button>
+          </div>
+        </div>
+        <div style="overflow:auto; margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Room Code</th>
+                <th>Error Type</th>
+                <th>Message</th>
+                <th>Player</th>
+              </tr>
+            </thead>
+            <tbody id="errorsTbody">
+              <tr><td colspan="5" class="muted">No errors</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -498,18 +630,28 @@
       const admin = document.getElementById('adminView');
       const imp = document.getElementById('importView');
       const analytics = document.getElementById('analyticsView');
+      const usage = document.getElementById('usageAnalyticsView');
       if (view === 'import') {
         if (admin) admin.style.display = 'none';
         if (analytics) analytics.style.display = 'none';
+        if (usage) usage.style.display = 'none';
         if (imp) imp.style.display = 'block';
       } else if (view === 'analytics') {
         if (admin) admin.style.display = 'none';
         if (imp) imp.style.display = 'none';
+        if (usage) usage.style.display = 'none';
         if (analytics) analytics.style.display = 'block';
         try { loadAnalytics(); } catch (_) {}
+      } else if (view === 'usage') {
+        if (admin) admin.style.display = 'none';
+        if (imp) imp.style.display = 'none';
+        if (analytics) analytics.style.display = 'none';
+        if (usage) usage.style.display = 'block';
+        try { loadUsageAnalytics(); } catch (_) {}
       } else {
         if (imp) imp.style.display = 'none';
         if (analytics) analytics.style.display = 'none';
+        if (usage) usage.style.display = 'none';
         if (admin) admin.style.display = 'block';
         try { listSongs(); } catch (_) {}
       }
@@ -1307,6 +1449,240 @@
       }
     }
 
+    // ===== Usage Analytics Implementation =====
+    async function loadUsageAnalytics() {
+      try {
+        const data = await adminFetch('/api/admin/usage-stats');
+        
+        // Update overview cards
+        const formatDuration = (secs) => {
+          if (!secs) return '0:00';
+          const mins = Math.floor(secs / 60);
+          const s = secs % 60;
+          return `${mins}:${s.toString().padStart(2, '0')}`;
+        };
+        
+        document.getElementById('usageTotalGames').textContent = data.overview?.totalGames || 0;
+        document.getElementById('usageUniquePlayers').textContent = data.overview?.uniquePlayers || 0;
+        document.getElementById('usageAvgDuration').textContent = formatDuration(data.overview?.avgDuration || 0);
+        document.getElementById('usageAvgRounds').textContent = data.overview?.avgRounds || 0;
+        document.getElementById('usageTotalRounds').textContent = data.overview?.totalRounds || 0;
+        document.getElementById('usageCompletionRate').textContent = (data.overview?.completionRate || 0) + '%';
+        document.getElementById('usageTotalErrors').textContent = data.overview?.totalErrors || 0;
+        document.getElementById('usageCompletedGames').textContent = data.overview?.completedGames || 0;
+        
+        // Render charts
+        const palette = ['#1f6feb', '#2ea043', '#d29922', '#f85149', '#a371f7', '#58a6ff'];
+        
+        // Games over time chart
+        const gamesData = data.timeSeries?.gamesOverTime || [];
+        upsertChart('gamesOverTimeChart', {
+          type: 'line',
+          data: {
+            labels: gamesData.map(([date]) => date),
+            datasets: [{ 
+              label: 'Games per day', 
+              data: gamesData.map(([, count]) => count),
+              borderColor: palette[0],
+              backgroundColor: 'rgba(31, 111, 235, 0.1)',
+              fill: true,
+              tension: 0.3
+            }]
+          },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+        
+        // Player count distribution
+        const playerCounts = data.distributions?.playerCount || {};
+        upsertChart('playerCountChart', {
+          type: 'pie',
+          data: {
+            labels: Object.keys(playerCounts).map(k => k + ' players'),
+            datasets: [{ data: Object.values(playerCounts), backgroundColor: palette }]
+          },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        });
+        
+        // Difficulty distribution
+        const difficulties = data.distributions?.difficulty || {};
+        upsertChart('difficultyDistChart', {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(difficulties),
+            datasets: [{ data: Object.values(difficulties), backgroundColor: palette }]
+          },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        });
+        
+        // Music mode distribution
+        const musicModes = data.distributions?.musicMode || {};
+        upsertChart('musicModeChart', {
+          type: 'pie',
+          data: {
+            labels: Object.keys(musicModes),
+            datasets: [{ data: Object.values(musicModes), backgroundColor: palette }]
+          },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        });
+        
+        // Error types
+        const errorTypes = data.distributions?.errorTypes || {};
+        upsertChart('errorTypesChart', {
+          type: 'bar',
+          data: {
+            labels: Object.keys(errorTypes),
+            datasets: [{ label: 'Errors', data: Object.values(errorTypes), backgroundColor: palette[3] }]
+          },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+        
+        // Completion chart
+        const completed = data.overview?.completedGames || 0;
+        const total = data.overview?.totalGames || 1;
+        const incomplete = total - completed;
+        upsertChart('completionChart', {
+          type: 'doughnut',
+          data: {
+            labels: ['Completed', 'Incomplete'],
+            datasets: [{ data: [completed, incomplete], backgroundColor: [palette[1], palette[3]] }]
+          },
+          options: { plugins: { legend: { position: 'bottom' } } }
+        });
+        
+        // Load sessions and errors
+        await Promise.all([loadGameSessions(), loadErrorLogs()]);
+        
+      } catch (e) {
+        showStatus(e.message || 'Failed to load usage analytics', 'error');
+      }
+    }
+    
+    async function loadGameSessions() {
+      try {
+        const data = await adminFetch('/api/admin/game-sessions?limit=50');
+        const tbody = document.getElementById('sessionsTbody');
+        const countEl = document.getElementById('sessionsCount');
+        
+        if (countEl) countEl.textContent = `Showing ${data.items?.length || 0} of ${data.total || 0} sessions`;
+        
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        if (!data.items || !data.items.length) {
+          tbody.innerHTML = '<tr><td colspan="10" class="muted">No sessions yet</td></tr>';
+          return;
+        }
+        
+        data.items.forEach(session => {
+          const tr = document.createElement('tr');
+          
+          const formatDuration = (secs) => {
+            if (!secs) return '-';
+            const mins = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${mins}:${s.toString().padStart(2, '0')}`;
+          };
+          
+          tr.innerHTML = `
+            <td>${session.roomCode || '-'}</td>
+            <td class="nowrap">${new Date(session.startTime).toLocaleString()}</td>
+            <td>${formatDuration(session.duration)}</td>
+            <td class="num">${session.playerCount || 0}</td>
+            <td>${(session.playerNames || []).join(', ')}</td>
+            <td class="num">${session.totalRounds || 0}</td>
+            <td>${session.winnerName || '-'}</td>
+            <td><span class="pill">${session.difficulty || 'normal'}</span></td>
+            <td><span class="pill">${session.musicMode || 'unknown'}</span></td>
+            <td><span class="pill ${session.completedNormally ? 'success' : 'warning'}">${session.completedNormally ? 'Completed' : 'Incomplete'}</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Failed to load sessions:', e);
+      }
+    }
+    
+    async function loadErrorLogs() {
+      try {
+        const filter = document.getElementById('errorTypeFilter');
+        const errorType = filter ? filter.value : '';
+        const params = errorType ? `?errorType=${errorType}&limit=50` : '?limit=50';
+        
+        const data = await adminFetch('/api/admin/error-logs' + params);
+        const tbody = document.getElementById('errorsTbody');
+        const countEl = document.getElementById('errorsCount');
+        
+        if (countEl) countEl.textContent = `Showing ${data.items?.length || 0} of ${data.total || 0} errors`;
+        
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        if (!data.items || !data.items.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="muted">No errors logged</td></tr>';
+          return;
+        }
+        
+        data.items.forEach(error => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="nowrap">${new Date(error.timestamp).toLocaleString()}</td>
+            <td>${error.roomCode || '-'}</td>
+            <td><span class="pill error">${error.errorType || 'unknown'}</span></td>
+            <td>${error.message || '-'}</td>
+            <td>${error.playerName || '-'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error('Failed to load errors:', e);
+      }
+    }
+    
+    async function exportSessions() {
+      try {
+        const data = await adminFetch('/api/admin/game-sessions?limit=500');
+        const sessions = data.items || [];
+        
+        // Convert to CSV
+        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Rounds', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
+        const rows = sessions.map(s => [
+          s.roomCode || '',
+          s.startTime || '',
+          s.duration || '',
+          s.playerCount || '',
+          (s.playerNames || []).join(';'),
+          s.totalRounds || '',
+          s.winnerName || '',
+          s.difficulty || '',
+          s.musicMode || '',
+          s.completedNormally ? 'Completed' : 'Incomplete'
+        ]);
+        
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'game-sessions.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showStatus('Sessions exported', 'success');
+      } catch (e) {
+        showStatus(e.message || 'Export failed', 'error');
+      }
+    }
+    
+    async function clearOldData() {
+      if (!confirm('Clear analytics data older than 90 days? This cannot be undone.')) return;
+      try {
+        const data = await adminFetch('/api/admin/analytics-data?olderThanDays=90', { method: 'DELETE' });
+        showStatus(`Cleared ${data.sessionsRemoved || 0} sessions and ${data.errorsRemoved || 0} errors`, 'success');
+        loadUsageAnalytics();
+      } catch (e) {
+        showStatus(e.message || 'Clear failed', 'error');
+      }
+    }
+
     // Wire UI
     if (els.bulkImportBtn) {
       els.bulkImportBtn.onclick = () => switchView('import');
@@ -1314,11 +1690,35 @@
     if (els.analyticsBtn) {
       els.analyticsBtn.onclick = () => switchView('analytics');
     }
+    const usageAnalyticsBtn = document.getElementById('usageAnalyticsBtn');
+    if (usageAnalyticsBtn) {
+      usageAnalyticsBtn.onclick = () => switchView('usage');
+    }
     if (els.backToAdminBtn) {
       els.backToAdminBtn.onclick = () => switchView('admin');
     }
     if (els.backFromAnalyticsBtn) {
       els.backFromAnalyticsBtn.onclick = () => switchView('admin');
+    }
+    const backFromUsageBtn = document.getElementById('backFromUsageBtn');
+    if (backFromUsageBtn) {
+      backFromUsageBtn.onclick = () => switchView('admin');
+    }
+    const refreshUsageBtn = document.getElementById('refreshUsageBtn');
+    if (refreshUsageBtn) {
+      refreshUsageBtn.onclick = loadUsageAnalytics;
+    }
+    const clearOldDataBtn = document.getElementById('clearOldDataBtn');
+    if (clearOldDataBtn) {
+      clearOldDataBtn.onclick = clearOldData;
+    }
+    const exportSessionsBtn = document.getElementById('exportSessionsBtn');
+    if (exportSessionsBtn) {
+      exportSessionsBtn.onclick = exportSessions;
+    }
+    const refreshErrorsBtn = document.getElementById('refreshErrorsBtn');
+    if (refreshErrorsBtn) {
+      refreshErrorsBtn.onclick = loadErrorLogs;
     }
     if (els.signOutBtn) {
       els.signOutBtn.onclick = () => {
