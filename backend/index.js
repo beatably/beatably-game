@@ -2633,8 +2633,19 @@ io.on('connection', (socket) => {
     const playerTimelineCommitted = game.timelines[currentPersistentId] || [];
     // Insert at the recorded index
     const commitTimeline = [...playerTimelineCommitted];
-    commitTimeline.splice(game.lastPlaced.index, 0, game.sharedDeck[game.currentCardIndex]);
-    game.timelines[currentPersistentId] = commitTimeline;
+    // CRITICAL FIX: Check if lastPlaced exists and has a valid index before accessing it
+    if (game.lastPlaced && game.lastPlaced.index !== undefined) {
+      commitTimeline.splice(game.lastPlaced.index, 0, game.sharedDeck[game.currentCardIndex]);
+      game.timelines[currentPersistentId] = commitTimeline;
+    } else {
+      console.error('[Backend] ERROR: game.lastPlaced is null or missing index in continue_game. Cannot commit card.', {
+        lastPlaced: game.lastPlaced,
+        currentCardIndex: game.currentCardIndex,
+        code
+      });
+      // Don't commit the card if we don't have valid placement info
+      game.timelines[currentPersistentId] = playerTimelineCommitted;
+    }
 
     // Now advance turn
     if (!advanceTurn(game, code)) {
@@ -2825,7 +2836,16 @@ io.on('connection', (socket) => {
     const currentPersistentIdForReveal = game.playerOrder[game.currentPlayerIdx];
     const revealTimeline = [...game.timelines[currentPersistentIdForReveal]];
     // Insert the placed card visually for reveal only
-    revealTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true });
+    // CRITICAL FIX: Check if lastPlaced exists and has a valid index before accessing it
+    if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCard) {
+      revealTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true });
+    } else {
+      console.error('[Backend] ERROR: game.lastPlaced is null or missing index in skip_challenge reveal. Cannot show card placement.', {
+        lastPlaced: game.lastPlaced,
+        hasCurrentCard: !!currentCard,
+        code
+      });
+    }
     
     updatePlayerScores(game); // scores from committed timelines only
 

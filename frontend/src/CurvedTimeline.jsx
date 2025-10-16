@@ -17,7 +17,8 @@ const CurvedTimeline = ({
   pendingDropIndex,
   currentPlayerName,
   roomCode,
-  myPersistentId
+  myPersistentId,
+  timelineOwnerPersistentId
 }) => {
   const [hoveredNodeIndex, setHoveredNodeIndex] = useState(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
@@ -27,6 +28,9 @@ const CurvedTimeline = ({
   const [tapCount, setTapCount] = useState(0);
   const [tapTimer, setTapTimer] = useState(null);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  
+  // Track which cards have already triggered confetti to prevent duplicate animations
+  const confettiPlayedRef = useRef(new Set());
 
   // Secret tap pattern handler for timeline title
   const handleSecretTap = (event) => {
@@ -67,6 +71,17 @@ const CurvedTimeline = ({
 
   // Trigger confetti and sound for correct/incorrect answers
   useEffect(() => {
+    // Create unique identifier for this reveal/challenge to prevent duplicate confetti
+    const revealId = lastPlaced?.id ? `${phase}-${lastPlaced.id}` : null;
+    const challengeId = challenge?.phase === 'resolved' ? `challenge-${challenge.challengerId}-${challenge.targetId}` : null;
+    const uniqueId = revealId || challengeId;
+    
+    // Skip if we've already played confetti for this exact situation
+    if (uniqueId && confettiPlayedRef.current.has(uniqueId)) {
+      console.log('[CurvedTimeline] Skipping duplicate confetti for:', uniqueId);
+      return;
+    }
+    
     // Determine if confetti should be shown and which sound to play
     let shouldShowConfetti = false;
     let shouldPlayCorrectSound = false;
@@ -109,6 +124,12 @@ const CurvedTimeline = ({
     }
     
     if (shouldShowConfetti) {
+      // Mark this reveal/challenge as having played confetti
+      if (uniqueId) {
+        confettiPlayedRef.current.add(uniqueId);
+        console.log('[CurvedTimeline] Marked confetti as played for:', uniqueId);
+      }
+      
       // Trigger confetti burst - 0.5x size
       const count = 200;
       const defaults = {
@@ -154,6 +175,15 @@ const CurvedTimeline = ({
       });
     }
   }, [phase, lastPlaced, challenge, timeline]);
+  
+  // Clean up old confetti tracking when phase changes to player-turn (new round starting)
+  useEffect(() => {
+    if (phase === 'player-turn') {
+      // Clear confetti tracking for previous rounds
+      confettiPlayedRef.current.clear();
+      console.log('[CurvedTimeline] Cleared confetti tracking for new round');
+    }
+  }, [phase]);
 
   // Effect to measure container dimensions and handle resize
   useEffect(() => {
@@ -669,6 +699,7 @@ const CurvedTimeline = ({
   // Determine year visual state
   const getYearState = (card, index) => {
     // Handle challenge-resolved phase with special logic for challenger and original cards
+    // This MUST be checked first to avoid lastPlaced logic overriding the correct colors
     if (phase === 'challenge-resolved' && challenge && challenge.phase === 'resolved') {
       // Check if this is a challenger card
       if (card.challengerCard) {
@@ -678,7 +709,19 @@ const CurvedTimeline = ({
       if (card.originalCard) {
         return challenge.result?.originalCorrect ? 'green' : 'red';
       }
-      // For all other cards during challenge resolution, use vibrant colors
+    }
+    
+    // Also check for challenger/original cards even if not in challenge-resolved phase
+    // in case the phase transitions but the cards still have these markers
+    if (card.challengerCard && challenge?.result) {
+      return challenge.result.challengerCorrect ? 'green' : 'red';
+    }
+    if (card.originalCard && challenge?.result) {
+      return challenge.result.originalCorrect ? 'green' : 'red';
+    }
+    
+    // For all other cards during challenge resolution, use vibrant colors
+    if (phase === 'challenge-resolved' && challenge && challenge.phase === 'resolved') {
       return { type: 'vibrant', color: getYearColor(index) };
     }
     
@@ -686,18 +729,32 @@ const CurvedTimeline = ({
       return { type: 'vibrant', color: getYearColor(index) };
     }
     
+    // CRITICAL FIX: Only show red/green outline for lastPlaced during specific active phases
+    // Don't let old lastPlaced data affect new turns
+    
     if (phase === 'song-guess') return 'grey';
     if (phase === 'challenge-window' || (phase === 'challenge' && lastPlaced.phase === 'challenged')) {
       return 'grey';
     }
-    if (phase === 'challenge-resolved' || lastPlaced.phase === 'resolved') {
+    
+    // CRITICAL FIX: During reveal phase, EVERYONE sees the outline (not just timeline owner)
+    // This is the feedback moment for all players
+    if (phase === 'reveal') {
+      return lastPlaced.correct ? 'green' : 'red';
+    }
+    
+    // CRITICAL FIX: During challenge-resolved phase, EVERYONE sees the outline
+    if (phase === 'challenge-resolved') {
       if (challenge && challenge.phase === 'resolved') {
+        // This should not be reached for challenger/original cards due to early returns above
         return challenge.originalCorrect ? 'green' : 'red';
       }
       return lastPlaced.correct ? 'green' : 'red';
     }
     
-    return lastPlaced.correct ? 'green' : 'red';
+    // For all other phases (including player-turn), don't show outline for old placements
+    // This ensures that cards from previous rounds don't keep showing outlines
+    return { type: 'vibrant', color: getYearColor(index) };
   };
 
   // Years should only be visible for confirmed/resolved cards, not during active guessing

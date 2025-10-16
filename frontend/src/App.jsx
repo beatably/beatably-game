@@ -397,20 +397,76 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
                 if (response.view === 'waiting') {
                   setPlayers(response.lobby.players);
                   setGameSettings(response.lobby.settings || gameSettings);
-                } else if (response.view === 'game') {
-                  const gameState = response.gameState;
-                  setPlayers(gameState.players);
-                  setCurrentPlayerIdx(gameState.currentPlayerIdx || 0);
-                  setTimeline(gameState.timeline || []);
-                  setDeck(gameState.deck || []);
-                  setPhase(gameState.phase);
-                  setFeedback(gameState.feedback);
-                  setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
-                  setLastPlaced(gameState.lastPlaced);
-                  setRemovingId(gameState.removingId);
-                  setChallenge(gameState.challenge);
-                  setCurrentPlayerId(gameState.currentPlayerId);
-                }
+              } else if (response.view === 'game') {
+                const gameState = response.gameState;
+                setPlayers(gameState.players);
+                setCurrentPlayerIdx(gameState.currentPlayerIdx || 0);
+                setTimeline(gameState.timeline || []);
+                setDeck(gameState.deck || []);
+                setPhase(gameState.phase);
+                setFeedback(gameState.feedback);
+                setShowFeedback(!!gameState.feedback && gameState.phase === 'reveal');
+                
+                // CRITICAL FIX: Preserve local UI state during visibility change reconnection
+                // The backend doesn't always maintain visual indicators (lastPlaced, challenge)
+                // Only update if backend provides MORE information than what we have locally
+                setLastPlaced(prevLastPlaced => {
+                  // Keep local lastPlaced if backend doesn't provide one
+                  if (!gameState.lastPlaced && prevLastPlaced) {
+                    console.log('[App] visibilitychange: Preserving local lastPlaced:', prevLastPlaced);
+                    return prevLastPlaced;
+                  }
+                  return gameState.lastPlaced;
+                });
+                
+                setRemovingId(prevRemovingId => {
+                  if (!gameState.removingId && prevRemovingId) {
+                    console.log('[App] visibilitychange: Preserving local removingId:', prevRemovingId);
+                    return prevRemovingId;
+                  }
+                  return gameState.removingId;
+                });
+                
+                setChallenge(prevChallenge => {
+                  const newChallenge = gameState.challenge;
+                  
+                  // If no new challenge from backend, keep existing
+                  if (!newChallenge && prevChallenge) {
+                    console.log('[App] visibilitychange: Preserving local challenge:', prevChallenge);
+                    return prevChallenge;
+                  }
+                  
+                  // If we have a new challenge, ensure player names are populated
+                  if (newChallenge && gameState.players) {
+                    let enrichedChallenge = { ...newChallenge };
+                    
+                    // Ensure challenger name is populated
+                    if (enrichedChallenge.challengerId && !enrichedChallenge.challengerName) {
+                      const challenger = gameState.players.find(p => p.persistentId === enrichedChallenge.challengerId);
+                      if (challenger) {
+                        enrichedChallenge.challengerName = challenger.name;
+                        console.log('[App] visibilitychange: Populated challengerName:', challenger.name);
+                      }
+                    }
+                    
+                    // Ensure target name is populated
+                    const targetPlayerId = enrichedChallenge.targetId || enrichedChallenge.originalPlayerId;
+                    if (targetPlayerId && !enrichedChallenge.targetName) {
+                      const target = gameState.players.find(p => p.persistentId === targetPlayerId);
+                      if (target) {
+                        enrichedChallenge.targetName = target.name;
+                        console.log('[App] visibilitychange: Populated targetName:', target.name);
+                      }
+                    }
+                    
+                    return enrichedChallenge;
+                  }
+                  
+                  return newChallenge;
+                });
+                
+                setCurrentPlayerId(gameState.currentPlayerId);
+              }
               } else {
                 console.warn('[App] Reconnection failed after unlock:', response.error);
               }
@@ -847,7 +903,14 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         // The backend doesn't always maintain visual indicators (lastPlaced) or player names (challenge)
         // Only update if backend provides MORE information than what we have locally
         setLastPlaced(prevLastPlaced => {
-          // Keep local lastPlaced if backend doesn't provide one
+          // IMPORTANT: If phase is 'player-turn' and backend sends null, it means we should clear lastPlaced
+          // This happens when transitioning to a new turn after challenge resolution
+          if (game.phase === 'player-turn' && !game.lastPlaced) {
+            console.log('[App] game_update: Clearing lastPlaced for new turn (phase: player-turn)');
+            return null;
+          }
+          
+          // Keep local lastPlaced if backend doesn't provide one (for other phases)
           if (!game.lastPlaced && prevLastPlaced) {
             console.log('[App] game_update: Preserving local lastPlaced:', prevLastPlaced);
             return prevLastPlaced;
@@ -2014,6 +2077,14 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       console.log("[App] Missing socket or room code:", { socket: !!socketRef.current, roomCode });
       return;
     }
+    
+    // CRITICAL FIX: Clear lastPlaced and challenge state to prevent outline persistence
+    console.log("[App] Clearing lastPlaced and challenge state before continuing");
+    setLastPlaced(null);
+    setChallenge(null);
+    setShowFeedback(false);
+    setFeedback(null);
+    
     console.log("[App] Emitting continue_after_challenge for room:", roomCode);
     socketRef.current.emit("continue_after_challenge", { code: roomCode });
   };
@@ -2516,6 +2587,16 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       return currentPlayerName;
     })();
     
+    // Get the timeline owner's persistent ID for comparison
+    const timelineOwnerPersistentId = (() => {
+      if (phase === 'challenge' && challenge) {
+        // During challenge, the timeline owner is the target/original player
+        return challenge.targetId || challenge.originalPlayerId || currentPlayerId;
+      }
+      // For all other phases, use the current player's persistent ID
+      return currentPlayerId;
+    })();
+    
     console.log("[App] Render game view:", {
       myId: socketRef.current?.id,
       currentPlayerId,
@@ -2570,6 +2651,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               currentPlayerName={timelineOwnerName}
               roomCode={roomCode}
               myPersistentId={myPersistentId}
+              timelineOwnerPersistentId={timelineOwnerPersistentId}
             />
           </div>
           <GameFooter

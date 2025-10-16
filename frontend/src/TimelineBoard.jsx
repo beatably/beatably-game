@@ -8,7 +8,7 @@ import { playClickSound } from "./utils/soundUtils";
 
 const CARD_TYPE = "SONG_CARD";
 
-function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName, roomCode, myPersistentId }) {
+function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName, roomCode, myPersistentId, timelineOwnerPersistentId }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
@@ -236,6 +236,7 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
           currentPlayerName={currentPlayerName}
           roomCode={roomCode}
           myPersistentId={myPersistentId}
+          timelineOwnerPersistentId={timelineOwnerPersistentId}
         />
       </div>
       
