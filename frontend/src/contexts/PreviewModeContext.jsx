@@ -62,23 +62,25 @@ export function PreviewModeProvider({ children }) {
         // Desktop fade-out using RAF
         if (!isIOSRef.current) {
           const timeRemaining = audioRef.current.duration - audioRef.current.currentTime;
-          if (timeRemaining <= 8 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
+          if (timeRemaining <= 6 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
             console.log('[PreviewMode] Starting fade-out (desktop)');
-            const fadeOutDuration = 8000; // 8 seconds for smoother fade
+            const fadeOutDuration = 6000; // 6 seconds - smooth and gradual
             const startTime = performance.now();
             const startValue = audioRef.current.volume;
             
             const fadeOut = (currentTime) => {
               const elapsed = currentTime - startTime;
               const progress = Math.min(elapsed / fadeOutDuration, 1);
-              // Exponential curve: (1-progress)^2 for more natural fade
-              const exponentialProgress = (1 - progress) * (1 - progress);
-              const value = startValue * exponentialProgress;
+              // Ease-in curve for smooth fade-out: (1-progress)^3 for very gradual start
+              const remaining = 1 - progress;
+              const easedProgress = remaining * remaining * remaining;
+              const value = startValue * easedProgress;
               audioRef.current.volume = Math.max(0, value);
               
               if (progress < 1 && audioRef.current.currentTime < audioRef.current.duration) {
                 fadeAnimationRef.current = requestAnimationFrame(fadeOut);
               } else {
+                audioRef.current.volume = 0;
                 fadeAnimationRef.current = null;
                 fadeOutTimerRef.current = null;
                 console.log('[PreviewMode] Fade-out complete');
@@ -98,14 +100,14 @@ export function PreviewModeProvider({ children }) {
         if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
           const ctx = audioContextRef.current;
           const gain = gainNodeRef.current;
-          const fadeOutDuration = 8; // 8 seconds for smoother, more gradual fade
+          const fadeOutDuration = 6; // 6 seconds - smooth and gradual
           const fadeOutStart = Math.max(0, audioRef.current.duration - fadeOutDuration);
           const when = ctx.currentTime + Math.max(0, fadeOutStart - audioRef.current.currentTime);
           
           console.log('[PreviewMode] iOS - Scheduling fade-out at', when, 'for duration', audioRef.current.duration);
           gain.gain.cancelScheduledValues(when);
           gain.gain.setValueAtTime(gain.gain.value, when);
-          // Use exponential ramp for more natural volume perception
+          // Exponential ramp creates smooth, natural-sounding fade-out
           gain.gain.exponentialRampToValueAtTime(0.0001, when + fadeOutDuration);
         }
       });
@@ -228,10 +230,10 @@ export function PreviewModeProvider({ children }) {
         
         // CRITICAL: Start from epsilon (0.0001), not 0 - prevents iOS "stuck at zero" bug
         gain.gain.setValueAtTime(0.0001, now);
-        // Use exponential ramp for more natural, smooth fade-in (1.5s for gentler start)
-        gain.gain.exponentialRampToValueAtTime(1, now + 1.5);
+        // Use exponential ramp for smooth, natural fade-in
+        gain.gain.exponentialRampToValueAtTime(1, now + 0.8);
         
-        console.log('[PreviewMode] iOS - Scheduled exponential fade-in from 0.0001 to 1 over 1.5s');
+        console.log('[PreviewMode] iOS - Scheduled exponential fade-in from 0.0001 to 1 over 0.8s');
       } else {
         audioRef.current.volume = 0;
       }
@@ -242,21 +244,22 @@ export function PreviewModeProvider({ children }) {
       setIsPlaying(true);
       isUnlockedRef.current = true;
       
-      // Desktop: fade with RAF using exponential curve for natural volume perception
+      // Desktop: fade with RAF using gentle easing curve
       if (!isIOSRef.current) {
         const startTime = performance.now();
-        const fadeInDuration = 1500; // 1.5 seconds for gentler fade-in
+        const fadeInDuration = 800; // 0.8 seconds - quick but smooth
         
         const fadeIn = (currentTime) => {
           const elapsed = currentTime - startTime;
           const progress = Math.min(elapsed / fadeInDuration, 1);
-          // Exponential curve: progress^2 for more gradual start
-          const exponentialProgress = progress * progress;
-          audioRef.current.volume = exponentialProgress;
+          // Ease-out curve: sqrt for gentler, smoother rise
+          const easedProgress = Math.sqrt(progress);
+          audioRef.current.volume = easedProgress;
           
           if (progress < 1) {
             fadeAnimationRef.current = requestAnimationFrame(fadeIn);
           } else {
+            audioRef.current.volume = 1;
             fadeAnimationRef.current = null;
             console.log('[PreviewMode] Desktop fade-in complete');
           }
