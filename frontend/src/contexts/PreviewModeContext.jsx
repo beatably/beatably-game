@@ -15,6 +15,7 @@ export function PreviewModeProvider({ children }) {
   const audioContextRef = useRef(null);
   const sourceNodeRef = useRef(null);
   const gainNodeRef = useRef(null);
+  const sourceCreatedRef = useRef(false); // Guard against double MediaElementSource creation
   const isUnlockedRef = useRef(false);
   const fadeTimerRef = useRef(null);
   const fadeAnimationRef = useRef(null);
@@ -48,6 +49,7 @@ export function PreviewModeProvider({ children }) {
       audioRef.current = new Audio();
       audioRef.current.setAttribute('playsinline', '');
       audioRef.current.setAttribute('webkit-playsinline', '');
+      audioRef.current.setAttribute('crossorigin', 'anonymous'); // For Spotify CDN
       audioRef.current.preload = 'auto';
       
       // Track if we're currently fading out
@@ -57,41 +59,51 @@ export function PreviewModeProvider({ children }) {
       audioRef.current.addEventListener('timeupdate', () => {
         setCurrentTime(audioRef.current.currentTime);
         
-        // Start fade-out 5 seconds before the end
-        const timeRemaining = audioRef.current.duration - audioRef.current.currentTime;
-        if (timeRemaining <= 5 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
-          console.log('[PreviewMode] Starting fade-out');
-          const fadeOutDuration = 5000;
-          const startTime = performance.now();
-          const startValue = isIOSRef.current && gainNodeRef.current ? gainNodeRef.current.gain.value : audioRef.current.volume;
-          
-          const fadeOut = (currentTime) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / fadeOutDuration, 1);
-            const value = startValue * (1 - progress);
+        // Desktop fade-out using RAF
+        if (!isIOSRef.current) {
+          const timeRemaining = audioRef.current.duration - audioRef.current.currentTime;
+          if (timeRemaining <= 5 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
+            console.log('[PreviewMode] Starting fade-out (desktop)');
+            const fadeOutDuration = 5000;
+            const startTime = performance.now();
+            const startValue = audioRef.current.volume;
             
-            if (isIOSRef.current && gainNodeRef.current) {
-              gainNodeRef.current.gain.value = Math.max(0, value);
-            } else {
+            const fadeOut = (currentTime) => {
+              const elapsed = currentTime - startTime;
+              const progress = Math.min(elapsed / fadeOutDuration, 1);
+              const value = startValue * (1 - progress);
               audioRef.current.volume = Math.max(0, value);
-            }
+              
+              if (progress < 1 && audioRef.current.currentTime < audioRef.current.duration) {
+                fadeAnimationRef.current = requestAnimationFrame(fadeOut);
+              } else {
+                fadeAnimationRef.current = null;
+                fadeOutTimerRef.current = null;
+                console.log('[PreviewMode] Fade-out complete');
+              }
+            };
             
-            if (progress < 1 && audioRef.current.currentTime < audioRef.current.duration) {
-              fadeAnimationRef.current = requestAnimationFrame(fadeOut);
-            } else {
-              fadeAnimationRef.current = null;
-              fadeOutTimerRef.current = null;
-              console.log('[PreviewMode] Fade-out complete');
-            }
-          };
-          
-          fadeOutTimerRef.current = true; // Mark that fade-out has started
-          fadeAnimationRef.current = requestAnimationFrame(fadeOut);
+            fadeOutTimerRef.current = true;
+            fadeAnimationRef.current = requestAnimationFrame(fadeOut);
+          }
         }
       });
       
       audioRef.current.addEventListener('loadedmetadata', () => {
         setDuration(audioRef.current.duration);
+        
+        // iOS: Schedule fade-out based on duration (audio-thread scheduling)
+        if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
+          const ctx = audioContextRef.current;
+          const gain = gainNodeRef.current;
+          const fadeOutStart = Math.max(0, audioRef.current.duration - 5);
+          const when = ctx.currentTime + Math.max(0, fadeOutStart - audioRef.current.currentTime);
+          
+          console.log('[PreviewMode] iOS - Scheduling fade-out at', when, 'for duration', audioRef.current.duration);
+          gain.gain.cancelScheduledValues(when);
+          gain.gain.setValueAtTime(gain.gain.value, when);
+          gain.gain.linearRampToValueAtTime(0.0001, when + 5.0);
+        }
       });
       
       audioRef.current.addEventListener('ended', () => {
@@ -177,27 +189,44 @@ export function PreviewModeProvider({ children }) {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         audioContextRef.current = new AudioContext();
         gainNodeRef.current = audioContextRef.current.createGain();
+        gainNodeRef.current.gain.setValueAtTime(1, audioContextRef.current.currentTime);
         gainNodeRef.current.connect(audioContextRef.current.destination);
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
-        sourceNodeRef.current.connect(gainNodeRef.current);
-      }
-      
-      // iOS Safari unlock
-      if (!isUnlockedRef.current) {
-        console.log('[PreviewMode] First play - unlocking audio');
-        isUnlockedRef.current = true;
-        if (isIOSRef.current && audioContextRef.current?.state === 'suspended') {
-          await audioContextRef.current.resume();
+        
+        // CRITICAL: Only create MediaElementSource ONCE per audio element
+        if (!sourceCreatedRef.current) {
+          console.log('[PreviewMode] Creating MediaElementSource (once only)');
+          sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+          sourceNodeRef.current.connect(gainNodeRef.current);
+          sourceCreatedRef.current = true;
         }
       }
       
       // Load new audio
+      audioRef.current.crossOrigin = 'anonymous'; // For Spotify CDN CORS
       audioRef.current.src = previewUrl;
       audioRef.current.load();
       
-      // Set initial volume/gain
-      if (isIOSRef.current && gainNodeRef.current) {
-        gainNodeRef.current.gain.value = 0;
+      // CRITICAL: Resume context MUST happen in user gesture, right before play
+      if (isIOSRef.current && audioContextRef.current) {
+        console.log('[PreviewMode] Resuming AudioContext before play');
+        await audioContextRef.current.resume();
+      }
+      
+      // iOS: Use epsilon (0.0001) and schedule fade on audio thread
+      // Desktop: Start at 0 and fade with RAF
+      if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
+        const ctx = audioContextRef.current;
+        const gain = gainNodeRef.current;
+        const now = ctx.currentTime;
+        
+        // Cancel any previous scheduled values
+        gain.gain.cancelScheduledValues(0);
+        
+        // CRITICAL: Start from epsilon (0.0001), not 0 - prevents iOS "stuck at zero" bug
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(1, now + 1.0);
+        
+        console.log('[PreviewMode] iOS - Scheduled fade-in from 0.0001 to 1 over 1s');
       } else {
         audioRef.current.volume = 0;
       }
@@ -206,31 +235,29 @@ export function PreviewModeProvider({ children }) {
       await audioRef.current.play();
       setCurrentPreviewUrl(previewUrl);
       setIsPlaying(true);
+      isUnlockedRef.current = true;
       
-      // Fade in using requestAnimationFrame (more reliable than setInterval on iOS)
-      const startTime = performance.now();
-      const fadeInDuration = 1000;
-      
-      const fadeIn = (currentTime) => {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / fadeInDuration, 1);
+      // Desktop: fade with RAF
+      if (!isIOSRef.current) {
+        const startTime = performance.now();
+        const fadeInDuration = 1000;
         
-        if (isIOSRef.current && gainNodeRef.current) {
-          gainNodeRef.current.gain.value = progress;
-        } else {
+        const fadeIn = (currentTime) => {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / fadeInDuration, 1);
           audioRef.current.volume = progress;
-        }
+          
+          if (progress < 1) {
+            fadeAnimationRef.current = requestAnimationFrame(fadeIn);
+          } else {
+            fadeAnimationRef.current = null;
+            console.log('[PreviewMode] Desktop fade-in complete');
+          }
+        };
         
-        if (progress < 1) {
-          fadeAnimationRef.current = requestAnimationFrame(fadeIn);
-        } else {
-          fadeAnimationRef.current = null;
-          console.log('[PreviewMode] Fade-in complete');
-        }
-      };
-      
-      fadeAnimationRef.current = requestAnimationFrame(fadeIn);
-      console.log('[PreviewMode] Preview playing with fade-in');
+        fadeAnimationRef.current = requestAnimationFrame(fadeIn);
+        console.log('[PreviewMode] Desktop - fade-in started');
+      }
       return true;
     } catch (error) {
       console.error('[PreviewMode] Error playing preview:', error);
