@@ -97,21 +97,21 @@ const CurvedTimeline = ({
         shouldPlayIncorrectSound = true;
       }
     } else if (phase === 'challenge-resolved' && challenge && challenge.phase === 'resolved') {
-      // Challenge resolved - only show confetti for the winning player
-      // Check if there are any cards marked as correct
-      const hasCorrectChallengerCard = timeline.some(card => 
-        card.challengerCard && challenge.result?.challengerCorrect
-      );
-      const hasCorrectOriginalCard = timeline.some(card => 
-        card.originalCard && challenge.result?.originalCorrect
-      );
+      // Challenge resolved - only show confetti to the player who won the challenge
+      const isChallenger = myPersistentId === challenge.challengerPersistentId;
+      const isOriginalPlayer = myPersistentId === challenge.originalPlayerId;
       
-      shouldShowConfetti = hasCorrectChallengerCard || hasCorrectOriginalCard;
-      
-      // Play sound based on challenge result
-      if (hasCorrectChallengerCard || hasCorrectOriginalCard) {
+      if (isChallenger && challenge.result?.challengerCorrect && !challenge.result?.originalCorrect) {
+        // Challenger won - show confetti only to challenger
+        shouldShowConfetti = true;
         shouldPlayCorrectSound = true;
-      } else {
+      } else if (isOriginalPlayer && challenge.result?.originalCorrect) {
+        // Original player won (either they were correct and challenger wrong, or both correct)
+        // Show confetti only to original player
+        shouldShowConfetti = true;
+        shouldPlayCorrectSound = true;
+      } else if (isChallenger || isOriginalPlayer) {
+        // This player was involved but lost - play incorrect sound
         shouldPlayIncorrectSound = true;
       }
     }
