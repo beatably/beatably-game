@@ -1593,8 +1593,8 @@ function GameFooter({
               </div>
             )}
             
-            {/* New Song button - only for current player with tokens, shown after first play */}
-            {isMyTurn && myPlayer && myPlayer.tokens > 0 && hasPlayedOnce && (
+            {/* New Song button - only for current player with tokens */}
+            {isMyTurn && myPlayer && myPlayer.tokens > 0 && (
               <div className="flex flex-col items-center">
                 <div className="text-muted-foreground text-sm mb-8">You can pay 1 token to get another song</div>
                 <button 
