@@ -333,8 +333,6 @@ function list({ q = '', genre, geography, yearMin, yearMax, difficulty, limit = 
     const geo = String(geography).toLowerCase();
     out = out.filter((s) => {
       const sg = (s.geography || '').toLowerCase();
-      const ms = Array.isArray(s.markets) ? s.markets.map((m) => String(m || '').toLowerCase()) : [];
-      if (ms.length) return ms.includes(geo);
       return sg === geo;
     });
   }
@@ -527,14 +525,41 @@ function selectForGame(criteria = {}) {
     });
   }
 
-  // Filter by geography via markets (US/SE/GB/INTL - success markets)
+  // Filter by music mode (geography/international)
+  // markets parameter now controls which songs to include based on isInternational flag
   if (Array.isArray(markets) && markets.length) {
     const mset = new Set(markets.map((m) => String(m || '').toLowerCase()));
+    
     pool = pool.filter((s) => {
-      const sg = (s.geography || '').toLowerCase();
-      const ms = Array.isArray(s.markets) ? s.markets.map((m) => String(m || '').toLowerCase()) : [];
-      if (ms.length) return ms.some((code) => mset.has(code));
-      return sg ? mset.has(sg) : true;
+      // Handle three game modes:
+      // 1. "se" - Swedish songs only (geography = "SE")
+      // 2. "international" - International songs only (isInternational = true)
+      // 3. "intl-se" or "se-intl" - Both international AND Swedish (isInternational = true OR geography = "SE")
+      
+      const geo = (s.geography || '').toLowerCase();
+      const isIntl = s.isInternational === true;
+      
+      // If "se" is in the markets list
+      if (mset.has('se')) {
+        // SE-only mode
+        if (mset.size === 1) {
+          return geo === 'se';
+        }
+        // SE + International mode (contains both "se" and "international")
+        if (mset.has('international') || mset.has('intl')) {
+          return geo === 'se' || isIntl;
+        }
+      }
+      
+      // International-only mode
+      if (mset.has('international') || mset.has('intl')) {
+        if (mset.size === 1 || !mset.has('se')) {
+          return isIntl;
+        }
+      }
+      
+      // Fallback: accept all if markets filter doesn't match our expected values
+      return true;
     });
   }
 

@@ -241,8 +241,8 @@
             <input id="filterGenre" placeholder="e.g. pop" />
           </div>
           <div class="col-3">
-            <label class="muted">Geography (Market)</label>
-            <input id="filterGeo" placeholder="e.g. US" />
+            <label class="muted">Origin (Artist Geography)</label>
+            <input id="filterGeo" placeholder="e.g. US, SE, CA" />
           </div>
           <div class="col-3">
             <label class="muted">Difficulty Level (1-5)</label>
@@ -292,6 +292,7 @@
             <thead>
               <tr>
                 <th>Cover</th>
+                <th>Spotify</th>
                 <th>Preview</th>
                 <th style="min-width:280px;">Title / Artist</th>
                 <th class="num">Year</th>
@@ -299,6 +300,8 @@
                 <th>Origin</th>
                 <th>Markets</th>
                 <th class="num">Billboard</th>
+                <th class="num">Multi-Country</th>
+                <th class="num">International</th>
                 <th class="num">Rank</th>
                 <th class="num">Peak</th>
                 <th class="num">Weeks</th>
@@ -919,7 +922,14 @@
 
         const tdUri = document.createElement('td');
         tdUri.className = 'mono';
-        tdUri.textContent = it.spotifyUri || it.uri || '';
+        if (it.spotifyUri || it.uri) {
+          const spotifyLink = createSpotifyLink(it.spotifyUri || it.uri);
+          if (spotifyLink) {
+            tdUri.appendChild(spotifyLink);
+          }
+        } else {
+          tdUri.textContent = '';
+        }
         tr.appendChild(tdUri);
 
         els.importPreviewTbody.appendChild(tr);
@@ -962,10 +972,20 @@
           signal: controller.signal
         });
         renderImportPreview(resp.items || []);
+        
+        // Show duplicate count if any were filtered
+        const duplicatesMsg = resp.duplicatesFiltered > 0 
+          ? ` (${resp.duplicatesFiltered} duplicates filtered)` 
+          : '';
+        
         if (els.importPreviewCount) {
-          els.importPreviewCount.textContent = `${resp.total || (resp.items?.length || 0)} items`;
+          els.importPreviewCount.textContent = `${resp.total || (resp.items?.length || 0)} items${duplicatesMsg}`;
         }
-        showStatus('Preview ready', 'success');
+        
+        const statusMsg = resp.duplicatesFiltered > 0
+          ? `Preview ready - ${resp.duplicatesFiltered} duplicate${resp.duplicatesFiltered > 1 ? 's' : ''} filtered out`
+          : 'Preview ready';
+        showStatus(statusMsg, 'success');
       } catch (e) {
         if (e.name === 'AbortError') {
           showStatus('Preview cancelled', 'warning');
@@ -1110,12 +1130,65 @@
         tdCover.appendChild(img);
         tr.appendChild(tdCover);
 
-        const tdPreview = document.createElement('td');
+        // Spotify URI link column
+        const tdSpotify = document.createElement('td');
         if (s.spotifyUri) {
           const spotifyLink = createSpotifyLink(s.spotifyUri);
           if (spotifyLink) {
-            tdPreview.appendChild(spotifyLink);
+            tdSpotify.appendChild(spotifyLink);
           }
+        }
+        tr.appendChild(tdSpotify);
+
+        // Preview audio player column
+        const tdPreview = document.createElement('td');
+        if (s.previewUrl) {
+          const playBtn = document.createElement('button');
+          playBtn.className = 'secondary small';
+          playBtn.textContent = '▶';
+          playBtn.title = 'Play 30s preview';
+          playBtn.style.minWidth = '40px';
+          
+          let audio = null;
+          let isPlaying = false;
+          
+          playBtn.onclick = () => {
+            if (isPlaying) {
+              // Stop playback
+              if (audio) {
+                audio.pause();
+                audio.currentTime = 0;
+              }
+              playBtn.textContent = '▶';
+              playBtn.className = 'secondary small';
+              isPlaying = false;
+            } else {
+              // Start playback
+              if (!audio) {
+                audio = new Audio(s.previewUrl);
+                audio.addEventListener('ended', () => {
+                  playBtn.textContent = '▶';
+                  playBtn.className = 'secondary small';
+                  isPlaying = false;
+                });
+                audio.addEventListener('error', () => {
+                  playBtn.textContent = '✗';
+                  playBtn.title = 'Preview URL failed to load';
+                  playBtn.disabled = true;
+                  isPlaying = false;
+                });
+              }
+              audio.play();
+              playBtn.textContent = '⏸';
+              playBtn.className = 'secondary small success';
+              isPlaying = true;
+            }
+          };
+          
+          tdPreview.appendChild(playBtn);
+        } else {
+          tdPreview.textContent = '-';
+          tdPreview.className = 'muted';
         }
         tr.appendChild(tdPreview);
 
@@ -1145,17 +1218,8 @@
         tr.appendChild(tdGenre);
 
         const tdGeo = document.createElement('td');
-        const originCode = (function() {
-          if (s && s.origin) return s.origin;
-          if (Array.isArray(s.markets) && s.markets.length) {
-            const pick = s.markets.find(m => {
-              const code = String(m || '').toUpperCase();
-              return code && code !== 'US' && code !== 'INTL';
-            });
-            if (pick) return pick;
-          }
-          return s.geography || '';
-        })();
+        // Show the actual origin (geography field), not markets
+        const originCode = s.geography || '';
         tdGeo.innerHTML = originCode ? '<span class="pill">' + originCode + '</span>' : '';
         tr.appendChild(tdGeo);
 
@@ -1169,6 +1233,16 @@
         tdBill.className = 'num';
         tdBill.innerHTML = s.isBillboardChart ? '<span class="pill">✓</span>' : '';
         tr.appendChild(tdBill);
+
+        const tdMultiCountry = document.createElement('td');
+        tdMultiCountry.className = 'num';
+        tdMultiCountry.innerHTML = s.hasMultiCountryCharts ? '<span class="pill">✓</span>' : '';
+        tr.appendChild(tdMultiCountry);
+
+        const tdInternational = document.createElement('td');
+        tdInternational.className = 'num';
+        tdInternational.innerHTML = s.isInternational ? '<span class="pill success">✓</span>' : '';
+        tr.appendChild(tdInternational);
 
         const tdRank = document.createElement('td');
         tdRank.className = 'num';
@@ -1227,6 +1301,41 @@
 
         const tdActions = document.createElement('td');
         tdActions.className = 'right nowrap actions';
+
+        const enrichBtn = document.createElement('button');
+        enrichBtn.className = 'secondary small';
+        enrichBtn.textContent = 'Enrich';
+        enrichBtn.title = 'Fetch missing genre, geography, or preview URL';
+        enrichBtn.onclick = async () => {
+          if (!confirm(`Enrich "${s.title}" by ${s.artist}?\n\nThis will fetch missing genre, geography, and preview URL.`)) return;
+          try {
+            enrichBtn.disabled = true;
+            enrichBtn.textContent = 'Enriching...';
+            const result = await adminFetch('/api/admin/curated-songs/enrich/' + encodeURIComponent(s.id), { method: 'POST' });
+            
+            // Show what changed
+            const changes = [];
+            if (result.changes?.genre) changes.push('genre');
+            if (result.changes?.geography) changes.push('geography');
+            if (result.changes?.previewUrl) changes.push('preview URL');
+            if (result.changes?.isInternational) changes.push('international flag');
+            
+            if (changes.length > 0) {
+              showStatus(`Enriched: ${changes.join(', ')}`, 'success');
+            } else {
+              showStatus('No changes needed - song already has all data', 'success');
+            }
+            
+            // Refresh to show updated data
+            listSongs();
+          } catch (e) {
+            showStatus(e.message || 'Enrichment failed', 'error');
+          } finally {
+            enrichBtn.disabled = false;
+            enrichBtn.textContent = 'Enrich';
+          }
+        };
+        tdActions.appendChild(enrichBtn);
 
         const editBtn = document.createElement('button');
         editBtn.className = 'secondary small';
@@ -1398,8 +1507,8 @@
         const diffs = (data.counts?.byDifficulty || []).map(([k]) => k);
         const diffVals = (data.counts?.byDifficulty || []).map(([, v]) => v);
 
-        const markets = (data.counts?.byMarket || []).map(([k]) => k);
-        const marketVals = (data.counts?.byMarket || []).map(([, v]) => v);
+        const geographies = (data.counts?.byGeography || []).map(([k]) => k);
+        const geographyVals = (data.counts?.byGeography || []).map(([, v]) => v);
 
         const billVals = [data.counts?.billboard?.billboard || 0, data.counts?.billboard?.nonBillboard || 0];
 
@@ -1431,7 +1540,7 @@
 
         upsertChart('marketChart', {
           type: 'bar',
-          data: { labels: markets, datasets: [{ label: 'Top markets', data: marketVals, backgroundColor: palette.slice(2, 2 + Math.max(1, markets.length)) }] },
+          data: { labels: geographies, datasets: [{ label: 'Top origins', data: geographyVals, backgroundColor: palette.slice(2, 2 + Math.max(1, geographies.length)) }] },
           options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
 

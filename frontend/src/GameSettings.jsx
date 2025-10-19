@@ -10,9 +10,9 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
     // Default win condition if not provided
     winCondition: 10,
     musicPreferences: {
-      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+      genres: ['pop', 'indie', 'rock', 'electronic', 'hip-hop'],
       yearRange: { min: 1960, max: 2025 },
-      markets: ['US']
+      markets: ['international']
     }
   });
 
@@ -65,10 +65,10 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
       difficulty: "normal",
       winCondition: 10,
       musicPreferences: {
-        // Normalize genres to lowercase canonical tags to avoid mismatches (e.g. 'r&b' vs 'R&B')
-        genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'r&b', 'reggae', 'funk', 'country', 'jazz', 'alternative'],
+        // Normalize genres to lowercase canonical tags to avoid mismatches
+        genres: ['pop', 'indie', 'rock', 'electronic', 'hip-hop'],
         yearRange: { min: 1960, max: 2025 },
-        markets: ['US']
+        markets: ['international']
       }
     });
   }, [settings]);
@@ -453,22 +453,16 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
   };
 
   const availableGenres = [
-    'pop', 'rock', 'hip-hop', 'electronic', 'indie', 'country',
-    'r&b', 'jazz', 'classical', 'folk', 'reggae', 'blues', 'funk', 'alternative'
+    'pop', 'indie', 'rock', 'electronic', 'hip-hop'
   ];
 
   const chartModeActive = localSettings.useChartMode ?? useChartMode;
 
-  const availableMarkets = [
-    { code: 'INTL', name: 'International' },
-    { code: 'US', name: 'United States' },
-    { code: 'SE', name: 'Sweden' },
-    { code: 'NO', name: 'Norway' },
-    { code: 'GB', name: 'United Kingdom' },
-    { code: 'DE', name: 'Germany' },
-    { code: 'FR', name: 'France' },
-    { code: 'ES', name: 'Spain' },
-    { code: 'IT', name: 'Italy' }
+  // New simplified game modes based on isInternational classification
+  const availableGameModes = [
+    { code: 'se', name: 'Swedish Only', description: 'Local Swedish hits' },
+    { code: 'intl-se', name: 'International + Swedish', description: 'Mix of both' },
+    { code: 'international', name: 'International Only', description: 'Global hits' }
   ];
 
 
@@ -641,30 +635,61 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
                 }`}
                 onClick={() => handleGenreToggle(genre)}
               >
-                {genre === 'r&b' ? 'R&B' : (genre.charAt(0).toUpperCase() + genre.slice(1))}
+                {genre.charAt(0).toUpperCase() + genre.slice(1)}
               </Button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Geography/Markets - Hidden when Chart Mode is active */}
+      {/* Music Mode - Hidden when Chart Mode is active */}
       {!chartModeActive && (
         <div className="space-y-3">
-          <Label className="text-xl font-semibold text-foreground">Markets</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {availableMarkets.map(market => (
-              <Button
-                key={market.code}
-                variant={localSettings.musicPreferences.markets.includes(market.code) ? "default" : "ghost"}
-                className={`h-10 text-sm justify-start touch-button setting-button border border-border ${
-                  !localSettings.musicPreferences.markets.includes(market.code) ? 'focus:ring-0 focus:bg-transparent' : ''
-                }`}
-                onClick={() => handleMarketToggle(market.code)}
-              >
-                {market.name}
-              </Button>
-            ))}
+          <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
+          <div className="grid grid-cols-1 gap-2">
+            {availableGameModes.map(mode => {
+              // Determine if this mode is active
+              const currentMarkets = localSettings.musicPreferences.markets || [];
+              const isActive = (() => {
+                if (mode.code === 'se') {
+                  return currentMarkets.length === 1 && currentMarkets.includes('SE');
+                } else if (mode.code === 'international') {
+                  return !currentMarkets.includes('SE') && 
+                         (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
+                } else if (mode.code === 'intl-se') {
+                  return currentMarkets.includes('SE') && 
+                         (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
+                }
+                return false;
+              })();
+
+              return (
+                <Button
+                  key={mode.code}
+                  variant={isActive ? "default" : "ghost"}
+                  className={`h-auto py-3 text-left justify-start touch-button setting-button border border-border ${
+                    !isActive ? 'focus:ring-0 focus:bg-transparent' : ''
+                  }`}
+                  onClick={() => {
+                    // Set markets based on selected mode
+                    let newMarkets;
+                    if (mode.code === 'se') {
+                      newMarkets = ['SE'];
+                    } else if (mode.code === 'international') {
+                      newMarkets = ['international'];
+                    } else if (mode.code === 'intl-se') {
+                      newMarkets = ['SE', 'international'];
+                    }
+                    handleMusicPreferenceChange('markets', newMarkets);
+                  }}
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold">{mode.name}</span>
+                    <span className="text-xs text-muted-foreground">{mode.description}</span>
+                  </div>
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -711,9 +736,9 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
               winCondition: 10,
               useChartMode: false,
               musicPreferences: {
-                genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+                genres: ['pop', 'indie', 'rock', 'electronic', 'hip-hop'],
                 yearRange: { min: 1960, max: 2025 },
-                markets: ['US']
+                markets: ['international']
               }
             };
             setLocalSettings(defaultSettings);

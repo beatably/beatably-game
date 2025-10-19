@@ -444,6 +444,53 @@ app.delete('/api/admin/curated-songs/:id', requireAdmin, (req, res) => {
   }
 });
 
+// Enrich single song (admin)
+app.post('/api/admin/curated-songs/enrich/:id', requireAdmin, async (req, res) => {
+  try {
+    // Force reload database to ensure we have latest data
+    curatedDb.load(true);
+    
+    const songId = req.params.id;
+    const song = curatedDb.get(songId);
+    
+    if (!song) {
+      return res.status(404).json({ ok: false, error: 'Song not found' });
+    }
+
+    console.log(`[Admin] Enriching song: ${song.artist} - "${song.title}" (current geography: ${song.geography || 'none'})`);
+
+    // Import enrichment module
+    const { enrichSong } = require('./songEnrichment');
+
+    // Enrich the song
+    const enriched = await enrichSong(song, {
+      fetchPreview: true,
+      fetchMusicBrainz: true,
+      rateLimit: true
+    });
+
+    // Update in database
+    const updated = curatedDb.update(songId, enriched);
+
+    console.log(`[Admin] Song enriched successfully (new geography: ${updated.geography || 'none'})`);
+
+    res.json({ 
+      ok: true, 
+      song: updated,
+      changes: {
+        genre: song.genre !== updated.genre,
+        geography: song.geography !== updated.geography,
+        previewUrl: song.previewUrl !== updated.previewUrl,
+        isInternational: song.isInternational !== updated.isInternational
+      }
+    });
+
+  } catch (e) {
+    console.error('[Admin] Enrichment failed:', e?.message, e?.stack);
+    res.status(500).json({ ok: false, error: e?.message || 'Enrichment failed' });
+  }
+});
+
 // --- Curated DB Analytics (admin) ---
 app.get('/api/admin/analytics', requireAdmin, (req, res) => {
   try {
@@ -478,7 +525,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
       byDecade: {},
       byYear: {},
       byDifficulty: {},
-      byMarket: {},
+      byGeography: {},
       billboard: { billboard: 0, nonBillboard: 0 },
       tags: {},
     };
@@ -496,7 +543,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
       const decade = toDecade(s.year);
       const year = Number(s.year);
       const diff = Number.isFinite(Number(s.difficultyLevel)) ? String(Number(s.difficultyLevel)) : 'unknown';
-      const marketsList = (Array.isArray(s.markets) && s.markets.length ? s.markets : [s.geography]).map((m) => lc(m));
+      const geography = lc(s.geography, 'unknown');
 
       for (const g of genreList) {
         counts.byGenre[g] = (counts.byGenre[g] || 0) + 1;
@@ -504,9 +551,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
       counts.byDecade[decade] = (counts.byDecade[decade] || 0) + 1;
       if (Number.isFinite(year)) counts.byYear[String(year)] = (counts.byYear[String(year)] || 0) + 1;
       counts.byDifficulty[diff] = (counts.byDifficulty[diff] || 0) + 1;
-      for (const m of marketsList) {
-        counts.byMarket[m] = (counts.byMarket[m] || 0) + 1;
-      }
+      counts.byGeography[geography] = (counts.byGeography[geography] || 0) + 1;
 
       if (s && s.isBillboardChart) counts.billboard.billboard += 1;
       else counts.billboard.nonBillboard += 1;
@@ -545,7 +590,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
     const difficultySorted = Object.keys(counts.byDifficulty)
       .sort((a, b) => (a === 'unknown') ? 1 : (b === 'unknown') ? -1 : Number(a) - Number(b))
       .map(k => [k, counts.byDifficulty[k]]);
-    const topMarkets = sortEntriesDesc(counts.byMarket).slice(0, 12);
+    const topGeographies = sortEntriesDesc(counts.byGeography).slice(0, 12);
 
     // Gap analysis: default threshold (can override via query ?gapThreshold=30)
     const gapThreshold = Math.max(1, Number(req.query.gapThreshold) || 30);
@@ -576,7 +621,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
         byDecade: decadesSorted,     // [ [decade, count], ... ]
         byGenre: topGenres,          // [ [genre, count], ... ]
         byDifficulty: difficultySorted, // [ [level, count], ... ]
-        byMarket: topMarkets,        // [ [market, count], ... ]
+        byGeography: topGeographies, // [ [geography, count], ... ]
         billboard: counts.billboard,
         byYear: sortEntriesDesc(counts.byYear).sort((a, b) => Number(a[0]) - Number(b[0])), // chronological
         tags: sortEntriesDesc(counts.tags).slice(0, 20),
@@ -877,7 +922,22 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       items.push(...diversified.slice(0, cap));
     }
 
-    res.json({ ok: true, mode, total: items.length, items });
+    // Deduplication: filter out songs already in database
+    const existing = curatedDb.list({ limit: 10000 }).items;
+    const existingUris = new Set(existing.map(s => s.spotifyUri).filter(Boolean));
+    
+    const newItems = items.filter(item => !existingUris.has(item.spotifyUri));
+    const duplicateCount = items.length - newItems.length;
+    
+    console.log(`[AdminImport] Filtered ${duplicateCount} duplicates, ${newItems.length} new songs`);
+
+    res.json({ 
+      ok: true, 
+      mode, 
+      total: newItems.length, 
+      items: newItems,
+      duplicatesFiltered: duplicateCount 
+    });
   } catch (e) {
     console.error('[AdminImport][preview] failed:', e && e.message);
     res.status(500).json({ ok: false, error: e?.message || 'Preview failed' });
@@ -889,13 +949,15 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
  * Body: { items: CuratedItem[] }
  * Saves items into curated DB (dedup by spotifyUri).
  */
-app.post('/api/admin/import/commit', requireAdmin, (req, res) => {
+app.post('/api/admin/import/commit', requireAdmin, async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     let added = 0;
     let updated = 0;
     const seen = new Set();
+    const enrichQueue = [];
 
+    // Step 1: Add all songs to database immediately
     for (const raw of items) {
       const spotifyUri = raw.spotifyUri || raw.uri || null;
       if (!spotifyUri || seen.has(spotifyUri)) continue;
@@ -923,11 +985,55 @@ app.post('/api/admin/import/commit', requireAdmin, (req, res) => {
       });
 
       // Heuristic: curatedDb.add sets updatedAt on updates
-      if (rec && rec.updatedAt) updated++;
-      else added++;
+      if (rec && rec.updatedAt) {
+        updated++;
+      } else {
+        added++;
+      }
+      
+      // Queue for background enrichment if rec exists
+      if (rec && rec.id) {
+        enrichQueue.push(rec.id);
+      }
     }
 
-    res.json({ ok: true, attempted: items.length, saved: added + updated, added, updated });
+    // Step 2: Return immediately so user doesn't wait
+    res.json({ 
+      ok: true, 
+      attempted: items.length, 
+      saved: added + updated, 
+      added, 
+      updated,
+      enriching: enrichQueue.length 
+    });
+
+    // Step 3: Enrich in background (don't await - runs async)
+    if (enrichQueue.length > 0) {
+      console.log(`[Import] Starting background enrichment for ${enrichQueue.length} songs`);
+      
+      // Import enrichment module
+      const { enrichSong } = require('./songEnrichment');
+      
+      // Enrich each song asynchronously (with rate limiting built into enrichSong)
+      (async () => {
+        for (const songId of enrichQueue) {
+          try {
+            const song = curatedDb.get(songId);
+            if (song) {
+              const enriched = await enrichSong(song, {
+                fetchPreview: true,
+                fetchMusicBrainz: true, // FIXED: Re-check geography in case preview was wrong
+                rateLimit: true
+              });
+              curatedDb.update(songId, enriched);
+            }
+          } catch (e) {
+            console.error(`[Import] Background enrichment failed for ${songId}:`, e.message);
+          }
+        }
+        console.log(`[Import] Background enrichment complete for ${enrichQueue.length} songs`);
+      })();
+    }
   } catch (e) {
     console.error('[AdminImport][commit] failed:', e && e.message);
     res.status(500).json({ ok: false, error: e?.message || 'Commit failed' });
