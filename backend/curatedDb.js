@@ -97,9 +97,9 @@ function getCacheDir() {
                 return persistentPath;
               }
               
-              // If deployed has significantly more songs, migrate
-              if (deployedCount > persistentCount * 1.1) {
-                console.log('[CuratedDB] Deployed database has significantly more songs - migrating...');
+              // If deployed has more songs (>1% increase), migrate
+              if (deployedCount > persistentCount * 1.01) {
+                console.log('[CuratedDB] Deployed database has more songs (>1%) - migrating...');
                 fs.copyFileSync(deployedDbFile, persistentDbFile);
                 console.log('[CuratedDB] Migration complete');
               }
