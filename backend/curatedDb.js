@@ -49,6 +49,31 @@ function getCacheDir() {
           // SMART MIGRATION: Check if deployed database is newer/better
           if (persistentCount > 0 && fs.existsSync(deployedDbFile)) {
             try {
+              // Check for force migration flag
+              const forceFlagPath = path.join(deployedPath, '.force-migration');
+              const hasForceMigrationFlag = fs.existsSync(forceFlagPath);
+              
+              if (hasForceMigrationFlag) {
+                console.log('[CuratedDB] Force migration flag detected - migrating regardless of threshold...');
+                try {
+                  const flagData = JSON.parse(fs.readFileSync(forceFlagPath, 'utf8'));
+                  console.log('[CuratedDB] Flag data:', flagData);
+                } catch (e) {
+                  console.log('[CuratedDB] Could not parse flag data, continuing with migration');
+                }
+                fs.copyFileSync(deployedDbFile, persistentDbFile);
+                console.log('[CuratedDB] Forced migration complete');
+                // Remove the flag file after successful migration
+                try {
+                  fs.unlinkSync(forceFlagPath);
+                  console.log('[CuratedDB] Removed force migration flag');
+                } catch (e) {
+                  console.warn('[CuratedDB] Could not remove force migration flag:', e.message);
+                }
+                console.log('[CuratedDB] Using persistent disk cache directory:', persistentPath);
+                return persistentPath;
+              }
+              
               const deployedData = JSON.parse(fs.readFileSync(deployedDbFile, 'utf8'));
               const deployedCount = Array.isArray(deployedData) ? deployedData.length : 0;
               
