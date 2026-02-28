@@ -2114,7 +2114,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     if (!isCreator) return;
     
     try {
-      // Reset local game state
+      console.log('[App] Restarting game - resetting all state');
+      
+      // Reset ALL local game state including player scores/tokens
       setShowWinnerView(false);
       setWinner(null);
       setTimeline([]);
@@ -2127,6 +2129,33 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       setRemovingId(null);
       setGameRound(1);
       setCurrentPlayerIdx(0);
+      setChallenge(null);
+      setChallengeResponseGiven(false);
+      setSongGuessNotification(null);
+      setPendingDropIndex(null);
+      setPreviewTimeline(null);
+      
+      // CRITICAL FIX: Reset player scores and tokens locally immediately
+      // so the UI shows reset values while waiting for the server response.
+      // The server will send authoritative values via game_started.
+      setPlayers(prev => prev.map(p => ({
+        ...p,
+        score: 1,
+        tokens: 3,
+        bonusTokens: 0,
+        doublePoints: false,
+        skipChallenge: false,
+      })));
+      
+      // Stop any music that's playing
+      setIsPlayingMusic(false);
+      if (spotifyDeviceId) {
+        try {
+          await pauseSpotifyPlayback();
+        } catch (e) {
+          console.warn('[App] Failed to pause playback during restart:', e);
+        }
+      }
       
       // Start a new game with fresh songs
       await handleStart();

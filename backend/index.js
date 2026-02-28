@@ -1958,6 +1958,22 @@ io.on('connection', (socket) => {
       // Update player's socket ID without affecting other players
       game.players[existingPlayerIndex].id = socket.id;
 
+      // RESTART FIX: Also update lobby.players to keep IDs in sync.
+      // Without this, lobby.players gets stale socket IDs after game reconnections,
+      // which breaks restart_game (start_game) since it iterates over lobby.players.
+      const lobbyForSync = lobbies[roomCode];
+      if (lobbyForSync) {
+        const lobbyPlayerIdx = lobbyForSync.players.findIndex(p => p.name === playerName);
+        if (lobbyPlayerIdx !== -1 && lobbyForSync.players[lobbyPlayerIdx].id !== socket.id) {
+          console.log('[Sessions] Syncing lobby player ID during game reconnection:', {
+            name: playerName,
+            oldId: lobbyForSync.players[lobbyPlayerIdx].id,
+            newId: socket.id
+          });
+          lobbyForSync.players[lobbyPlayerIdx].id = socket.id;
+        }
+      }
+
       // Update playerOrder mapping
       for (let i = 0; i < game.playerOrder.length; i++) {
         if (game.playerOrder[i] === oldPlayerId) {
@@ -2345,6 +2361,35 @@ io.on('connection', (socket) => {
       console.log('[Backend] No lobby found for code:', code);
       return;
     }
+
+    // RESTART FIX: If a game already exists (restart scenario), sync lobby player IDs
+    // from game players to ensure we use the most up-to-date socket IDs.
+    // During gameplay, reconnectToGame() updates game.players[].id but NOT lobby.players[].id,
+    // so lobby.players can have stale socket IDs after reconnections.
+    const existingGame = games[code];
+    if (existingGame) {
+      console.log('[Backend] Existing game found - this is a RESTART. Syncing lobby player IDs from game players.');
+      existingGame.players.forEach(gamePlayer => {
+        const lobbyPlayer = lobby.players.find(p => p.persistentId === gamePlayer.persistentId);
+        if (lobbyPlayer) {
+          if (lobbyPlayer.id !== gamePlayer.id) {
+            console.log('[Backend] Syncing lobby player ID:', { name: gamePlayer.name, oldId: lobbyPlayer.id, newId: gamePlayer.id });
+            lobbyPlayer.id = gamePlayer.id;
+          }
+        } else {
+          // Player exists in game but not in lobby - add them back
+          console.log('[Backend] Adding missing player back to lobby:', { name: gamePlayer.name, id: gamePlayer.id });
+          lobby.players.push({
+            id: gamePlayer.id,
+            persistentId: gamePlayer.persistentId,
+            name: gamePlayer.name,
+            isCreator: gamePlayer.isCreator,
+            isReady: true
+          });
+        }
+      });
+    }
+
     console.log('[Backend] Lobby players:', lobby.players.map(p => ({ id: p.id, persistentId: p.persistentId, name: p.name })));
     lobby.status = "playing";
 
