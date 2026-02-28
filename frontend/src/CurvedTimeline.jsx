@@ -1001,7 +1001,7 @@ const CurvedTimeline = ({
                 key={`node-${item.index}`}
                 className={`absolute transition-all duration-200 ${
                   nodeSelectable ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed'
-                } ${nodeDisabled ? 'opacity-50' : ''}`}
+                }`}
                 style={{
                   left: item.x - 12 + (item.curveShift || 0),
                   top: item.y - 12,
@@ -1012,11 +1012,33 @@ const CurvedTimeline = ({
                 onMouseEnter={() => nodeSelectable && setHoveredNodeIndex(item.index)}
                 onMouseLeave={() => setHoveredNodeIndex(null)}
               >
+                {/* Bet callout label - shows who placed the bet (only for other players, not the placer themselves) */}
+                {(nodeDisabled || (nodeState === 'selected' && phase !== 'challenge')) && currentPlayerName && myPersistentId !== timelineOwnerPersistentId && (
+                  <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none whitespace-nowrap z-10 flex flex-col items-center"
+                    style={{ bottom: '100%', marginBottom: '4px' }}
+                  >
+                    <span className="text-[8px] leading-none font-semibold text-pink-300 bg-black/60 px-1.5 py-0.5 rounded"
+                      style={{ letterSpacing: '0.02em' }}
+                    >
+                      {currentPlayerName}
+                    </span>
+                    {/* Callout arrow pointing down */}
+                    <div style={{
+                      width: 0,
+                      height: 0,
+                      borderLeft: '4px solid transparent',
+                      borderRight: '4px solid transparent',
+                      borderTop: '4px solid rgba(0, 0, 0, 0.6)',
+                      marginTop: '-0.5px'
+                    }} />
+                  </div>
+                )}
+                
                 {/* Node Circle */}
                 <div
                   className={`w-6 h-6 rounded-full border-2 transition-all duration-200 ${
                     nodeDisabled
-                      ? 'border-green-400 shadow-lg shadow-green-500/50 opacity-70'
+                      ? 'border-[#FF1493] shadow-lg shadow-pink-500/30 opacity-50'
                       : nodeState === 'selected'
                       ? 'border-[#FF1493] neon-glow-magenta'
                       : nodeState === 'hovered'
@@ -1032,7 +1054,7 @@ const CurvedTimeline = ({
                     ...(nodeState === 'selected' && !nodeDisabled ? {
                       background: 'linear-gradient(135deg, #FF1493, #9945FF)',
                     } : nodeDisabled ? {
-                      background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                      background: 'linear-gradient(135deg, rgba(255, 20, 147, 0.4), rgba(153, 69, 255, 0.3))',
                     } : {})
                   }}
                 />
