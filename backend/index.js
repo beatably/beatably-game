@@ -2261,41 +2261,86 @@ io.on('connection', (socket) => {
   });
 
   // Leave lobby
-  socket.on('leave_lobby', ({ code }, callback) => {
-    const lobby = lobbies[code];
+socket.on('leave_lobby', ({ code }, callback) => {
+const lobby = lobbies[code];
     if (!lobby) return;
-    
+
     // Find the leaving player to check if they're the creator
     const leavingPlayer = lobby.players.find(p => p.id === socket.id);
     const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
-    
-    // Remove the leaving player
-    lobby.players = lobby.players.filter(p => p.id !== socket.id);
-    socket.leave(code);
-    
-    // If creator left, notify remaining players and clean up
-    if (isCreatorLeaving && lobby.players.length > 0) {
-      // Notify remaining players that host has left
-      io.to(code).emit('host_left', {
-        message: 'The host has left the game. You will be returned to the lobby.',
-        hostName: leavingPlayer.name
-      });
+    const hasActiveGame = !!games[code];
+
+    // If there's an active game in progress, notify ALL remaining players BEFORE removing from room
+    if (hasActiveGame && lobby.players.length > 1) {
+      // Also try to find the player in the game's player list (more reliable for socket ID matching)
+      const gamePlayer = games[code]?.players?.find(p => p.id === socket.id);
+      const leaverName = leavingPlayer?.name || gamePlayer?.name || 'A player';
       
-      // Clean up the lobby after a short delay to allow notification to be received
+      console.log(`[Leave] Player "${leaverName}" left during active game in room ${code}. Ending game for everyone.`);
+      
+      // Mark the lobby/game as ending to prevent disconnect handler from also sending notifications
+      lobby._ending = true;
+      
+      const notification = {
+        message: `${leaverName} has left the game. The game has ended for everyone.`,
+        playerName: leaverName,
+        wasCreator: isCreatorLeaving
+      };
+      
+      // ROBUST: Emit to EACH remaining player individually using game's player list
+      // This is more reliable than room-based broadcasting since it doesn't depend on room membership
+      const game = games[code];
+      if (game && game.players) {
+        game.players.forEach(p => {
+          if (p.id !== socket.id) {
+            console.log(`[Leave] Sending player_left_game to ${p.name} (${p.id})`);
+            io.to(p.id).emit('player_left_game', notification);
+          }
+        });
+      }
+      
+      // Also broadcast via room as a fallback
+      socket.to(code).emit('player_left_game', notification);
+
+      // Now remove the leaving player and leave the room
+      lobby.players = lobby.players.filter(p => p.id !== socket.id);
+      socket.leave(code);
+
+      // Clean up the game and lobby after a short delay to allow notification to be received
       setTimeout(() => {
+        delete games[code];
         delete lobbies[code];
         schedulePersist();
-      }, 1000);
-    } else if (lobby.players.length === 0) {
-      // No players left, delete lobby
-      delete lobbies[code];
-      schedulePersist();
+      }, 2000);
     } else {
-      // Normal leave, update remaining players
-      io.to(code).emit('lobby_update', lobby);
-      schedulePersist();
+      // Remove the leaving player and leave the room
+      lobby.players = lobby.players.filter(p => p.id !== socket.id);
+      socket.leave(code);
+      
+      if (isCreatorLeaving && lobby.players.length > 0) {
+        // Creator left from waiting room (no active game) - notify remaining players
+        io.to(code).emit('host_left', {
+          message: 'The host has left the game. You will be returned to the lobby.',
+          hostName: leavingPlayer.name
+        });
+
+        // Clean up the lobby after a short delay to allow notification to be received
+        setTimeout(() => {
+          delete lobbies[code];
+          schedulePersist();
+        }, 1000);
+      } else if (lobby.players.length === 0) {
+        // No players left, delete lobby and game
+        delete games[code];
+        delete lobbies[code];
+        schedulePersist();
+      } else {
+        // Normal leave from waiting room (non-creator), update remaining players
+        io.to(code).emit('lobby_update', lobby);
+        schedulePersist();
+      }
     }
-    
+
     callback && callback();
   });
 
@@ -4176,6 +4221,12 @@ io.on('connection', (socket) => {
       const lobby = lobbies[code];
       const wasInLobby = lobby.players.some(p => p.id === socket.id);
       if (wasInLobby) {
+        // Skip if the lobby is already being cleaned up by leave_lobby handler
+        if (lobby._ending) {
+          console.log('[Disconnect] Skipping lobby', code, '- already being cleaned up by leave_lobby');
+          continue;
+        }
+        
         const leavingPlayer = lobby.players.find(p => p.id === socket.id);
         const isCreatorLeaving = leavingPlayer && leavingPlayer.isCreator;
         

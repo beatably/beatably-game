@@ -33,6 +33,7 @@ function TokenStack({ count }) {
 
 function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreator, onRestart, onExit }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [showExitConfirm, setShowExitConfirm] = React.useState(false);
   const [animatingTokens, setAnimatingTokens] = useState({});
   const [isRestarting, setIsRestarting] = useState(false);
 
@@ -70,9 +71,18 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
 
   const handleExit = () => {
     setMenuOpen(false);
+    setShowExitConfirm(true);
+  };
+
+  const handleConfirmExit = () => {
+    setShowExitConfirm(false);
     if (onExit) {
       onExit();
     }
+  };
+
+  const handleCancelExit = () => {
+    setShowExitConfirm(false);
   };
 
   return (
@@ -207,6 +217,53 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
                 </CardContent>
               </Card>
             </div>,
+            document.body
+          )}
+
+          {/* Exit confirmation modal - rendered via portal */}
+          {showExitConfirm && createPortal(
+            <>
+              {/* Background overlay */}
+              <div 
+                className="fixed inset-0 bg-black bg-opacity-50"
+                style={{ zIndex: 9999 }}
+                onClick={handleCancelExit}
+              />
+              
+              {/* Modal content */}
+              <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+                <Card className="bg-card border-border mobile-shadow container-card w-full max-w-sm">
+                  <CardContent className="p-6 text-center">
+                    <div className="mb-2">
+                      <svg className="mx-auto mb-3" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" className="text-yellow-500" fill="currentColor" />
+                        <line x1="12" y1="9" x2="12" y2="13" stroke="#000" strokeWidth="2" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" stroke="#000" strokeWidth="2" />
+                      </svg>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">Leave Game?</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Are you sure you want to exit? This will <span className="text-foreground font-semibold">end the game for everyone</span>.
+                      </p>
+                    </div>
+                    <div className="space-y-3 mt-5">
+                      <Button
+                        onClick={handleConfirmExit}
+                        className="w-full h-12 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2"
+                      >
+                        Yes, End Game
+                      </Button>
+                      <Button
+                        onClick={handleCancelExit}
+                        variant="outline"
+                        className="w-full h-12 px-4 border border-border bg-transparent hover:bg-input font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>,
             document.body
           )}
         </>

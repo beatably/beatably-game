@@ -246,6 +246,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   const [showSpotifyAuthRenewal, setShowSpotifyAuthRenewal] = useState(false);
   const [authRenewalGameState, setAuthRenewalGameState] = useState(null);
 
+  // Player left game notification state
+  const [playerLeftNotification, setPlayerLeftNotification] = useState(null);
+
   // Initialize viewport manager for mobile Safari optimizations
   useEffect(() => {
     console.log('[App] Initializing viewport manager for mobile Safari optimizations');
@@ -1152,7 +1155,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         joinedRef.current = false;
       });
 
-      // Handle host leaving
+      // Handle host leaving (from waiting room only - active game uses player_left_game)
       socketRef.current.on("host_left", (data) => {
         console.log("[Socket] Host left:", data);
         // Clean up session data
@@ -1161,28 +1164,27 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           sessionStorage.removeItem(PENDING_RESTORE_KEY); 
         } catch {}
         
-        // Show notification to user
-        alert(data.message || "The host has left the game. You will be returned to the lobby.");
+        // Use the same modal notification as player_left_game for consistency
+        setPlayerLeftNotification({
+          message: data.message || "The host has left. You will be returned to the lobby.",
+          playerName: data.hostName || "The host"
+        });
+      });
+
+      // Handle player leaving during active game (game ends for everyone)
+      socketRef.current.on("player_left_game", (data) => {
+        console.log("[Socket] Player left game:", data);
+        // Clean up session data
+        sessionManager.clearSession();
+        try { 
+          sessionStorage.removeItem(PENDING_RESTORE_KEY); 
+        } catch {}
         
-        // Reset state and return to landing
-        setPlayerName("");
-        setRoomCode("");
-        setIsCreator(false);
-        setPlayers([]);
-        setCurrentPlayerIdx(0);
-        setTimeline([]);
-        setDeck([]);
-        setCurrentCard(null);
-        setFeedback(null);
-        setShowFeedback(false);
-        setPhase('player-turn');
-        setLastPlaced(null);
-        setRemovingId(null);
-        setGameRound(1);
-        setWinner(null);
-        setShowWinnerView(false);
-        setView("landing");
-        joinedRef.current = false;
+        // Show the notification modal instead of alert
+        setPlayerLeftNotification({
+          message: data.message || "A player has left the game. The game has ended.",
+          playerName: data.playerName || "A player"
+        });
       });
       socketRef.current.on("connect_error", (err) => {
         console.error("[Socket] Connection error:", err);
@@ -2755,6 +2757,53 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
               gameState={authRenewalGameState}
               autoRedirect={false}
             />
+          )}
+
+          {/* Player Left Game Notification Modal */}
+          {playerLeftNotification && (
+            <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
+              <div className="fixed inset-0 bg-black bg-opacity-60" />
+              <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+                <div className="mb-3">
+                  <svg className="mx-auto mb-3" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" className="text-red-500" stroke="currentColor" />
+                    <line x1="15" y1="9" x2="9" y2="15" className="text-red-500" stroke="currentColor" strokeWidth="2" />
+                    <line x1="9" y1="9" x2="15" y2="15" className="text-red-500" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Game Ended</h3>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="text-foreground font-semibold">{playerLeftNotification.playerName}</span> has left the game. The game has ended for everyone.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setPlayerLeftNotification(null);
+                    // Reset all state and return to landing
+                    setPlayerName("");
+                    setRoomCode("");
+                    setIsCreator(false);
+                    setPlayers([]);
+                    setCurrentPlayerIdx(0);
+                    setTimeline([]);
+                    setDeck([]);
+                    setCurrentCard(null);
+                    setFeedback(null);
+                    setShowFeedback(false);
+                    setPhase('player-turn');
+                    setLastPlaced(null);
+                    setRemovingId(null);
+                    setGameRound(1);
+                    setWinner(null);
+                    setShowWinnerView(false);
+                    setView("landing");
+                    joinedRef.current = false;
+                  }}
+                  className="mt-4 w-full h-12 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-md transition-colors"
+                >
+                  Return to Lobby
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </DndProvider>
