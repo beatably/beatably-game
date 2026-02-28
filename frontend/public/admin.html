@@ -29,7 +29,7 @@
     }
     .container {
       padding: 16px;
-      max-width: 1600px; /* widen for desktop */
+      max-width: 100%; /* full width */
       margin: 0 auto;
     }
     .card {
@@ -153,6 +153,23 @@
     .small { font-size: 12px; padding: 6px 8px; }
     .tight { padding: 4px 8px; font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    
+    /* Sticky Actions column */
+    th:last-child,
+    td:last-child {
+      position: sticky;
+      right: 0;
+      background: #10161f;
+      box-shadow: -4px 0 8px rgba(0,0,0,0.3);
+      z-index: 2;
+    }
+    th:last-child {
+      background: #0b0f14;
+      z-index: 3;
+    }
+    tr:hover td:last-child {
+      background: #151d28;
+    }
     
     /* Spotify URI links */
     .spotify-link {
