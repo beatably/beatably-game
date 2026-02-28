@@ -2412,7 +2412,11 @@ io.on('connection', (socket) => {
     // Each player gets their own timeline starting with one random card
     const timelines = {};
     // NEW: Use persistent IDs for player order instead of socket IDs
-    const playerOrder = lobby.players.map((p) => p.persistentId);
+    // Host (creator) always plays last
+    const nonHostPlayers = lobby.players.filter((p) => !p.isCreator);
+    const hostPlayer = lobby.players.find((p) => p.isCreator);
+    const orderedPlayers = hostPlayer ? [...nonHostPlayers, hostPlayer] : nonHostPlayers;
+    const playerOrder = orderedPlayers.map((p) => p.persistentId);
     
     // Give each player a unique starting card for their timeline
     const usedStartCards = new Set();
@@ -2459,7 +2463,7 @@ io.on('connection', (socket) => {
       removingId: null,
       challenge: null, // { challengerId, targetId, cardId, phase: 'waiting'|'resolved' }
       songGuess: null, // { playerId, title, artist, phase: 'waiting'|'resolved' }
-      players: lobby.players.map((p, idx) => ({
+      players: orderedPlayers.map((p, idx) => ({
         id: p.id,
         persistentId: p.persistentId,  // NEW: Include persistent ID in player object
         name: p.name,
