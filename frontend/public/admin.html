@@ -620,8 +620,8 @@
         // Development: local backend
         return loc.protocol + '//' + loc.hostname + ':3001';
       }
-      if (loc.hostname.includes('netlify.app')) {
-        // Production: Netlify frontend -> OnRender backend
+      if (loc.hostname.includes('netlify.app') || loc.hostname.includes('beatably.app')) {
+        // Production: Netlify/custom domain frontend -> OnRender backend
         return 'https://beatably-backend.onrender.com';
       }
       // Fallback: same origin
