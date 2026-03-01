@@ -3483,6 +3483,7 @@ const lobby = lobbies[code];
         currentPlayerId: originalPersistentId,  // PERSISTENT ID FIX: Use persistent ID
         lastSongGuess: game.lastSongGuess || null,
       });
+    });
   });
 
   // Helper function to update all player scores to match their timeline lengths
