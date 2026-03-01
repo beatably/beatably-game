@@ -3385,6 +3385,22 @@ const lobby = lobbies[code];
     
     // Spend token for challenge
     game.players[playerIdx].tokens -= 1;
+
+    // Broadcast explicit credit spend feedback to ALL players
+    console.log('[Token] Emitting credit_spent_for_new_song (challenge):', {
+      room: code,
+      spenderPersistentId: persistentId,
+      spenderName: game.players[playerIdx].name,
+      remainingTokens: game.players[playerIdx].tokens,
+    });
+    io.to(code).emit('credit_spent_for_new_song', {
+      spenderPersistentId: persistentId,
+      spenderName: game.players[playerIdx].name,
+      cost: 1,
+      action: 'challenge',
+      remainingTokens: game.players[playerIdx].tokens,
+      timestamp: Date.now(),
+    });
     
     // Set up challenge state
     game.challenge = {

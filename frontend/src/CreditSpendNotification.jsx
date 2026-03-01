@@ -38,6 +38,9 @@ function CreditSpendNotification({ event, myPersistentId, onClose }) {
   if (!event || !isVisible) return null;
 
   const isSelf = !!myPersistentId && myPersistentId === event.spenderPersistentId;
+  const isChallenge = event.action === 'challenge';
+  const actionText = isChallenge ? 'to challenge' : 'for a new song';
+  const subtitleText = isChallenge ? 'Challenge started...' : 'Loading a new song...';
 
   return (
     <div
@@ -58,11 +61,11 @@ function CreditSpendNotification({ event, myPersistentId, onClose }) {
             <div className="flex-1 min-w-0">
               <div className="font-semibold text-lg text-foreground">
                 {isSelf
-                  ? `You spent ${event.cost || 1} credit for a new song`
-                  : `${event.spenderName || 'A player'} spent ${event.cost || 1} credit for a new song`}
+                  ? `You spent ${event.cost || 1} credit ${actionText}`
+                  : `${event.spenderName || 'A player'} spent ${event.cost || 1} credit ${actionText}`}
               </div>
               <div className="text-sm text-muted-foreground mt-1">
-                Loading a new song...
+                {subtitleText}
               </div>
             </div>
           </div>
