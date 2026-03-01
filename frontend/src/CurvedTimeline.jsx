@@ -781,6 +781,30 @@ const CurvedTimeline = ({
     return confirmedYears.length === 1 ? confirmedYears[0].card.year : null;
   };
 
+  const getTimelineOwnerLabel = () => {
+    if (!currentPlayerName) return null;
+    return myPersistentId === timelineOwnerPersistentId ? 'You' : currentPlayerName;
+  };
+
+  const getChallengeResolvedLabel = (card) => {
+    if (card.isYourGuess) return 'You';
+    if (card.challengerCard) return challenge?.challengerName || 'Challenger';
+    if (card.originalCard) return challenge?.targetName || currentPlayerName || 'Player';
+    return null;
+  };
+
+  const getYearPlacementLabel = (card) => {
+    if (phase === 'reveal' && lastPlaced && card.id === lastPlaced.id) {
+      return getTimelineOwnerLabel();
+    }
+
+    if (phase === 'challenge-resolved' && challenge?.phase === 'resolved') {
+      return getChallengeResolvedLabel(card);
+    }
+
+    return null;
+  };
+
   // Memoize background stars and orbs - optimized for iOS Safari performance
   const backgroundStars = useMemo(() => {
     const colors = [
@@ -995,6 +1019,9 @@ const CurvedTimeline = ({
             const nodeState = getNodeState(item.index);
             const nodeDisabled = isNodeDisabled(item.index);
             const nodeSelectable = item.isSelectable && !nodeDisabled;
+            const nodeLabel = (nodeDisabled || (nodeState === 'selected' && phase !== 'challenge'))
+              ? getTimelineOwnerLabel()
+              : null;
             
             return (
               <div
@@ -1012,25 +1039,14 @@ const CurvedTimeline = ({
                 onMouseEnter={() => nodeSelectable && setHoveredNodeIndex(item.index)}
                 onMouseLeave={() => setHoveredNodeIndex(null)}
               >
-                {/* Bet callout label - shows who placed the bet (only for other players, not the placer themselves) */}
-                {(nodeDisabled || (nodeState === 'selected' && phase !== 'challenge')) && currentPlayerName && myPersistentId !== timelineOwnerPersistentId && (
+                {/* Bet label - shows who placed the bet (only for other players, not the placer themselves) */}
+                {nodeLabel && (
                   <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none whitespace-nowrap z-10 flex flex-col items-center"
                     style={{ bottom: '100%', marginBottom: '4px' }}
                   >
-                    <span className="text-[8px] leading-none font-semibold text-pink-300 bg-black/60 px-1.5 py-0.5 rounded"
-                      style={{ letterSpacing: '0.02em' }}
-                    >
-                      {currentPlayerName}
+                    <span className="text-xs font-semibold text-white px-2 py-0.5 rounded shadow-md">
+                      {nodeLabel}
                     </span>
-                    {/* Callout arrow pointing down */}
-                    <div style={{
-                      width: 0,
-                      height: 0,
-                      borderLeft: '4px solid transparent',
-                      borderRight: '4px solid transparent',
-                      borderTop: '4px solid rgba(0, 0, 0, 0.6)',
-                      marginTop: '-0.5px'
-                    }} />
                   </div>
                 )}
                 
@@ -1079,6 +1095,7 @@ const CurvedTimeline = ({
           if (item.type === 'year') {
             const yearState = getYearState(item.card, item.index);
             const showYear = shouldShowYear(item.card);
+            const yearPlacementLabel = getYearPlacementLabel(item.card);
             
             // Only render year if it should be shown
             if (!showYear) return null;
@@ -1125,11 +1142,11 @@ const CurvedTimeline = ({
                   height: 24,
                 }}
               >
-                {/* "You" label for player's own guess during challenge resolution */}
-                {item.card.isYourGuess && (
+                {/* Placement label: "You" for own guess, otherwise player name */}
+                {yearPlacementLabel && (
                   <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
                     <span className="text-xs font-semibold bg-none text-white px-2 py-0.5 rounded shadow-md">
-                      You
+                      {yearPlacementLabel}
                     </span>
                   </div>
                 )}
