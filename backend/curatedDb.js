@@ -394,8 +394,8 @@ function add(song) {
     year: Number(song.year) || null,
     // Backward-compatible single genre; prefer first from genres[]
     genre: (Array.isArray(song.genres) && song.genres.length ? String(song.genres[0]) : (song.genre || '')),
-    // Backward-compatible single geography; prefer first from markets[]
-    geography: (Array.isArray(song.markets) && song.markets.length ? String(song.markets[0]) : (song.geography || '')),
+    // Backward-compatible single geography; prefer explicit origin (geography) first
+    geography: (song.geography || (Array.isArray(song.markets) && song.markets.length ? String(song.markets[0]) : '')),
     // New multi-fields for markets (success regions) and genres
     markets: Array.isArray(song.markets)
       ? Array.from(new Set(song.markets.map((m) => String(m || '').toUpperCase()).filter(Boolean)))

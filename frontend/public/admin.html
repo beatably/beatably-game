@@ -369,7 +369,7 @@
             <label class="muted">Mode</label>
             <select id="importMode">
               <option value="billboard">Billboard</option>
-              <option value="search">Spotify Search</option>
+              <option value="spotify">Spotify</option>
             </select>
           </div>
           <div class="col-3">
@@ -389,8 +389,12 @@
             <input id="importGenres" placeholder="pop, rock, ..." />
           </div>
           <div class="col-6">
-            <label class="muted">Markets (comma separated)</label>
-            <input id="importMarkets" placeholder="US, GB, SE" value="US" />
+            <label class="muted">Search Markets (Spotify market codes, comma separated)</label>
+            <input id="importSearchMarkets" placeholder="US, GB, SE" value="US" />
+          </div>
+          <div class="col-6">
+            <label class="muted">Origin Countries (artist origin filter, optional)</label>
+            <input id="importOriginCountries" placeholder="SE, NO, DK" />
           </div>
         </div>
         <div class="row" style="margin-top:8px; justify-content:space-between;">
@@ -710,7 +714,8 @@
       importYearMin: document.getElementById('importYearMin'),
       importYearMax: document.getElementById('importYearMax'),
       importGenres: document.getElementById('importGenres'),
-      importMarkets: document.getElementById('importMarkets'),
+      importSearchMarkets: document.getElementById('importSearchMarkets'),
+      importOriginCountries: document.getElementById('importOriginCountries'),
       importLimit: document.getElementById('importLimit'),
       previewImportBtn: document.getElementById('previewImportBtn'),
       commitImportBtn: document.getElementById('commitImportBtn'),
@@ -969,7 +974,8 @@
         const yearMin = Number(els.importYearMin?.value);
         const yearMax = Number(els.importYearMax?.value);
         const genres = (els.importGenres?.value || '').split(',').map(s => s.trim()).filter(Boolean);
-        const markets = (els.importMarkets?.value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        const searchMarkets = (els.importSearchMarkets?.value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        const originCountries = (els.importOriginCountries?.value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
         const limit = Math.max(1, Math.min(500, Number(els.importLimit?.value) || 100));
 
         const body = {
@@ -978,7 +984,10 @@
             yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
             yearMax: Number.isFinite(yearMax) ? yearMax : undefined,
             genres: genres.length ? genres : undefined,
-            markets: markets.length ? markets : undefined
+            searchMarkets: searchMarkets.length ? searchMarkets : undefined,
+            // Backward-compatible payload key still accepted by backend
+            markets: searchMarkets.length ? searchMarkets : undefined,
+            originCountries: originCountries.length ? originCountries : undefined
           },
           limit
         };
@@ -995,8 +1004,12 @@
           ? ` (${resp.duplicatesFiltered} duplicates filtered)` 
           : '';
         
+        const diagnostics = resp.diagnostics || {};
         if (els.importPreviewCount) {
-          els.importPreviewCount.textContent = `${resp.total || (resp.items?.length || 0)} items${duplicatesMsg}`;
+          const diagMsg = diagnostics.modeCanonical
+            ? ` • mode: ${diagnostics.modeCanonical}`
+            : '';
+          els.importPreviewCount.textContent = `${resp.total || (resp.items?.length || 0)} items${duplicatesMsg}${diagMsg}`;
         }
         
         const statusMsg = resp.duplicatesFiltered > 0

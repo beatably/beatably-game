@@ -665,7 +665,12 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     curatedDb.load();
     
     const body = req.body || {};
-    const mode = (body.mode || 'billboard').toLowerCase();
+    const modeRaw = String(body.mode || 'billboard').toLowerCase();
+    const mode = (function normalizeImportMode(m) {
+      if (m === 'spotify' || m === 'spotify-search' || m === 'search') return 'search';
+      if (m === 'billboard') return 'billboard';
+      return 'billboard';
+    })(modeRaw);
     const filters = body.filters || {};
     const cap = Math.max(1, Math.min(500, Number(body.limit) || 100));
 
@@ -683,15 +688,39 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       genres = filters.genre.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    let markets = [];
-    if (Array.isArray(filters.markets)) {
-      markets = filters.markets;
+    // Search markets (Spotify market parameter) - legacy key "markets" still supported
+    let searchMarkets = [];
+    if (Array.isArray(filters.searchMarkets)) {
+      searchMarkets = filters.searchMarkets;
+    } else if (typeof filters.searchMarkets === 'string') {
+      searchMarkets = filters.searchMarkets.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    } else if (Array.isArray(filters.markets)) {
+      searchMarkets = filters.markets;
     } else if (typeof filters.markets === 'string') {
-      markets = filters.markets.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      searchMarkets = filters.markets.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
     } else if (typeof filters.market === 'string') {
-      markets = [filters.market.trim().toUpperCase()];
+      searchMarkets = [filters.market.trim().toUpperCase()];
     }
-    if (!markets.length) markets = ['US'];
+    searchMarkets = Array.from(new Set(searchMarkets.map((m) => String(m || '').toUpperCase()).filter(Boolean)));
+    if (!searchMarkets.length) searchMarkets = ['US'];
+
+    // Explicit origin-country filter (e.g., ["SE"]) separate from search market(s)
+    let originCountries = [];
+    if (Array.isArray(filters.originCountries)) {
+      originCountries = filters.originCountries;
+    } else if (typeof filters.originCountries === 'string') {
+      originCountries = filters.originCountries.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    } else if (Array.isArray(filters.origin)) {
+      originCountries = filters.origin;
+    } else if (typeof filters.origin === 'string') {
+      originCountries = filters.origin.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    } else if (Array.isArray(filters.geography)) {
+      originCountries = filters.geography;
+    } else if (typeof filters.geography === 'string') {
+      originCountries = filters.geography.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    }
+    originCountries = Array.from(new Set(originCountries.map((m) => String(m || '').toUpperCase()).filter(Boolean)));
+    const needsOriginMatch = originCountries.length > 0;
 
     const toDifficultyFromRankPop = (rank, pop) => {
       // Map to curated difficultyLevel (1-5); we keep 2-4 range primary
@@ -709,6 +738,78 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
 
     const items = [];
     const seen = new Set(); // by spotifyUri
+    const artistOriginCache = new Map();
+    const mbYearCache = new Map();
+    const resolveArtistOrigin = async (artistName, fallbackCountry) => {
+      const fallback = String(fallbackCountry || 'US').toUpperCase();
+      const key = String(artistName || '').trim().toLowerCase();
+      if (!key) return fallback;
+      if (artistOriginCache.has(key)) return artistOriginCache.get(key);
+      try {
+        const r = await detectGeographyForArtist(artistName);
+        const geo = String(r?.geography || fallback).toUpperCase();
+        artistOriginCache.set(key, geo);
+        return geo;
+      } catch (_) {
+        artistOriginCache.set(key, fallback);
+        return fallback;
+      }
+    };
+    const maybeResolveOriginalYearForImport = async ({ artist, title, album, spotifyYear }) => {
+      if (!config.featureFlags.enableMusicBrainz) return spotifyYear;
+      const hasYearFilter = Number.isFinite(yearMin) || Number.isFinite(yearMax);
+      const outsideYearFilter = hasYearFilter && (
+        (Number.isFinite(yearMin) && Number.isFinite(spotifyYear) && spotifyYear < yearMin) ||
+        (Number.isFinite(yearMax) && Number.isFinite(spotifyYear) && spotifyYear > yearMax)
+      );
+      const suspicious = isSuspiciousTrack({ title: title || '', album: album || '' });
+      if (!outsideYearFilter && !suspicious) return spotifyYear;
+
+      const cacheKey = `${String(artist || '').toLowerCase()}::${normalizeTitle(String(title || '').toLowerCase())}`;
+      if (mbYearCache.has(cacheKey)) {
+        return mbYearCache.get(cacheKey);
+      }
+
+      diagnostics.mbYearChecks += 1;
+      try {
+        const mb = await resolveOriginalYear({ artist, title });
+        if (mb?.earliestYear && mb?.confidence >= config.musicbrainz.minConfidence) {
+          const mbYear = Number(mb.earliestYear);
+          const shouldAdjust = !Number.isFinite(spotifyYear) ||
+            Math.abs(Number(spotifyYear) - mbYear) >= config.musicbrainz.yearDiffThreshold ||
+            outsideYearFilter;
+          const resolved = shouldAdjust ? mbYear : spotifyYear;
+          if (resolved !== spotifyYear) diagnostics.mbYearAdjusted += 1;
+          mbYearCache.set(cacheKey, resolved);
+          return resolved;
+        }
+      } catch (_) {
+        // ignore MB failures per-track
+      }
+
+      mbYearCache.set(cacheKey, spotifyYear);
+      return spotifyYear;
+    };
+    const diagnostics = {
+      modeRaw,
+      modeCanonical: mode,
+      searchMarkets,
+      originCountries,
+      needsOriginMatch,
+      queryBudget: null,
+      trackEvaluationBudget: null,
+      truncated: false,
+      truncationReason: null,
+      queriesAttempted: 0,
+      tracksEvaluated: 0,
+      droppedByYearFilter: 0,
+      droppedByOriginFilter: 0,
+      droppedAsDuplicatesInPreview: 0,
+      droppedAsExistingInDb: 0,
+      mbYearChecks: 0,
+      mbYearAdjusted: 0,
+      errors: 0,
+    };
 
     // Genre mapping: map Spotify's detailed genres to game categories used in game settings
     const artistGenresCache = new Map();
@@ -744,16 +845,27 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
           const resp = await spotifyGet('https://api.spotify.com/v1/search', {
             headers: { Authorization: `Bearer ${token}` },
-            params: { q, type: 'track', limit: 5, market: markets[0] || 'US' }
+            params: { q, type: 'track', limit: 5, market: searchMarkets[0] || 'US' }
           }, 'search:billboard');
+          diagnostics.queriesAttempted += 1;
           const t = (resp.data.tracks.items || [])[0];
           if (!t) continue;
 
           const spotifyUri = t.uri;
-          if (seen.has(spotifyUri)) continue;
+          if (seen.has(spotifyUri)) {
+            diagnostics.droppedAsDuplicatesInPreview += 1;
+            continue;
+          }
           seen.add(spotifyUri);
+          diagnostics.tracksEvaluated += 1;
 
-          const year = new Date(t.album.release_date).getFullYear();
+          const spotifyYear = new Date(t.album.release_date).getFullYear();
+          const year = await maybeResolveOriginalYearForImport({
+            artist: t.artists[0]?.name || entry.artist,
+            title: t.name,
+            album: t.album?.name || '',
+            spotifyYear,
+          });
           const popularity = t.popularity;
           const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
 
@@ -801,15 +913,16 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           }
 
           // Detect origin country (artist-based)
-          let origin = markets[0] || 'US';
-          try {
-            const geoRes = await detectGeographyForArtist(t.artists[0]?.name || entry.artist);
-            if (geoRes && geoRes.geography) origin = geoRes.geography;
-          } catch (e) {}
+          const origin = await resolveArtistOrigin(t.artists[0]?.name || entry.artist, searchMarkets[0] || 'US');
+
+          if (originCountries.length && !originCountries.includes(String(origin || '').toUpperCase())) {
+            diagnostics.droppedByOriginFilter += 1;
+            continue;
+          }
 
           // Compute markets (success regions): selected market, artist origin, and INTL for very high popularity
           const marketsArr = Array.from(new Set([
-            (markets[0] || 'US').toUpperCase(),
+            (searchMarkets[0] || 'US').toUpperCase(),
             origin ? String(origin).toUpperCase() : null,
             (Number(popularity) >= 85 ? 'INTL' : null)
           ].filter(Boolean)));
@@ -828,7 +941,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             genres: genresArr,
             geography: origin,
             markets: marketsArr,
-            searchMarket: markets[0] || 'US',
+            searchMarket: searchMarkets[0] || 'US',
             difficultyLevel,
             popularity,
             albumArt: t.album.images?.[0]?.url || null,
@@ -846,6 +959,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           });
         } catch (e) {
           // ignore individual failures
+          diagnostics.errors += 1;
         }
       }
     } else {
@@ -856,11 +970,46 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
         max: Number.isFinite(yearMax) ? yearMax : 2025
       };
       const gen = genres.length ? genres : ['pop', 'rock', 'hip-hop', 'electronic', 'indie'];
-      const queries = createYearBasedSearches(yrRange, gen, markets).sort(() => 0.5 - Math.random());
+      const countrySearchTerms = {
+        SE: ['swedish', 'sweden', 'svensk'],
+        NO: ['norwegian', 'norway'],
+        DK: ['danish', 'denmark'],
+        FI: ['finnish', 'finland'],
+        IS: ['icelandic', 'iceland'],
+      };
+      const baseQueries = createYearBasedSearches(yrRange, gen, searchMarkets);
+      let boostedQueries = [];
+      if (needsOriginMatch) {
+        const terms = originCountries.flatMap((c) => countrySearchTerms[c] || []);
+        for (const term of terms) {
+          boostedQueries.push(`${term} hits`);
+          boostedQueries.push(`${term} pop`);
+          for (const g of gen) boostedQueries.push(`${term} ${g}`);
+        }
+      }
+      const queries = Array.from(new Set([...boostedQueries, ...baseQueries])).sort(() => 0.5 - Math.random());
+      const maxQueries = needsOriginMatch ? Math.min(140, Math.max(30, cap * 3)) : Math.min(90, Math.max(20, cap * 2));
+      const maxTracksToEvaluate = needsOriginMatch ? Math.max(1800, cap * 30) : Math.max(1000, cap * 20);
+      diagnostics.queryBudget = maxQueries;
+      diagnostics.trackEvaluationBudget = maxTracksToEvaluate;
 
-      for (const market of markets) {
+      let stopEarly = false;
+
+      for (const market of searchMarkets) {
         for (const q of queries) {
-          if (items.length >= cap) break;
+          if (items.length >= cap) { stopEarly = true; break; }
+          if (diagnostics.queriesAttempted >= maxQueries) {
+            diagnostics.truncated = true;
+            diagnostics.truncationReason = 'query_budget_reached';
+            stopEarly = true;
+            break;
+          }
+          if (diagnostics.tracksEvaluated >= maxTracksToEvaluate) {
+            diagnostics.truncated = true;
+            diagnostics.truncationReason = 'track_budget_reached';
+            stopEarly = true;
+            break;
+          }
           try {
             let query = q;
             if (!q.includes('year:') && Number.isFinite(yrRange.min) && Number.isFinite(yrRange.max)) {
@@ -870,24 +1019,53 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
               headers: { Authorization: `Bearer ${token}` },
               params: { q: query, type: 'track', limit: 20, market }
             }, 'search:generic');
+            diagnostics.queriesAttempted += 1;
             for (const track of resp.data.tracks.items || []) {
               if (items.length >= cap) break;
+              if (diagnostics.tracksEvaluated >= maxTracksToEvaluate) {
+                diagnostics.truncated = true;
+                diagnostics.truncationReason = 'track_budget_reached';
+                stopEarly = true;
+                break;
+              }
+              diagnostics.tracksEvaluated += 1;
 
-              const trackYear = new Date(track.album.release_date).getFullYear();
+              const spotifyYear = new Date(track.album.release_date).getFullYear();
+              const trackYear = await maybeResolveOriginalYearForImport({
+                artist: track.artists[0]?.name || '',
+                title: track.name,
+                album: track.album?.name || '',
+                spotifyYear,
+              });
               if ((Number.isFinite(yrRange.min) && trackYear < yrRange.min) ||
-                  (Number.isFinite(yrRange.max) && trackYear > yrRange.max)) continue;
+                  (Number.isFinite(yrRange.max) && trackYear > yrRange.max)) {
+                diagnostics.droppedByYearFilter += 1;
+                continue;
+              }
 
               if (config.featureFlags.enableRemasterFilter) {
                 if (isSuspiciousTrack({ title: track.name, album: track.album?.name || '' })) continue;
               }
 
               const spotifyUri = track.uri;
-              if (seen.has(spotifyUri)) continue;
+              if (seen.has(spotifyUri)) {
+                diagnostics.droppedAsDuplicatesInPreview += 1;
+                continue;
+              }
               seen.add(spotifyUri);
 
               const popularity = track.popularity;
               const difficultyLevel = toDifficultyFromRankPop(null, popularity);
               const genreTag = q.includes('genre:') ? q.split('genre:')[1].split(' ')[0] : (genres[0] || 'general');
+
+              const origin = needsOriginMatch
+                ? await resolveArtistOrigin(track.artists[0]?.name || '', market)
+                : String(market).toUpperCase();
+
+              if (originCountries.length && !originCountries.includes(String(origin || '').toUpperCase())) {
+                diagnostics.droppedByOriginFilter += 1;
+                continue;
+              }
 
               items.push({
                 spotifyUri,
@@ -896,7 +1074,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
                 year: trackYear,
                 genre: genreTag,
                 genres: Array.from(new Set([genreTag].filter(Boolean))),
-                geography: (await (async () => { try { const r = await detectGeographyForArtist(track.artists[0]?.name || ''); return r?.geography || market; } catch (_) { return market; }})()),
+                geography: origin,
                 markets: Array.from(new Set([String(market).toUpperCase(), (Number(popularity) >= 85 ? 'INTL' : null)].filter(Boolean))),
                 searchMarket: market,
                 difficultyLevel,
@@ -912,8 +1090,10 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             }
           } catch (e) {
             // ignore this query
+            diagnostics.errors += 1;
           }
         }
+        if (stopEarly) break;
       }
 
       // diversify by artist and cap
@@ -928,15 +1108,17 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     
     const newItems = items.filter(item => !existingUris.has(item.spotifyUri));
     const duplicateCount = items.length - newItems.length;
+    diagnostics.droppedAsExistingInDb = duplicateCount;
     
     console.log(`[AdminImport] Filtered ${duplicateCount} duplicates, ${newItems.length} new songs`);
 
     res.json({ 
       ok: true, 
-      mode, 
+      mode,
       total: newItems.length, 
       items: newItems,
-      duplicatesFiltered: duplicateCount 
+      duplicatesFiltered: duplicateCount,
+      diagnostics,
     });
   } catch (e) {
     console.error('[AdminImport][preview] failed:', e && e.message);
