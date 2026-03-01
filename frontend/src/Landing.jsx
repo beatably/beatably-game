@@ -174,7 +174,7 @@ function Landing({ onCreate, onJoin }) {
         className="absolute inset-0 w-full h-full object-cover"
         style={{ zIndex: 0 }}
       >
-        <source src="/videos/sound-wave-video.mp4" type="video/mp4" />
+        <source src="/videos/ghost5.mp4" type="video/mp4" />
       </video>
 
       {/* Gradient Overlay */}
