@@ -4,6 +4,11 @@ import productionPlaybackFix from "./utils/productionPlaybackFix";
 import DeviceSwitchModal from './DeviceSwitchModal';
 import SongGuessModal from './SongGuessModal';
 import { usePreviewMode } from './contexts/PreviewModeContext';
+import {
+  isAirPlaySupported,
+  showAirPlayPicker,
+  onAirPlayAvailabilityChange
+} from './utils/castUtils';
 
 function GameFooter({ 
   currentCard, 
@@ -42,11 +47,50 @@ function GameFooter({
     playPreview,
     pausePreview,
     resumePreview,
-    stopPreview
+    stopPreview,
+    getMediaElement
   } = usePreviewMode();
   
   // Determine if we're using preview mode (only creator uses it)
   const usingPreviewMode = isPreviewMode && isCreator;
+  
+  // ─── AirPlay state (Safari/iOS) ─────────────────────────────────────────
+  const [airPlayAvailable, setAirPlayAvailable] = React.useState(false);
+  const airPlayButtonRef = React.useRef(null);
+  
+  // Detect AirPlay support (Safari/iOS only)
+  React.useEffect(() => {
+    if (!isCreator) return;
+    
+    const supported = isAirPlaySupported();
+    console.log('[GameFooter] AirPlay supported:', supported);
+    
+    if (supported) {
+      // AirPlay is supported — check if devices are available
+      setAirPlayAvailable(true);
+      
+      // Listen for AirPlay device availability changes
+      const mediaEl = getMediaElement?.();
+      if (mediaEl) {
+        const cleanup = onAirPlayAvailabilityChange(mediaEl, (available) => {
+          console.log('[GameFooter] AirPlay devices available:', available);
+          setAirPlayAvailable(available);
+        });
+        return cleanup;
+      }
+    }
+  }, [isCreator, getMediaElement]);
+  
+  // Handle AirPlay button click
+  const handleAirPlayClick = () => {
+    const mediaEl = getMediaElement?.();
+    if (mediaEl) {
+      showAirPlayPicker(mediaEl);
+    }
+  };
+  
+  // Show AirPlay button when supported (Safari/iOS)
+  const showAirPlayButton = isCreator && airPlayAvailable;
   
   // Track local playing state for UI
   const [localIsPlaying, setLocalIsPlaying] = React.useState(false);
@@ -1029,48 +1073,63 @@ function GameFooter({
                   <div className="absolute left-0 top-0 h-2 bg-primary rounded-full" style={{ width: `${(displayProgress/displayDuration)*100}%` }}></div>
                 </div>
                 <span>{formatTime(displayDuration)}</span>
+                {/* Spotify device switcher (non-preview mode) */}
                 {isCreator && !isPreviewMode && (
                   <button
                   ref={deviceSwitchButtonRef}
                   onClick={() => {
                     setShowDeviceModal(true);
-                    // Immediately blur after click to prevent focus ring
                     if (deviceSwitchButtonRef.current) {
-                      setTimeout(() => {
-                        deviceSwitchButtonRef.current.blur();
-                      }, 0);
+                      setTimeout(() => { deviceSwitchButtonRef.current.blur(); }, 0);
                     }
                   }}
-                  onTouchStart={() => {
-                    // Prevent focus on touch start
-                    if (deviceSwitchButtonRef.current) {
-                      deviceSwitchButtonRef.current.blur();
-                    }
-                  }}
-                  onTouchEnd={() => {
-                    // Blur the button after touch to remove persistent focus highlight
-                    if (deviceSwitchButtonRef.current) {
-                      deviceSwitchButtonRef.current.blur();
-                    }
-                  }}
+                  onTouchStart={() => { deviceSwitchButtonRef.current?.blur(); }}
+                  onTouchEnd={() => { deviceSwitchButtonRef.current?.blur(); }}
                   className="ml-2 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-input hover:bg-input/90 text-foreground text-xs"
                   title="Switch device"
                   aria-label="Switch Spotify device"
                   style={{ 
-                WebkitTapHighlightColor: 'transparent',
-                outline: 'none !important',
-                border: 'none !important', 
-                boxShadow: 'none !important',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none',
-                appearance: 'none'
-              }}
+                    WebkitTapHighlightColor: 'transparent',
+                    outline: 'none !important',
+                    border: 'none !important', 
+                    boxShadow: 'none !important',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
+                    appearance: 'none'
+                  }}
                   >
                   <img
                     src="/img/speaker-icon.svg"
                     alt="Switch device"
                     className="w-5 h-5"
                   />
+                  </button>
+                )}
+                {/* AirPlay button (Safari/iOS - preview & Spotify mode) */}
+                {showAirPlayButton && (
+                  <button
+                    ref={airPlayButtonRef}
+                    onClick={() => {
+                      handleAirPlayClick();
+                      airPlayButtonRef.current?.blur();
+                    }}
+                    onTouchStart={() => { airPlayButtonRef.current?.blur(); }}
+                    onTouchEnd={() => { airPlayButtonRef.current?.blur(); }}
+                    className="ml-1 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-input hover:bg-input/90 text-foreground text-xs"
+                    title="AirPlay"
+                    aria-label="Stream via AirPlay"
+                    style={{
+                      WebkitTapHighlightColor: 'transparent',
+                      outline: 'none',
+                      border: 'none',
+                      boxShadow: 'none',
+                    }}
+                  >
+                    {/* AirPlay icon (standard Apple AirPlay symbol) */}
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1" />
+                      <polygon points="12 15 17 21 7 21 12 15" fill="currentColor" />
+                    </svg>
                   </button>
                 )}
                 </div>

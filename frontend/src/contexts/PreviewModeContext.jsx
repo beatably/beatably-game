@@ -11,6 +11,9 @@ export function usePreviewMode() {
 }
 
 export function PreviewModeProvider({ children }) {
+  // IMPORTANT: We use a <video> element instead of <audio> because Safari/iOS
+  // only exposes the AirPlay picker (webkitShowPlaybackTargetPicker) on <video>.
+  // A <video> element works perfectly for audio-only content.
   const audioRef = useRef(null);
   const audioContextRef = useRef(null);
   const sourceNodeRef = useRef(null);
@@ -43,14 +46,20 @@ export function PreviewModeProvider({ children }) {
     console.log('[PreviewMode] Initialized - Preview Mode:', isPreviewMode, 'Full Play Mode:', isFullPlayMode);
   }, []);
   
-  // Initialize audio element
+  // Initialize media element (using <video> for AirPlay compatibility on Safari/iOS)
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio();
+      // Use <video> element instead of <audio> so Safari exposes AirPlay picker
+      audioRef.current = document.createElement('video');
       audioRef.current.setAttribute('playsinline', '');
       audioRef.current.setAttribute('webkit-playsinline', '');
       audioRef.current.setAttribute('crossorigin', 'anonymous'); // For Spotify CDN
+      audioRef.current.setAttribute('x-webkit-airplay', 'allow'); // Enable AirPlay
+      audioRef.current.setAttribute('airplay', 'allow'); // Future-proof
+      audioRef.current.style.display = 'none'; // Hidden — audio only
       audioRef.current.preload = 'auto';
+      // Append to DOM so Safari can track it for AirPlay
+      document.body.appendChild(audioRef.current);
       
       // Track if we're currently fading out
       const fadeOutTimerRef = { current: null };
@@ -163,12 +172,19 @@ export function PreviewModeProvider({ children }) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
+        // Remove from DOM
+        if (audioRef.current.parentNode) {
+          audioRef.current.parentNode.removeChild(audioRef.current);
+        }
       }
       if (isIOSRef.current && audioContextRef.current?.state === 'running') {
         audioContextRef.current.suspend();
       }
     };
   }, []);
+  
+  // Getter for the underlying media element (needed for AirPlay picker on Safari)
+  const getMediaElement = () => audioRef.current;
   
   // Play preview with fade-in (Web Audio API for iOS, requestAnimationFrame for smooth fades)
   const playPreview = async (previewUrl) => {
@@ -343,7 +359,8 @@ export function PreviewModeProvider({ children }) {
     pausePreview,
     resumePreview,
     stopPreview,
-    seekPreview
+    seekPreview,
+    getMediaElement  // Expose for AirPlay picker (needs access to <video> element)
   };
   
   return (
