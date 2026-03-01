@@ -8,6 +8,7 @@ import WaitingRoom from "./WaitingRoom";
 import SpotifyPlayer from "./SpotifyPlayer";
 import SongDebugPanel from "./SongDebugPanel";
 import SongGuessNotification from "./SongGuessNotification";
+import CreditSpendNotification from "./CreditSpendNotification";
 import SessionRestore from "./SessionRestore";
 import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import spotifyAuth from "./utils/spotifyAuth";
@@ -226,6 +227,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Song guess notification state
   const [songGuessNotification, setSongGuessNotification] = useState(null);
+  const [creditSpendEvent, setCreditSpendEvent] = useState(null);
   const [lastSongGuess, setLastSongGuess] = useState(null);
   const [tokenAnimations, setTokenAnimations] = useState({});
   // Winner screen state
@@ -1003,6 +1005,22 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           playerName: result.playerName,
           submitted: true
         });
+      });
+
+      // Listen for token/credit spend feedback when requesting a new song
+      socketRef.current.on("credit_spent_for_new_song", (data) => {
+        console.log("[App] Credit spent for new song:", data);
+
+        const eventId = Date.now();
+        setCreditSpendEvent({ ...data, eventId });
+
+        // Trigger top-row pulse on the spender's token stack
+        // Use persistentId key to avoid stale player list closures in socket listeners.
+        if (data?.spenderPersistentId) {
+          setTokenAnimations({ [data.spenderPersistentId]: true });
+          // Keep tokenAnimations transient so PlayerHeader doesn't re-trigger on every render
+          setTimeout(() => setTokenAnimations({}), 1200);
+        }
       });
 
       // Listen for challenge results
@@ -2728,6 +2746,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           <SongGuessNotification
             notification={songGuessNotification}
             onClose={() => setSongGuessNotification(null)}
+          />
+
+          <CreditSpendNotification
+            event={creditSpendEvent}
+            myPersistentId={myPersistentId}
+            onClose={() => setCreditSpendEvent(null)}
           />
           
 

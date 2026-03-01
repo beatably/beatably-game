@@ -3153,8 +3153,28 @@ const lobby = lobbies[code];
     if (!game) return;
     
     // PERSISTENT ID FIX: Get persistent ID from socket ID
-    const persistentId = getPersistentId(socket.id);
-    const playerIdx = game.players.findIndex(p => p.persistentId === persistentId);
+    let persistentId = getPersistentId(socket.id);
+    let playerIdx = game.players.findIndex(p => p.persistentId === persistentId);
+
+    // Reconnection fallback: if socket->persistent mapping is missing/stale,
+    // resolve the player from socket id and recover persistentId.
+    if (playerIdx === -1) {
+      const bySocketIdx = game.players.findIndex(p => p.id === socket.id);
+      if (bySocketIdx !== -1) {
+        playerIdx = bySocketIdx;
+        persistentId = game.players[bySocketIdx].persistentId;
+        if (persistentId) {
+          socketToPlayerMap[socket.id] = persistentId;
+          console.log('[Token] Recovered missing socket->persistent mapping for token action:', {
+            socketId: socket.id,
+            persistentId,
+            playerName: game.players[bySocketIdx].name,
+            action,
+          });
+        }
+      }
+    }
+
     if (playerIdx === -1 || game.players[playerIdx].tokens <= 0) return;
     
     // Spend token
@@ -3162,6 +3182,22 @@ const lobby = lobbies[code];
     
     switch (action) {
       case 'skip_song':
+        // Broadcast explicit credit spend feedback to ALL players
+        console.log('[Token] Emitting credit_spent_for_new_song:', {
+          room: code,
+          spenderPersistentId: persistentId,
+          spenderName: game.players[playerIdx].name,
+          remainingTokens: game.players[playerIdx].tokens,
+        });
+        io.to(code).emit('credit_spent_for_new_song', {
+          spenderPersistentId: persistentId,
+          spenderName: game.players[playerIdx].name,
+          cost: 1,
+          action: 'skip_song',
+          remainingTokens: game.players[playerIdx].tokens,
+          timestamp: Date.now(),
+        });
+
         // Allow any player to skip song, not just the current player
         // Emit music stop event to all players (creator will handle it)
         io.to(code).emit('stop_music', { reason: 'new_song' });

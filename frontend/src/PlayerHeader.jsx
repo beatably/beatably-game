@@ -55,6 +55,11 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
     });
   }, [tokenAnimations, animatingTokens]);
 
+  const isPlayerAnimating = (player) => {
+    if (!player) return false;
+    return !!(animatingTokens[player.id] || animatingTokens[player.persistentId]);
+  };
+
   const handleRestart = async () => {
     setMenuOpen(false);
     if (onRestart) {
@@ -126,12 +131,12 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
               players.length === 4 ? 'max-w-[60px]' : 'max-w-[70px] md:max-w-[60px]'
             } mb-0.5 md:mb-1`}>{p.name}</span>
             <div className={`flex items-center gap-0.5 transition-all duration-500 ${
-              animatingTokens[p.id] ? 'animate-pulse bg-primary/10 rounded-md px-1' : ''
+              isPlayerAnimating(p) ? 'animate-pulse bg-primary/10 rounded-md px-1' : ''
             }`}>
               <span className="font-semibold text-base md:text-lg text-foreground">{p.score}</span>
               <span className="text-muted-foreground xs:inline">pts</span>
               <div className={`transition-transform duration-300 ${
-                animatingTokens[p.id] ? 'scale-110' : 'scale-100'
+                isPlayerAnimating(p) ? 'scale-110' : 'scale-100'
               }`}>
                 <TokenStack count={p.tokens} />
               </div>
