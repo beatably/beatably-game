@@ -1,28 +1,128 @@
 // Sound utility functions for the game
 
 /**
- * Audio element for playing the click sound
+ * Fallback HTMLAudio elements (used when Web Audio is unavailable)
  */
 let clickAudio = null;
-
-/**
- * Audio element for playing the correct guess sound
- */
 let correctGuessAudio = null;
-
-/**
- * Audio element for playing the incorrect guess sound
- */
 let incorrectGuessAudio = null;
 
 /**
- * Initialize the audio element with the sound file
+ * Web Audio state (preferred for low-latency SFX)
+ */
+let audioContext = null;
+let webAudioSupported = false;
+let webAudioInitAttempted = false;
+const audioBufferCache = new Map();
+const bufferLoadPromises = new Map();
+
+const SOUND_CONFIG = {
+  click: { url: '/sounds/drop_card_3.mp3', volume: 0.4 },
+  correct: { url: '/sounds/correct_guess.mp3', volume: 0.5 },
+  incorrect: { url: '/sounds/incorrect_guess.mp3', volume: 0.5 },
+};
+
+function ensureAudioContext() {
+  if (audioContext) return audioContext;
+  if (webAudioInitAttempted) return null;
+
+  webAudioInitAttempted = true;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) {
+      webAudioSupported = false;
+      return null;
+    }
+
+    audioContext = new Ctx({ latencyHint: 'interactive' });
+    webAudioSupported = true;
+    return audioContext;
+  } catch (error) {
+    webAudioSupported = false;
+    console.warn('Web Audio not supported, using HTMLAudio fallback:', error);
+    return null;
+  }
+}
+
+async function unlockAudioContext() {
+  const ctx = ensureAudioContext();
+  if (!ctx) return false;
+
+  try {
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    return ctx.state === 'running';
+  } catch (error) {
+    console.warn('Could not unlock audio context:', error);
+    return false;
+  }
+}
+
+async function loadBuffer(key, url) {
+  const ctx = ensureAudioContext();
+  if (!ctx) return null;
+
+  if (audioBufferCache.has(key)) {
+    return audioBufferCache.get(key);
+  }
+
+  if (bufferLoadPromises.has(key)) {
+    return bufferLoadPromises.get(key);
+  }
+
+  const promise = (async () => {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    audioBufferCache.set(key, audioBuffer);
+    return audioBuffer;
+  })()
+    .catch((error) => {
+      console.warn(`Could not preload sound buffer (${key}):`, error);
+      return null;
+    })
+    .finally(() => {
+      bufferLoadPromises.delete(key);
+    });
+
+  bufferLoadPromises.set(key, promise);
+  return promise;
+}
+
+function playWebAudioBuffer(key, volume) {
+  const ctx = ensureAudioContext();
+  const buffer = audioBufferCache.get(key);
+
+  if (!ctx || !buffer || ctx.state !== 'running') {
+    return false;
+  }
+
+  try {
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(0);
+    return true;
+  } catch (error) {
+    console.warn(`Could not play web audio buffer (${key}):`, error);
+    return false;
+  }
+}
+
+/**
+ * Initialize fallback HTMLAudio element
  */
 function initializeAudio() {
   if (!clickAudio) {
     try {
-      clickAudio = new Audio('/sounds/drop_card_3.mp3');
-      clickAudio.volume = 0.4; // Set volume to a pleasant level
+      clickAudio = new Audio(SOUND_CONFIG.click.url);
+      clickAudio.volume = SOUND_CONFIG.click.volume;
       clickAudio.preload = 'auto';
     } catch (error) {
       console.warn('Audio not supported:', error);
@@ -31,13 +131,13 @@ function initializeAudio() {
 }
 
 /**
- * Initialize the correct guess audio element
+ * Initialize fallback HTMLAudio element for correct guess
  */
 function initializeCorrectGuessAudio() {
   if (!correctGuessAudio) {
     try {
-      correctGuessAudio = new Audio('/sounds/correct_guess.mp3');
-      correctGuessAudio.volume = 0.5; // Set volume to a pleasant level
+      correctGuessAudio = new Audio(SOUND_CONFIG.correct.url);
+      correctGuessAudio.volume = SOUND_CONFIG.correct.volume;
       correctGuessAudio.preload = 'auto';
     } catch (error) {
       console.warn('Correct guess audio not supported:', error);
@@ -46,13 +146,13 @@ function initializeCorrectGuessAudio() {
 }
 
 /**
- * Initialize the incorrect guess audio element
+ * Initialize fallback HTMLAudio element for incorrect guess
  */
 function initializeIncorrectGuessAudio() {
   if (!incorrectGuessAudio) {
     try {
-      incorrectGuessAudio = new Audio('/sounds/incorrect_guess.mp3');
-      incorrectGuessAudio.volume = 0.5; // Set volume to a pleasant level
+      incorrectGuessAudio = new Audio(SOUND_CONFIG.incorrect.url);
+      incorrectGuessAudio.volume = SOUND_CONFIG.incorrect.volume;
       incorrectGuessAudio.preload = 'auto';
     } catch (error) {
       console.warn('Incorrect guess audio not supported:', error);
@@ -65,22 +165,21 @@ function initializeIncorrectGuessAudio() {
  */
 export function playClickSound() {
   try {
-    // Initialize audio on first use
+    // Prefer low-latency Web Audio if ready
+    if (webAudioSupported && playWebAudioBuffer('click', SOUND_CONFIG.click.volume)) {
+      return;
+    }
+
+    // Fallback to HTMLAudio
     if (!clickAudio) {
       initializeAudio();
     }
-
     if (clickAudio) {
-      // Reset the audio to the beginning in case it's already playing
       clickAudio.currentTime = 0;
-      
-      // Play the sound
       const playPromise = clickAudio.play();
-      
-      // Handle the promise to avoid unhandled rejection warnings
+
       if (playPromise !== undefined) {
         playPromise.catch(error => {
-          // Silently fail if audio doesn't work - don't break the game
           console.warn('Could not play click sound:', error);
         });
       }
@@ -96,22 +195,21 @@ export function playClickSound() {
  */
 export function playCorrectGuessSound() {
   try {
-    // Initialize audio on first use
+    // Prefer low-latency Web Audio if ready
+    if (webAudioSupported && playWebAudioBuffer('correct', SOUND_CONFIG.correct.volume)) {
+      return;
+    }
+
+    // Fallback to HTMLAudio
     if (!correctGuessAudio) {
       initializeCorrectGuessAudio();
     }
-
     if (correctGuessAudio) {
-      // Reset the audio to the beginning in case it's already playing
       correctGuessAudio.currentTime = 0;
-      
-      // Play the sound
       const playPromise = correctGuessAudio.play();
-      
-      // Handle the promise to avoid unhandled rejection warnings
+
       if (playPromise !== undefined) {
         playPromise.catch(error => {
-          // Silently fail if audio doesn't work - don't break the game
           console.warn('Could not play correct guess sound:', error);
         });
       }
@@ -127,22 +225,21 @@ export function playCorrectGuessSound() {
  */
 export function playIncorrectGuessSound() {
   try {
-    // Initialize audio on first use
+    // Prefer low-latency Web Audio if ready
+    if (webAudioSupported && playWebAudioBuffer('incorrect', SOUND_CONFIG.incorrect.volume)) {
+      return;
+    }
+
+    // Fallback to HTMLAudio
     if (!incorrectGuessAudio) {
       initializeIncorrectGuessAudio();
     }
-
     if (incorrectGuessAudio) {
-      // Reset the audio to the beginning in case it's already playing
       incorrectGuessAudio.currentTime = 0;
-      
-      // Play the sound
       const playPromise = incorrectGuessAudio.play();
-      
-      // Handle the promise to avoid unhandled rejection warnings
+
       if (playPromise !== undefined) {
         playPromise.catch(error => {
-          // Silently fail if audio doesn't work - don't break the game
           console.warn('Could not play incorrect guess sound:', error);
         });
       }
@@ -157,6 +254,16 @@ export function playIncorrectGuessSound() {
  * Preload audio (call this on user interaction to prepare audio)
  */
 export function preloadAudio() {
+  // Initialize and unlock Web Audio ASAP (on user gesture)
+  ensureAudioContext();
+  unlockAudioContext();
+
+  // Preload Web Audio buffers for low-latency playback
+  loadBuffer('click', SOUND_CONFIG.click.url);
+  loadBuffer('correct', SOUND_CONFIG.correct.url);
+  loadBuffer('incorrect', SOUND_CONFIG.incorrect.url);
+
+  // Initialize HTMLAudio fallback as well
   initializeAudio();
   initializeCorrectGuessAudio();
   initializeIncorrectGuessAudio();

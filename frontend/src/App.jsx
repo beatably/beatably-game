@@ -15,6 +15,7 @@ import sessionManager from "./utils/sessionManager";
 import debugLogger from './utils/debugLogger';
 import viewportManager from "./utils/viewportUtils";
 import deviceAwarePlayback from "./utils/deviceAwarePlayback";
+import { preloadAudio } from "./utils/soundUtils";
 import './App.css';
 import WinnerView from "./WinnerView";
 import { DndProvider } from 'react-dnd';
@@ -1406,6 +1407,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // This reduces friction on iOS Safari so that future auto-plays succeed.
   useEffect(() => {
     const handler = async () => {
+      // Preload + unlock local SFX pipeline on first gesture for lower latency
+      preloadAudio();
+
       if (window.beatablyPlayback && !window.beatablyPlayback.isUnlocked()) {
         const ok = await window.beatablyPlayback.ensureUnlockedViaGesture();
         console.log('[Audio] Early unlock attempted, result:', ok);
@@ -2225,6 +2229,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Add user interaction listener for Safari audio unlock
   useEffect(() => {
     const unlockAudio = () => {
+      // Ensure local SFX buffers/context are also primed on first interaction
+      preloadAudio();
+
       // Create a silent audio context to unlock audio on Safari
       try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
