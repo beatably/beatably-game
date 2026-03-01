@@ -225,6 +225,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Song guess notification state
   const [songGuessNotification, setSongGuessNotification] = useState(null);
+  const [lastSongGuess, setLastSongGuess] = useState(null);
   const [tokenAnimations, setTokenAnimations] = useState({});
   // Winner screen state
   const [winner, setWinner] = useState(null);
@@ -978,55 +979,29 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
         }
         
+        // Track lastSongGuess from game_update (sent during reveal phase)
+        if (game.lastSongGuess) {
+          setLastSongGuess(game.lastSongGuess);
+        } else if (game.phase === 'player-turn' || game.phase === 'song-guess') {
+          // Clear song guess when starting a new
+          setLastSongGuess(null);
+        }
+        
         // Increment game round when the current player changes
         if (game.currentPlayerId !== currentPlayerId) {
           setGameRound(prevRound => prevRound + 1);
         }
       });
 
-      // Listen for song guess results
+      // Listen for song guess results (now just a "submitted" notification)
       socketRef.current.on("song_guess_result", (result) => {
-        console.log("[App] Song guess result:", result);
+        console.log("[App] Song guess submitted:", result);
         
-        // Play audio feedback
-        const audioFile = result.correct ? '/sounds/correct_guess.mp3' : '/sounds/incorrect_guess.mp3';
-        try {
-          const audio = new Audio(audioFile);
-          audio.volume = 0.5;
-          audio.play().catch(err => console.log('[Audio] Could not play sound:', err));
-        } catch (error) {
-          console.log('[Audio] Error creating audio:', error);
-        }
-        
-        // Calculate tokens earned (check for double points)
-        const player = players.find(p => p.id === result.playerId);
-        const tokensEarned = result.correct ? (player?.doublePoints ? 2 : 1) : 0;
-        
-        // Show notification
+        // Show "submitted" notification (result will be revealed at end of round)
         setSongGuessNotification({
           playerName: result.playerName,
-          correct: result.correct,
-          title: result.title,
-          artist: result.artist,
-          tokensEarned: tokensEarned
+          submitted: true
         });
-        
-        // Trigger token animation if correct
-        if (result.correct && result.playerId) {
-          setTokenAnimations(prev => ({
-            ...prev,
-            [result.playerId]: tokensEarned
-          }));
-          
-          // Clear animation after 3 seconds
-          setTimeout(() => {
-            setTokenAnimations(prev => {
-              const newState = { ...prev };
-              delete newState[result.playerId];
-              return newState;
-            });
-          }, 3000);
-        }
       });
 
       // Listen for challenge results
@@ -2717,6 +2692,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             pendingDropIndex={pendingDropIndex}
             onConfirmDrop={handleConfirmDrop}
             onCancelDrop={handleCancelDrop}
+            lastSongGuess={lastSongGuess}
           />
           {/* Device switch propagation from GameFooter / DeviceSwitchModal */}
           <script dangerouslySetInnerHTML={{

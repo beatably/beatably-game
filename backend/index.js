@@ -2647,6 +2647,7 @@ const lobby = lobbies[code];
     game.feedback = { correct, year: currentCard.year, title: currentCard.title, artist: currentCard.artist };
     game.removingId = null;
     game.phase = "song-guess";
+    game.lastSongGuess = null; // Clear previous round's song guess
     game.challengeWindowStart = Date.now();
 
     // Normalize scores to committed timeline lengths before broadcasting
@@ -3088,6 +3089,7 @@ const lobby = lobbies[code];
         removingId: null,
         currentPlayerIdx: game.currentPlayerIdx,
         currentPlayerId: currentPersistentIdForReveal,
+        lastSongGuess: game.lastSongGuess || null,
       });
     });
     } else {
@@ -3479,8 +3481,8 @@ const lobby = lobbies[code];
         removingId: null,
         currentPlayerIdx: game.currentPlayerIdx,
         currentPlayerId: originalPersistentId,  // PERSISTENT ID FIX: Use persistent ID
+        lastSongGuess: game.lastSongGuess || null,
       });
-    });
   });
 
   // Helper function to update all player scores to match their timeline lengths
@@ -3965,6 +3967,20 @@ const lobby = lobbies[code];
       bothCorrect
     });
     
+    // Store the song guess for deferred reveal at end of round
+    const playerObj = game.players.find(pl => pl.id === playerId);
+    const tokensEarned = bothCorrect ? (playerObj?.doublePoints ? 2 : 1) : 0;
+    game.lastSongGuess = {
+      playerId,
+      playerName: playerObj?.name,
+      guessTitle: title,
+      guessArtist: artist,
+      correct: bothCorrect,
+      titleCorrect,
+      artistCorrect,
+      tokensEarned
+    };
+
     if (bothCorrect) {
       // Award bonus tokens
       const playerIdx = game.players.findIndex(p => p.id === playerId);
@@ -3975,7 +3991,7 @@ const lobby = lobbies[code];
         game.players[playerIdx].doublePoints = false; // Reset double points
       }
     }
-    
+
     // Move to challenge window after song guess
     game.phase = "challenge-window";
     
@@ -4019,16 +4035,12 @@ const lobby = lobbies[code];
       });
     }
     
-    // Broadcast guess result
+    // Broadcast "submitted" notification only (result deferred to reveal phase)
     game.players.forEach((p) => {
       io.to(p.id).emit('song_guess_result', {
         playerId,
         playerName: game.players.find(pl => pl.id === playerId)?.name,
-        title,
-        artist,
-        correct: bothCorrect,
-        titleCorrect,
-        artistCorrect
+        submitted: true
       });
     });
   });

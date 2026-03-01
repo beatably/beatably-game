@@ -28,6 +28,7 @@ function GameFooter({
   onContinueAfterChallenge,
   onSkipChallenge,
   onSkipSongGuess,
+  lastSongGuess,
   spotifyDeviceId,
   isPlayingMusic,
   isCreator,
@@ -1443,7 +1444,7 @@ function GameFooter({
           <div className="text-white font-bold">
             Challenge Complete!
           </div>
-          <div className="text-white text-sm mb-8">
+          <div className="text-white text-sm mb-4">
             {challenge.result?.challengeWon ? 
               `${findPlayerByPersistentId(challenge.challengerPersistentId)?.name} won the challenge!` :
               !challenge.result?.challengerCorrect && challenge.result?.originalCorrect ?
@@ -1455,6 +1456,21 @@ function GameFooter({
                     `${findPlayerByPersistentId(challenge.challengerPersistentId)?.name} placed it correctly, but ${findPlayerByPersistentId(challenge.originalPlayerId)?.name} went first!`
             }
           </div>
+
+          {/* Song guess result - shown inline during challenge-resolved reveal */}
+          {lastSongGuess && (
+            <div className="mb-4 text-sm">
+              {lastSongGuess.correct ? (
+                <div className="text-primary font-semibold">
+                  Song guess: {lastSongGuess.playerName} got both title and artist right and is awarded an extra credit 🎉
+                </div>
+              ) : (
+                <div className="text-muted-foreground">
+                  Song guess: {lastSongGuess.playerName} guessed "{lastSongGuess.guessTitle}" by "{lastSongGuess.guessArtist}" which is wrong and gets no extra credit
+                </div>
+              )}
+            </div>
+          )}
           
           {/* Continue button - only creator can click */}
           {isCreator ? (
@@ -1586,7 +1602,7 @@ function GameFooter({
       <div className="w-full max-w-md flex flex-col items-center">
         {showFeedback && feedback && phase !== 'challenge-resolved' ? (
           <div className="w-full p-3 text-center mb-2" style={{ background: 'transparent' }}>
-            <div className="font-bold mb-4">
+            <div className="font-bold mb-2">
               {feedback.correct ? 
                 (myPlayerId === currentPlayerId ? 
                   "Yay, your answer is correct!" : 
@@ -1598,6 +1614,21 @@ function GameFooter({
                 )
               }
             </div>
+
+            {/* Song guess result - shown inline during reveal */}
+            {lastSongGuess && (
+              <div className="mb-4 text-sm">
+                {lastSongGuess.correct ? (
+                  <div className="text-primary font-semibold">
+                    Song guess: {lastSongGuess.playerName} got both title and artist right and is awarded an extra credit 🎉
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">
+                    Song guess: {lastSongGuess.playerName} guessed "{lastSongGuess.guessTitle}" by "{lastSongGuess.guessArtist}" which is wrong and gets no extra credit
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* Continue button - only creator can click */}
             {isCreator ? (
