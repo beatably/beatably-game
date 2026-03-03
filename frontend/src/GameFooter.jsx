@@ -1180,15 +1180,6 @@ function GameFooter({
           onDeviceSwitch={(newDeviceId) => {
             console.log('[GameFooter] Device switched to:', newDeviceId);
             
-            // CRITICAL FIX: If switching back to web player, sync current song
-            const webDeviceId = localStorage.getItem('spotify_device_id');
-            if (newDeviceId === webDeviceId && window.beatablyPlayerSync && currentCard?.uri) {
-              console.log('[GameFooter] Switching back to web player - syncing current song');
-              // Sync current song at current position to fix sync issues
-              const currentPosition = progress * 1000; // Convert to milliseconds
-              window.beatablyPlayerSync.syncCurrentSong(currentCard.uri, currentPosition);
-            }
-            
             // Notify parent component about device change
             if (window.parent && window.parent.handleDeviceSwitch) {
               window.parent.handleDeviceSwitch(newDeviceId);

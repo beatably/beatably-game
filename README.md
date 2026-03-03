@@ -1,172 +1,65 @@
-# Beatably - Digital Music Timeline Game
+# Beatably
 
-A web-based multiplayer version of the popular Beatably board game. Players guess where songs fit chronologically in a timeline, with real-time Spotify integration for music playback.
+A multiplayer music timeline game. Players take turns placing songs in chronological order on a shared timeline. Real-time Spotify integration for music playback.
 
-## 🎮 Game Features
+**Live:** https://beatably.app
 
-- **Multiplayer Real-time Gameplay** - Up to 8 players per room
-- **Spotify Integration** - Real music playback with Spotify Premium
-- **Timeline Mechanics** - Drag and drop cards to build your music timeline
-- **Challenge System** - Players can challenge each other's placements
-- **Token System** - Strategic token usage for skips and challenges
-- **Song Guessing** - Bonus points for identifying song titles and artists
+---
 
-## 🚀 Live Demo
+## How to Play
 
-**Frontend**: [Your Netlify URL will go here]
-**Backend**: [Your Render URL will go here]
+1. **Create a room** — one player creates a lobby and shares the room code
+2. **Join** — other players join with the code (no account required to join)
+3. **Listen** — a song plays; place it in the correct spot on the timeline
+4. **Challenge** — other players can challenge your placement
+5. **Win** — first to 10 correctly placed songs wins
 
-## 🛠 Tech Stack
+**Preview Mode** — play without Spotify Premium using 30-second previews (default)
+**Full Play Mode** — requires Spotify Premium; plays full tracks
 
-- **Frontend**: React, Vite, Socket.IO Client, React DnD, Tailwind CSS
-- **Backend**: Node.js, Express, Socket.IO, Spotify Web API
-- **Deployment**: Netlify (Frontend) + Render (Backend)
+---
 
-## 🏗 Local Development
+## Local Development
 
-### Prerequisites
-- Node.js 16+ 
-- Spotify Premium account
-- Spotify Developer App credentials
+**Requirements:** Node 18+, Spotify Developer credentials
 
-### Setup
+```bash
+# Backend (port 3001)
+cd backend && npm install && npm start
 
-1. **Clone the repository**
-   ```bash
-   git clone [your-repo-url]
-   cd beatably-game
-   ```
-
-2. **Install dependencies**
-   ```bash
-   # Backend
-   cd backend
-   npm install
-   
-   # Frontend
-   cd ../frontend
-   npm install
-   ```
-
-3. **Environment Setup**
-   ```bash
-   # Copy environment template
-   cp backend/.env.example backend/.env
-   ```
-   
-   Fill in your Spotify credentials in `backend/.env`:
-   ```
-   SPOTIFY_CLIENT_ID=your_spotify_client_id
-   SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-   SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/callback
-   FRONTEND_URI=http://127.0.0.1:5173
-   ```
-
-4. **Start Development Servers**
-   ```bash
-   # Terminal 1 - Backend
-   cd backend
-   npm run dev
-   
-   # Terminal 2 - Frontend  
-   cd frontend
-   npm run dev
-   ```
-
-5. **Open your browser**
-   Navigate to `http://127.0.0.1:5173`
-
-## 🌐 Deployment
-
-This project is configured for deployment on:
-- **Frontend**: Netlify (Free tier)
-- **Backend**: Render (Free tier)
-
-### Deployment Steps
-
-1. **Create accounts** (if you haven't already):
-   - [GitHub](https://github.com)
-   - [Netlify](https://netlify.com) 
-   - [Render](https://render.com)
-
-2. **Push to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin [your-github-repo-url]
-   git push -u origin main
-   ```
-
-3. **Deploy Backend to Render**:
-   - Connect your GitHub repo
-   - Set build command: `cd backend && npm install`
-   - Set start command: `cd backend && npm start`
-   - Add environment variables
-
-4. **Deploy Frontend to Netlify**:
-   - Connect your GitHub repo
-   - Set build command: `cd frontend && npm run build`
-   - Set publish directory: `frontend/dist`
-
-5. **Update Spotify App Settings**:
-   - Add production redirect URI
-   - Update CORS settings
-
-## 🎵 Spotify Setup
-
-1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Create a new app
-3. Add redirect URIs:
-   - Local: `http://127.0.0.1:5173/callback`
-   - Production: `https://your-netlify-url.netlify.app/callback`
-4. Copy Client ID and Client Secret to your environment variables
-
-## 🎯 How to Play
-
-1. **Create a Room**: One player creates a game room and connects their Spotify Premium account
-2. **Join Players**: Other players join using the room code
-3. **Listen & Guess**: Players listen to song snippets and place them in chronological order
-4. **Challenge**: Players can challenge each other's placements using tokens
-5. **Win**: First player to build a timeline of 10 songs wins!
-
-## 🔧 Configuration
-
-### Environment Variables
-
-**Backend (.env)**:
-```
-SPOTIFY_CLIENT_ID=your_spotify_client_id
-SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-SPOTIFY_REDIRECT_URI=your_redirect_uri
-FRONTEND_URI=your_frontend_url
-PORT=3001
+# Frontend (port 5173, separate terminal)
+cd frontend && npm install && npm run dev
 ```
 
-### Build Commands
+Create `backend/.env`:
+```env
+NODE_ENV=development
+SPOTIFY_CLIENT_ID=your_id
+SPOTIFY_CLIENT_SECRET=your_secret
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/callback
+FRONTEND_URI=http://127.0.0.1:5173
+ADMIN_PASSWORD=anything
+```
 
-**Frontend**:
-- Build: `npm run build`
-- Preview: `npm run preview`
+Add `http://127.0.0.1:5173/callback` as a Redirect URI in your [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
 
-**Backend**:
-- Start: `npm start`
-- Development: `npm run dev`
+Visit `http://127.0.0.1:5173`
 
-## 📝 License
+---
 
-This project is for educational and personal use. Spotify integration requires compliance with Spotify's Terms of Service.
+## Stack
 
-## 🤝 Contributing
+- **Frontend:** React 19, Vite, Tailwind CSS, react-dnd, socket.io-client
+- **Backend:** Node.js, Express 5, Socket.io 4
+- **Music:** Spotify Web Playback SDK + Web API
+- **Hosting:** Netlify (frontend) + Render (backend)
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+---
 
-## 🐛 Issues
+## Docs
 
-If you encounter any issues, please create an issue on GitHub with:
-- Description of the problem
-- Steps to reproduce
-- Browser and device information
+- [Architecture](docs/architecture.md) — how the system works, socket events, components
+- [Deployment](docs/deployment.md) — hosting setup, environment variables
+- [Song Database Guide](song-database-guide.md) — managing the curated song database
+- [Design System](beatably-design-system.md) — UI/UX conventions
+- [Feature Plan](feature-plan.md) — upcoming features

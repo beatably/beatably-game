@@ -129,28 +129,7 @@ function DeviceSwitchModal({ isOpen, onClose, onDeviceSwitch, currentDeviceId })
 
     const transferPlayback = async (deviceId) => {
     try {
-      // Check if PlayerSync v2 is available
-      if (window.beatablyPlayerSync) {
-        console.log('[DeviceSwitchModal] Using PlayerSync v2 for device transfer');
-        
-        // Check if there's a current song that should continue playing
-        const shouldContinuePlayback = window.__beatablyPendingAutoplay || 
-          (window.currentGameCard && window.currentGameCard.uri);
-        
-        await window.beatablyPlayerSync.transferTo(deviceId, shouldContinuePlayback);
-        
-        // Clear pending autoplay intent since PlayerSync handled it
-        if (window.__beatablyPendingAutoplay) {
-          window.__beatablyPendingAutoplay = false;
-        }
-        
-        onDeviceSwitch(deviceId);
-        onClose();
-        return;
-      }
-
-      // Fallback to legacy transfer logic with enhanced pause-before-transfer
-      console.log('[DeviceSwitchModal] Using legacy transfer logic with pause-before-transfer');
+      console.log('[DeviceSwitchModal] Transferring playback to device:', deviceId);
       
       const tokenValidation = await spotifyAuth.ensureValidToken();
       if (!tokenValidation.valid) {

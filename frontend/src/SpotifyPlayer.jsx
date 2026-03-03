@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import spotifyAuth from './utils/spotifyAuth';
-import { createPlayerSync, isPlayerSyncEnabled } from './lib/spotify';
 import deviceAwarePlayback from './utils/deviceAwarePlayback';
 
 // Default track object structure
@@ -18,7 +17,6 @@ const track = {
 
 const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayerStateChange }) => {
   const [player, setPlayer] = useState(undefined);
-  const [playerSync, setPlayerSync] = useState(null);
   const [is_paused, setPaused] = useState(false);
   const [is_active, setActive] = useState(false);
   const [current_track, setTrack] = useState(track);
@@ -312,33 +310,6 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         // Store player instance globally for Safari activateElement() calls
         window.spotifyPlayerInstance = spotifyPlayer;
 
-        // Initialize PlayerSync if enabled
-        if (isPlayerSyncEnabled()) {
-          console.log('[SpotifyPlayer] Initializing PlayerSync v2');
-          const sync = createPlayerSync(spotifyPlayer);
-          if (sync) {
-            setPlayerSync(sync);
-            
-            // Subscribe to PlayerSync state changes
-            const unsubscribe = sync.onChange((state) => {
-              console.log('[SpotifyPlayer] PlayerSync state:', state);
-              setPaused(!state.isPlaying);
-              setActive(state.isWebDeviceActive || !!state.activeDeviceId);
-              
-              if (onPlayerStateChange) {
-                onPlayerStateChange({
-                  paused: !state.isPlaying,
-                  device: { id: state.activeDeviceId },
-                  lastSource: state.lastSource
-                });
-              }
-            });
-
-            // Store unsubscribe function for cleanup
-            spotifyPlayer._playerSyncUnsubscribe = unsubscribe;
-          }
-        }
-
       } catch (error) {
         console.error('[SpotifyPlayer] Error creating player:', error);
         setConnectionStatus('error');
@@ -364,40 +335,18 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
     initializePlayer();
 
     return () => {
-      // Cleanup PlayerSync subscription
-      if (player && player._playerSyncUnsubscribe) {
-        player._playerSyncUnsubscribe();
-      }
-      
-      // Cleanup PlayerSync instance
-      if (playerSync) {
-        playerSync.destroy();
-      }
-      
       const script = document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]');
       if (script && script.parentNode) {
         script.parentNode.removeChild(script);
       }
     };
-  }, [token, onPlayerReady, onPlayerStateChange, retryCount, playerSync]);
+  }, [token, onPlayerReady, onPlayerStateChange, retryCount]);
 
   // REMOVED: Automatic playback trigger to prevent restarts on phase changes
   // Playback is now controlled manually through the GameFooter play button
 
-  // PlayerSync v2 integration for autoplay handling
+  // Autoplay handling
   useEffect(() => {
-    if (!playerSync || !isPlaying) return;
-
-    console.log('[SpotifyPlayer] PlayerSync v2: Setting playing state to', isPlaying);
-    playerSync.setPlaying(isPlaying).catch(error => {
-      console.warn('[SpotifyPlayer] PlayerSync setPlaying failed:', error);
-    });
-  }, [isPlaying, playerSync]);
-
-  // Legacy autoplay handling (when PlayerSync is disabled)
-  useEffect(() => {
-    if (isPlayerSyncEnabled()) return; // Skip legacy logic when PlayerSync is enabled
-    
     // Only attempt when creator side sets isPlaying true and we have SDK/player
     if (!player) return;
     if (!isPlaying) return;
@@ -437,14 +386,8 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
   }, [isPlaying, player]);
 
   // Control functions
-  const togglePlay = async () => {
-    if (playerSync) {
-      try {
-        await playerSync.toggle();
-      } catch (error) {
-        console.warn('[SpotifyPlayer] PlayerSync toggle failed:', error);
-      }
-    } else if (player) {
+  const togglePlay = () => {
+    if (player) {
       player.togglePlay();
     }
   };
@@ -461,19 +404,8 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
     }
   };
 
-  // Expose PlayerSync methods and device-aware playback globally for other components
+  // Expose device-aware playback globally for other components
   useEffect(() => {
-    if (playerSync) {
-      window.beatablyPlayerSync = {
-        setPlaying: (playing) => playerSync.setPlaying(playing),
-        toggle: () => playerSync.toggle(),
-        transferTo: (deviceId, playing) => playerSync.transferTo(deviceId, playing),
-        refresh: () => playerSync.refresh(),
-        activateAutoplayGuard: () => playerSync.activateAutoplayGuard()
-      };
-    }
-
-    // Always expose device-aware playback methods
     window.beatablyDeviceAware = {
       startPlayback: (deviceId, trackUri, positionMs, options) => 
         deviceAwarePlayback.startPlayback(deviceId, trackUri, positionMs, options),
@@ -486,14 +418,11 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
     };
     
     return () => {
-      if (window.beatablyPlayerSync) {
-        delete window.beatablyPlayerSync;
-      }
       if (window.beatablyDeviceAware) {
         delete window.beatablyDeviceAware;
       }
     };
-  }, [playerSync]);
+  }, []);
 
   // Show connection status and errors
   if (connectionStatus === 'error') {
