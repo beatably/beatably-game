@@ -201,6 +201,96 @@
     .auth-dialog h3 { margin: 0 0 8px 0; }
     .auth-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
 
+    /* Import mode cards */
+    .import-mode-card {
+      border: 1px solid #223045;
+      border-radius: 8px;
+      padding: 12px 14px;
+      cursor: pointer;
+      flex: 1;
+      min-width: 0;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .import-mode-card.active {
+      border-color: #1f6feb;
+      background: rgba(31,111,235,0.08);
+    }
+    .import-mode-card:hover:not(.active) { border-color: #4a5568; }
+    .import-mode-card .mode-title {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .import-mode-card .mode-title::before {
+      content: '';
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid #4a5568;
+      flex-shrink: 0;
+    }
+    .import-mode-card.active .mode-title::before {
+      border-color: #1f6feb;
+      background: #1f6feb;
+    }
+    .import-mode-card .mode-desc { font-size: 12px; color: #8b949e; line-height: 1.4; }
+    /* Chips */
+    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .chip {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #223045;
+      font-size: 12px;
+      cursor: pointer;
+      background: transparent;
+      color: #8b949e;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: #4a5568; color: #e6edf3; }
+    .chip.active { border-color: #1f6feb; background: rgba(31,111,235,0.15); color: #58a6ff; }
+    .chip.preset-btn { padding: 5px 14px; border-radius: 6px; font-size: 13px; }
+    .field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; margin: 0 0 6px 0; display: block; }
+    /* Import filter grid layouts */
+    .import-filter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 40px;
+    }
+    .import-filter-grid.import-filter-3col {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+    .import-filter-col { min-width: 0; }
+    .import-diag { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+    .import-diag .diag-item { font-size: 12px; color: #8b949e; }
+    .import-diag .diag-item strong { color: #e6edf3; }
+    select.geo-select { font-size: 11px; padding: 1px 2px; background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 3px; cursor: pointer; }
+
+    /* Column toggle */
+    .col-group-hidden { display: none !important; }
+    .col-toggle-panel { position:absolute; right:0; top:calc(100% + 4px); background:#10161f; border:1px solid #223045; border-radius:6px; padding:12px 14px; min-width:200px; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+    .col-toggle-panel label { display:flex; align-items:center; gap:8px; font-size:12px; color:#e6edf3; cursor:pointer; padding:4px 0; }
+    .col-toggle-panel label input { accent-color:#1f6feb; cursor:pointer; }
+    .col-toggle-wrap { position:relative; display:inline-block; }
+    /* Missing data dot */
+    .missing-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#f59e0b; margin-left:5px; vertical-align:middle; flex-shrink:0; }
+    /* Edit modal */
+    .edit-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:100; display:flex; align-items:center; justify-content:center; }
+    .edit-modal { background:#10161f; border:1px solid #223045; border-radius:10px; padding:24px; width:680px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+    .edit-modal h4 { margin:0 0 16px; font-size:16px; }
+    .edit-modal .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+    .edit-modal .form-row.full { grid-template-columns:1fr; }
+    .edit-modal .form-row.three { grid-template-columns:1fr 1fr 1fr 1fr; }
+    .edit-modal label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#8b949e; display:block; margin-bottom:4px; }
+    .edit-modal input[type=text], .edit-modal input[type=number], .edit-modal select { width:100%; box-sizing:border-box; }
+    .diff-btn { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:6px; border:1px solid #30363d; background:#161b22; color:#e6edf3; font-size:13px; font-weight:600; cursor:pointer; }
+    .diff-btn.active { background:rgba(31,111,235,0.2); border-color:#1f6feb; color:#58a6ff; }
+    .edit-modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; border-top:1px solid #223045; padding-top:16px; }
     /* Pagination/status bar */
     .pager {
       display: flex;
@@ -227,8 +317,10 @@
     </div>
     <div class="row" style="justify-content:flex-end;">
       <button id="bulkImportBtn">Bulk Import</button>
+      <button id="healthBtn" class="secondary">Database Health</button>
       <button id="analyticsBtn" class="secondary">Song Analytics</button>
       <button id="usageAnalyticsBtn" class="secondary">Usage Analytics</button>
+      <button id="yearAuditBtn" class="secondary">Year Audit</button>
       <button id="signOutBtn" class="secondary">Sign out</button>
     </div>
   </header>
@@ -248,38 +340,82 @@
     <!-- Admin main view -->
     <div id="adminView">
       <div class="card">
-        <div class="row" style="align-items:flex-end;">
-          <div class="col-3">
-            <label class="muted">Search</label>
-            <input id="filterQ" placeholder="Title or artist..." />
+        <!-- Row 1: Search + Year -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div>
+            <label class="field-label">Search</label>
+            <input id="filterQ" placeholder="Title or artist…" style="width:100%; box-sizing:border-box;" />
           </div>
-          <div class="col-3">
-            <label class="muted">Genre</label>
-            <input id="filterGenre" placeholder="e.g. pop" />
-          </div>
-          <div class="col-3">
-            <label class="muted">Origin (Artist Geography)</label>
-            <input id="filterGeo" placeholder="e.g. US, SE, CA" />
-          </div>
-          <div class="col-3">
-            <label class="muted">Difficulty Level (1-5)</label>
-            <input id="filterDiff" type="number" min="1" max="5" />
-          </div>
-        </div>
-        <div class="row" style="margin-top:8px;">
-          <div class="col-3">
-            <label class="muted">Year Min</label>
-            <input id="filterYearMin" type="number" placeholder="1960" />
-          </div>
-          <div class="col-3">
-            <label class="muted">Year Max</label>
-            <input id="filterYearMax" type="number" placeholder="2025" />
-          </div>
-          <div class="col-6 right">
-            <button id="applyFiltersBtn">Apply Filters</button>
-            <button id="resetFiltersBtn" class="secondary">Reset</button>
+          <div>
+            <label class="field-label">Year Range</label>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div class="chip-group" style="margin:0;">
+                <span class="chip" data-decade="1970" onclick="setDecadeFilter(1970)">70s</span>
+                <span class="chip" data-decade="1980" onclick="setDecadeFilter(1980)">80s</span>
+                <span class="chip" data-decade="1990" onclick="setDecadeFilter(1990)">90s</span>
+                <span class="chip" data-decade="2000" onclick="setDecadeFilter(2000)">00s</span>
+                <span class="chip" data-decade="2010" onclick="setDecadeFilter(2010)">10s</span>
+                <span class="chip" data-decade="2020" onclick="setDecadeFilter(2020)">20s</span>
+              </div>
+              <input id="filterYearMin" type="number" placeholder="Min" style="width:68px;" />
+              <span class="muted">–</span>
+              <input id="filterYearMax" type="number" placeholder="Max" style="width:68px;" />
+            </div>
           </div>
         </div>
+        <!-- Row 2: Genre + Origin chips -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div>
+            <label class="field-label">Genre</label>
+            <div class="chip-group" id="filterGenreChips">
+              <span class="chip" data-genre="pop" onclick="toggleFilterGenre('pop')">Pop</span>
+              <span class="chip" data-genre="rock" onclick="toggleFilterGenre('rock')">Rock</span>
+              <span class="chip" data-genre="hip-hop" onclick="toggleFilterGenre('hip-hop')">Hip-Hop</span>
+              <span class="chip" data-genre="electronic" onclick="toggleFilterGenre('electronic')">Electronic</span>
+              <span class="chip" data-genre="indie" onclick="toggleFilterGenre('indie')">Indie</span>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Origin</label>
+            <div class="chip-group" id="filterOriginChips">
+              <span class="chip" data-origin="SE" onclick="toggleFilterOrigin('SE')">SE</span>
+              <span class="chip" data-origin="NO" onclick="toggleFilterOrigin('NO')">NO</span>
+              <span class="chip" data-origin="DK" onclick="toggleFilterOrigin('DK')">DK</span>
+              <span class="chip" data-origin="FI" onclick="toggleFilterOrigin('FI')">FI</span>
+              <span class="chip" data-origin="US" onclick="toggleFilterOrigin('US')">US</span>
+              <span class="chip" data-origin="GB" onclick="toggleFilterOrigin('GB')">GB</span>
+              <span class="chip" data-origin="DE" onclick="toggleFilterOrigin('DE')">DE</span>
+              <span class="chip" data-origin="AU" onclick="toggleFilterOrigin('AU')">AU</span>
+            </div>
+          </div>
+        </div>
+        <!-- Row 3: Difficulty + Missing data + Reset -->
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="field-label" style="margin:0;">Difficulty</span>
+            <div class="chip-group" id="filterDiffChips" style="margin:0;">
+              <span class="chip active" data-diff="" onclick="setFilterDiff('')">Any</span>
+              <span class="chip" data-diff="1" onclick="setFilterDiff('1')">1</span>
+              <span class="chip" data-diff="2" onclick="setFilterDiff('2')">2</span>
+              <span class="chip" data-diff="3" onclick="setFilterDiff('3')">3</span>
+              <span class="chip" data-diff="4" onclick="setFilterDiff('4')">4</span>
+              <span class="chip" data-diff="5" onclick="setFilterDiff('5')">5</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
+            <span class="field-label" style="margin:0;">Show only</span>
+            <div class="chip-group" style="margin:0;">
+              <span class="chip" id="missingGenreChip" onclick="toggleMissingFilter('genre')">Missing Genre</span>
+              <span class="chip" id="missingOriginChip" onclick="toggleMissingFilter('origin')">Missing Origin</span>
+              <span class="chip" id="missingPreviewChip" onclick="toggleMissingFilter('preview')">Missing Preview</span>
+            </div>
+          </div>
+          <button id="resetFiltersBtn" class="secondary" style="margin-left:auto;">Reset</button>
+        </div>
+        <!-- Hidden inputs for compat with buildFilterParams -->
+        <input id="filterGenre" type="hidden" />
+        <input id="filterGeo" type="hidden" />
+        <input id="filterDiff" type="hidden" />
       </div>
 
       <div class="card">
@@ -299,6 +435,13 @@
                 <option value="500">500</option>
               </select>
             </div>
+            <div class="col-toggle-wrap">
+              <button id="colToggleBtn" class="secondary" onclick="toggleColPanel()">Columns ▾</button>
+              <div class="col-toggle-panel" id="colTogglePanel" style="display:none;">
+                <label><input type="checkbox" id="colChartToggle" onchange="applyColGroups()"> Chart Details</label>
+                <label><input type="checkbox" id="colMetaToggle" onchange="applyColGroups()"> Metadata</label>
+              </div>
+            </div>
             <button id="refreshBtn" class="secondary">Refresh</button>
             <button id="exportBtn" class="secondary">Export JSON</button>
           </div>
@@ -315,20 +458,20 @@
                 <th class="num">Year</th>
                 <th>Genre</th>
                 <th>Origin</th>
-                <th>Markets</th>
-                <th class="num">Billboard</th>
-                <th class="num">Multi-Country</th>
-                <th class="num">International</th>
-                <th class="num">Rank</th>
-                <th class="num">Peak</th>
-                <th class="num">Weeks</th>
-                <th>Chart Date</th>
+                <th class="num">Intl</th>
                 <th class="num">Difficulty</th>
                 <th class="num">Popularity</th>
-                <th>Tags</th>
-                <th>Verified</th>
-                <th>Added</th>
-                <th>URI</th>
+                <th data-col-group="chart" class="num">Billboard</th>
+                <th data-col-group="chart" class="num">Multi-Country</th>
+                <th data-col-group="chart" class="num">Rank</th>
+                <th data-col-group="chart" class="num">Peak</th>
+                <th data-col-group="chart" class="num">Weeks</th>
+                <th data-col-group="chart">Chart Date</th>
+                <th data-col-group="meta">Markets</th>
+                <th data-col-group="meta">Tags</th>
+                <th data-col-group="meta">Verified</th>
+                <th data-col-group="meta">Added</th>
+                <th data-col-group="meta">URI</th>
                 <th class="right">Actions</th>
               </tr>
             </thead>
@@ -364,47 +507,113 @@
       </div>
 
       <div class="card">
-        <div class="grid">
-          <div class="col-3">
-            <label class="muted">Mode</label>
-            <select id="importMode">
-              <option value="billboard">Billboard</option>
-              <option value="spotify">Spotify</option>
-            </select>
+        <!-- Mode cards -->
+        <div style="display:flex; gap:12px; margin-bottom:20px;">
+          <div class="import-mode-card active" id="modeCardBillboard" onclick="selectImportMode('billboard')">
+            <div class="mode-title">Chart Hits</div>
+            <div class="mode-desc">Billboard Hot 100 entries matched to Spotify. Best for chart-verified songs with rank data. <strong style="color:#f59e0b;">US chart — use Spotify Search for non-US origin filters.</strong></div>
           </div>
-          <div class="col-3">
-            <label class="muted">Year Min</label>
-            <input id="importYearMin" type="number" placeholder="1960" />
-          </div>
-          <div class="col-3">
-            <label class="muted">Year Max</label>
-            <input id="importYearMax" type="number" placeholder="2025" />
-          </div>
-          <div class="col-3">
-            <label class="muted">Limit</label>
-            <input id="importLimit" type="number" min="1" max="500" value="100" />
-          </div>
-          <div class="col-6">
-            <label class="muted">Genres (comma separated)</label>
-            <input id="importGenres" placeholder="pop, rock, ..." />
-          </div>
-          <div class="col-6">
-            <label class="muted">Search Markets (Spotify market codes, comma separated)</label>
-            <input id="importSearchMarkets" placeholder="US, GB, SE" value="US" />
-          </div>
-          <div class="col-6">
-            <label class="muted">Origin Countries (artist origin filter, optional)</label>
-            <input id="importOriginCountries" placeholder="SE, NO, DK" />
+          <div class="import-mode-card" id="modeCardSearch" onclick="selectImportMode('search')">
+            <div class="mode-title">Spotify Search</div>
+            <div class="mode-desc">Genre + year + market queries against Spotify API. Best for broader variety — and for non-US markets/origins (e.g. SE, NO).</div>
           </div>
         </div>
-        <div class="row" style="margin-top:8px; justify-content:space-between;">
-          <div class="muted" id="importPreviewCount"></div>
-          <div class="actions">
+
+        <!-- Filter grid row 1: Year Range | Genres -->
+        <div class="import-filter-grid">
+          <div class="import-filter-col">
+            <label class="field-label">Year Range</label>
+            <div class="chip-group" id="decadeChips">
+              <span class="chip" data-decade="1960" onclick="toggleDecade(1960)">1960s</span>
+              <span class="chip" data-decade="1970" onclick="toggleDecade(1970)">1970s</span>
+              <span class="chip" data-decade="1980" onclick="toggleDecade(1980)">1980s</span>
+              <span class="chip" data-decade="1990" onclick="toggleDecade(1990)">1990s</span>
+              <span class="chip" data-decade="2000" onclick="toggleDecade(2000)">2000s</span>
+              <span class="chip" data-decade="2010" onclick="toggleDecade(2010)">2010s</span>
+              <span class="chip" data-decade="2020" onclick="toggleDecade(2020)">2020s</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+              <input id="importYearMin" type="number" placeholder="Min year" style="width:90px; flex:none;" />
+              <span class="muted" style="font-size:12px;">–</span>
+              <input id="importYearMax" type="number" placeholder="Max year" style="width:90px; flex:none;" />
+              <span class="muted" style="font-size:11px;">Leave blank for all years</span>
+            </div>
+          </div>
+
+          <div class="import-filter-col" id="genresSection">
+            <label class="field-label">Genres</label>
+            <div class="chip-group" id="genreChips">
+              <span class="chip" data-genre="pop" onclick="toggleGenre('pop')">Pop</span>
+              <span class="chip" data-genre="rock" onclick="toggleGenre('rock')">Rock</span>
+              <span class="chip" data-genre="hip-hop" onclick="toggleGenre('hip-hop')">Hip-Hop</span>
+              <span class="chip" data-genre="electronic" onclick="toggleGenre('electronic')">Electronic</span>
+              <span class="chip" data-genre="indie" onclick="toggleGenre('indie')">Indie</span>
+              <span class="chip" data-genre="r&b" onclick="toggleGenre('r&b')">R&amp;B</span>
+              <span class="chip" data-genre="country" onclick="toggleGenre('country')">Country</span>
+              <span class="chip" data-genre="metal" onclick="toggleGenre('metal')">Metal</span>
+              <span class="chip" data-genre="jazz" onclick="toggleGenre('jazz')">Jazz</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter grid row 2: Markets | Origin | Limit -->
+        <div class="import-filter-grid import-filter-3col" style="margin-top:20px;">
+          <div class="import-filter-col">
+            <label class="field-label">Search Markets</label>
+            <div class="chip-group" id="marketChips">
+              <span class="chip active" data-market="US" onclick="toggleMarket('US')">US</span>
+              <span class="chip" data-market="GB" onclick="toggleMarket('GB')">GB</span>
+              <span class="chip" data-market="SE" onclick="toggleMarket('SE')">SE</span>
+              <span class="chip" data-market="NO" onclick="toggleMarket('NO')">NO</span>
+              <span class="chip" data-market="DK" onclick="toggleMarket('DK')">DK</span>
+              <span class="chip" data-market="DE" onclick="toggleMarket('DE')">DE</span>
+              <span class="chip" data-market="AU" onclick="toggleMarket('AU')">AU</span>
+              <span class="chip" data-market="CA" onclick="toggleMarket('CA')">CA</span>
+            </div>
+          </div>
+          <div class="import-filter-col">
+            <label class="field-label">Artist Origin <span class="muted">(optional)</span></label>
+            <div class="chip-group" id="originChips">
+              <span class="chip" data-origin="SE" onclick="toggleOrigin('SE')">SE</span>
+              <span class="chip" data-origin="NO" onclick="toggleOrigin('NO')">NO</span>
+              <span class="chip" data-origin="DK" onclick="toggleOrigin('DK')">DK</span>
+              <span class="chip" data-origin="FI" onclick="toggleOrigin('FI')">FI</span>
+              <span class="chip" data-origin="US" onclick="toggleOrigin('US')">US</span>
+              <span class="chip" data-origin="GB" onclick="toggleOrigin('GB')">GB</span>
+              <span class="chip" data-origin="DE" onclick="toggleOrigin('DE')">DE</span>
+              <span class="chip" data-origin="FR" onclick="toggleOrigin('FR')">FR</span>
+              <span class="chip" data-origin="AU" onclick="toggleOrigin('AU')">AU</span>
+            </div>
+          </div>
+          <div class="import-filter-col">
+            <label class="field-label">Limit</label>
+            <div class="chip-group">
+              <span class="chip preset-btn" id="limitChip10" onclick="selectLimit(10)">10</span>
+              <span class="chip preset-btn" id="limitChip50" onclick="selectLimit(50)">50</span>
+              <span class="chip preset-btn active" id="limitChip100" onclick="selectLimit(100)">100</span>
+              <span class="chip preset-btn" id="limitChip300" onclick="selectLimit(300)">300</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid #223045;">
+          <div id="importDiag" class="import-diag"></div>
+          <div class="actions" style="flex-shrink:0;">
             <button id="previewImportBtn">Preview</button>
             <button id="cancelImportBtn" class="secondary" style="display:none;">Cancel</button>
+            <button id="fetchPreviewsBtn" class="secondary" style="display:none;">Fetch Previews</button>
             <button id="commitImportBtn" class="danger" disabled>Commit Selected</button>
           </div>
         </div>
+
+        <!-- Live progress (shown while loading) -->
+        <div id="importProgressBar" style="display:none; margin-top:10px; padding:8px 12px; background:#0b0f14; border:1px solid #223045; border-radius:6px;">
+          <span id="importProgressText" style="font-size:12px; color:#8b949e;">Searching…</span>
+        </div>
+        <div id="importPreviewCount" class="muted" style="margin-top:4px; font-size:12px;"></div>
+
+        <!-- Results table -->
         <div style="overflow:auto; margin-top:8px;">
           <table>
             <thead>
@@ -412,18 +621,20 @@
                 <th><input type="checkbox" id="importSelectAll" /></th>
                 <th>Title</th>
                 <th>Artist</th>
-                <th>Year</th>
+                <th>Year (MB)</th>
                 <th>Genre</th>
                 <th>Geo</th>
                 <th>Markets</th>
-                <th>Billboard</th>
+                <th>Chart</th>
                 <th>Rank</th>
-                <th>Popularity</th>
+                <th>Pop</th>
+                <th>Lvl</th>
+                <th>Prev</th>
                 <th>URI</th>
               </tr>
             </thead>
             <tbody id="importPreviewTbody">
-              <tr><td colspan="11" class="muted">No preview yet</td></tr>
+              <tr><td colspan="13" class="muted">No preview yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -631,6 +842,235 @@
       </div>
     </div>
 
+    <!-- Year Audit & Fix view -->
+    <div id="yearAuditView" style="display:none;">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <div class="actions">
+          <button id="backFromYearAuditBtn" class="secondary">&larr; Back to Admin</button>
+        </div>
+        <div><h3 style="margin:0;">Year Audit &amp; Fix</h3></div>
+        <div></div>
+      </div>
+      <div class="card">
+        <p class="muted">Checks every song's release year against MusicBrainz and corrects it when the Spotify year differs significantly (e.g. songs on compilation albums). Rate-limited — allow several minutes for large sets.</p>
+        <div class="grid" style="margin-top:8px;">
+          <div class="col-3">
+            <label class="muted">Year Min (optional)</label>
+            <input id="yearAuditYearMin" type="number" placeholder="e.g. 1960" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Year Max (optional)</label>
+            <input id="yearAuditYearMax" type="number" placeholder="e.g. 2000" />
+          </div>
+          <div class="col-3">
+            <label class="muted">Geography (optional)</label>
+            <input id="yearAuditGeo" type="text" placeholder="e.g. SE" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px; gap:8px; align-items:center;">
+          <button id="runYearAuditBtn">Run Year Fix</button>
+          <span id="yearAuditStatus" class="muted"></span>
+        </div>
+      </div>
+      <div id="yearAuditResults" style="display:none; margin-top:16px;">
+        <div class="card">
+          <div id="yearAuditSummary" class="muted" style="margin-bottom:8px;"></div>
+          <div style="overflow:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Artist</th>
+                  <th>Title</th>
+                  <th>Old Year</th>
+                  <th>New Year</th>
+                </tr>
+              </thead>
+              <tbody id="yearAuditTbody">
+                <tr><td colspan="4" class="muted">No corrections yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Database Health view -->
+    <div id="healthView" style="display:none;">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <div class="actions">
+          <button id="backFromHealthBtn" class="secondary">&larr; Back to Admin</button>
+        </div>
+        <div><h3 style="margin:0;">Database Health</h3></div>
+        <div></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+          <div>
+            <div style="font-size:13px; color:#8b949e;">Total songs in database</div>
+            <div style="font-size:28px; font-weight:600; margin-top:2px;" id="enrichTotal">—</div>
+          </div>
+          <button id="enrichRefreshBtn" class="secondary">Refresh</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:20px;">
+          <div style="background:#0b0f14; border:1px solid #223045; border-radius:6px; padding:14px;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#8b949e; margin-bottom:6px;">Missing Genre</div>
+            <div style="font-size:22px; font-weight:600;" id="enrichMissingGenre">—</div>
+            <div style="font-size:11px; color:#8b949e; margin-top:2px;">songs</div>
+            <button id="enrichGenreBtn" class="secondary" style="margin-top:10px; font-size:11px; width:100%;" disabled>Enrich Genre</button>
+          </div>
+          <div style="background:#0b0f14; border:1px solid #223045; border-radius:6px; padding:14px;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#8b949e; margin-bottom:6px;">Missing Origin</div>
+            <div style="font-size:22px; font-weight:600;" id="enrichMissingGeo">—</div>
+            <div style="font-size:11px; color:#8b949e; margin-top:2px;">songs</div>
+            <button id="enrichGeoBtn" class="secondary" style="margin-top:10px; font-size:11px; width:100%;" disabled>Enrich Origin</button>
+          </div>
+          <div style="background:#0b0f14; border:1px solid #223045; border-radius:6px; padding:14px;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:#8b949e; margin-bottom:6px;">Missing Preview</div>
+            <div style="font-size:22px; font-weight:600;" id="enrichMissingPreview">—</div>
+            <div style="font-size:11px; color:#8b949e; margin-top:2px;">songs</div>
+            <button id="enrichPreviewBtn" class="secondary" style="margin-top:10px; font-size:11px; width:100%;" disabled>Fetch Previews</button>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #223045; padding-top:16px;">
+          <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+            <span style="font-size:12px; color:#8b949e;">Limit:</span>
+            <span class="chip preset-btn" id="enrichLimit10" onclick="setEnrichLimit(10)">10</span>
+            <span class="chip preset-btn" id="enrichLimit50" onclick="setEnrichLimit(50)">50</span>
+            <span class="chip preset-btn" id="enrichLimit100" onclick="setEnrichLimit(100)">100</span>
+            <span class="chip preset-btn active" id="enrichLimitAll" onclick="setEnrichLimit(0)">All</span>
+            <button id="enrichAllBtn" class="secondary" style="margin-left:auto;" disabled>Enrich All Missing Fields</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="enrichProgressBar" style="display:none; margin-top:0;">
+        <div class="card" style="margin-top:0;">
+          <div style="font-size:12px; color:#8b949e; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">Progress</div>
+          <div id="enrichProgressText" style="font-size:13px; color:#e6edf3;">Enriching…</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Edit Song Modal -->
+  <div id="editModalOverlay" class="edit-modal-overlay" style="display:none;" onclick="if(event.target===this)closeEditModal()">
+    <div class="edit-modal">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h4 style="margin:0;">Edit Song</h4>
+        <button class="secondary small" onclick="closeEditModal()" style="padding:2px 8px;font-size:16px;">✕</button>
+      </div>
+
+      <div class="form-row">
+        <div><label>Title</label><input type="text" id="emTitle" class="input"></div>
+        <div><label>Artist</label><input type="text" id="emArtist" class="input"></div>
+      </div>
+      <div class="form-row" style="grid-template-columns:120px 1fr;align-items:end;">
+        <div><label>Year</label><input type="number" id="emYear" class="input" min="1900" max="2099" style="width:100%;"></div>
+        <div>
+          <label>Difficulty</label>
+          <div style="display:flex;gap:6px;" id="emDiffBtns">
+            <button class="diff-btn" data-diff="1" onclick="setEmDiff(1)">1</button>
+            <button class="diff-btn" data-diff="2" onclick="setEmDiff(2)">2</button>
+            <button class="diff-btn" data-diff="3" onclick="setEmDiff(3)">3</button>
+            <button class="diff-btn" data-diff="4" onclick="setEmDiff(4)">4</button>
+            <button class="diff-btn" data-diff="5" onclick="setEmDiff(5)">5</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row full" style="margin-bottom:8px;">
+        <div>
+          <label>Genre</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="emGenreChips">
+            <span class="chip" data-genre="pop" onclick="toggleEmGenre('pop')">Pop</span>
+            <span class="chip" data-genre="rock" onclick="toggleEmGenre('rock')">Rock</span>
+            <span class="chip" data-genre="hip-hop" onclick="toggleEmGenre('hip-hop')">Hip-Hop</span>
+            <span class="chip" data-genre="electronic" onclick="toggleEmGenre('electronic')">Electronic</span>
+            <span class="chip" data-genre="indie" onclick="toggleEmGenre('indie')">Indie</span>
+            <span class="chip" data-genre="country" onclick="toggleEmGenre('country')">Country</span>
+            <span class="chip" data-genre="r&b" onclick="toggleEmGenre('r&b')">R&amp;B</span>
+            <span class="chip" data-genre="latin" onclick="toggleEmGenre('latin')">Latin</span>
+            <input type="text" id="emGenreCustom" class="input" placeholder="or type custom…" style="width:120px;font-size:12px;">
+          </div>
+        </div>
+      </div>
+      <div class="form-row" style="grid-template-columns:180px 1fr;">
+        <div>
+          <label>Origin</label>
+          <select id="emGeo" class="geo-select input" style="width:100%;">
+            <option value="">— Unknown —</option>
+            <option value="SE">🇸🇪 Sweden</option>
+            <option value="NO">🇳🇴 Norway</option>
+            <option value="DK">🇩🇰 Denmark</option>
+            <option value="FI">🇫🇮 Finland</option>
+            <option value="US">🇺🇸 United States</option>
+            <option value="GB">🇬🇧 United Kingdom</option>
+            <option value="AU">🇦🇺 Australia</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="DE">🇩🇪 Germany</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="NL">🇳🇱 Netherlands</option>
+            <option value="IE">🇮🇪 Ireland</option>
+            <option value="NZ">🇳🇿 New Zealand</option>
+            <option value="ZA">🇿🇦 South Africa</option>
+            <option value="NG">🇳🇬 Nigeria</option>
+            <option value="BR">🇧🇷 Brazil</option>
+            <option value="ES">🇪🇸 Spain</option>
+            <option value="IT">🇮🇹 Italy</option>
+            <option value="CO">🇨🇴 Colombia</option>
+            <option value="PR">🇵🇷 Puerto Rico</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:18px;">
+          <label style="margin:0;display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:normal;color:#e6edf3;cursor:pointer;">
+            <input type="checkbox" id="emBillboard" style="accent-color:#1f6feb;"> Billboard Chart
+          </label>
+          <label style="margin:0;display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:normal;color:#e6edf3;cursor:pointer;">
+            <input type="checkbox" id="emVerified" style="accent-color:#1f6feb;"> Verified
+          </label>
+        </div>
+      </div>
+
+      <div class="form-row full">
+        <div>
+          <label>Preview URL</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="emPreviewUrl" class="input" style="flex:1;">
+            <button class="secondary small" onclick="testEmPreview()" title="Test preview">▶</button>
+            <audio id="emPreviewAudio" style="display:none;"></audio>
+          </div>
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>Album Art URL</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="emAlbumArt" class="input" style="flex:1;" oninput="updateEmArtThumb()">
+            <img id="emArtThumb" src="" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #30363d;display:none;">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row three" style="grid-template-columns:1fr 1fr 1fr 180px;">
+        <div><label>Chart Rank</label><input type="number" id="emRank" class="input"></div>
+        <div><label>Peak Position</label><input type="number" id="emPeak" class="input"></div>
+        <div><label>Weeks on Chart</label><input type="number" id="emWeeks" class="input"></div>
+        <div><label>Chart Date</label><input type="text" id="emChartDate" class="input" placeholder="YYYY-MM-DD"></div>
+      </div>
+
+      <div class="form-row full">
+        <div><label>Tags (comma separated)</label><input type="text" id="emTags" class="input"></div>
+      </div>
+
+      <div class="edit-modal-actions">
+        <button class="secondary" onclick="closeEditModal()">Cancel</button>
+        <button id="emSaveBtn" onclick="saveEditModal()">Save Changes</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -655,27 +1095,24 @@
       const imp = document.getElementById('importView');
       const analytics = document.getElementById('analyticsView');
       const usage = document.getElementById('usageAnalyticsView');
+      const yearAudit = document.getElementById('yearAuditView');
+      const health = document.getElementById('healthView');
+      const allViews = [admin, imp, analytics, usage, yearAudit, health];
+      allViews.forEach(v => { if (v) v.style.display = 'none'; });
       if (view === 'import') {
-        if (admin) admin.style.display = 'none';
-        if (analytics) analytics.style.display = 'none';
-        if (usage) usage.style.display = 'none';
         if (imp) imp.style.display = 'block';
       } else if (view === 'analytics') {
-        if (admin) admin.style.display = 'none';
-        if (imp) imp.style.display = 'none';
-        if (usage) usage.style.display = 'none';
         if (analytics) analytics.style.display = 'block';
         try { loadAnalytics(); } catch (_) {}
       } else if (view === 'usage') {
-        if (admin) admin.style.display = 'none';
-        if (imp) imp.style.display = 'none';
-        if (analytics) analytics.style.display = 'none';
         if (usage) usage.style.display = 'block';
         try { loadUsageAnalytics(); } catch (_) {}
+      } else if (view === 'yearAudit') {
+        if (yearAudit) yearAudit.style.display = 'block';
+      } else if (view === 'health') {
+        if (health) health.style.display = 'block';
+        try { loadEnrichmentStatus(); } catch (_) {}
       } else {
-        if (imp) imp.style.display = 'none';
-        if (analytics) analytics.style.display = 'none';
-        if (usage) usage.style.display = 'none';
         if (admin) admin.style.display = 'block';
         try { listSongs(); } catch (_) {}
       }
@@ -699,7 +1136,6 @@
       filterDiff: document.getElementById('filterDiff'),
       filterYearMin: document.getElementById('filterYearMin'),
       filterYearMax: document.getElementById('filterYearMax'),
-      applyFiltersBtn: document.getElementById('applyFiltersBtn'),
       resetFiltersBtn: document.getElementById('resetFiltersBtn'),
 
       // Pagination
@@ -710,19 +1146,24 @@
       pageRangeInfo: document.getElementById('pageRangeInfo'),
 
       // Bulk import elements
-      importMode: document.getElementById('importMode'),
       importYearMin: document.getElementById('importYearMin'),
       importYearMax: document.getElementById('importYearMax'),
-      importGenres: document.getElementById('importGenres'),
-      importSearchMarkets: document.getElementById('importSearchMarkets'),
-      importOriginCountries: document.getElementById('importOriginCountries'),
-      importLimit: document.getElementById('importLimit'),
+      importDiag: document.getElementById('importDiag'),
       previewImportBtn: document.getElementById('previewImportBtn'),
       commitImportBtn: document.getElementById('commitImportBtn'),
       importPreviewTbody: document.getElementById('importPreviewTbody'),
       importPreviewCount: document.getElementById('importPreviewCount'),
       importSelectAll: document.getElementById('importSelectAll'),
       cancelImportBtn: document.getElementById('cancelImportBtn'),
+      fetchPreviewsBtn: document.getElementById('fetchPreviewsBtn'),
+
+      // Database Health elements
+      healthBtn: document.getElementById('healthBtn'),
+      enrichRefreshBtn: document.getElementById('enrichRefreshBtn'),
+      enrichGenreBtn: document.getElementById('enrichGenreBtn'),
+      enrichGeoBtn: document.getElementById('enrichGeoBtn'),
+      enrichPreviewBtn: document.getElementById('enrichPreviewBtn'),
+      enrichAllBtn: document.getElementById('enrichAllBtn'),
 
       status: document.getElementById('status'),
       songsTbody: document.getElementById('songsTbody'),
@@ -797,8 +1238,9 @@
         await adminFetch('/api/admin/curated-songs?limit=1');
         if (els.authModal) els.authModal.style.display = 'none';
         if (els.adminContent) els.adminContent.style.display = 'block';
-        // init per-page select
+        // init per-page select + column groups
         if (els.perPageSelect) els.perPageSelect.value = String(pageState.perPage);
+        initColGroups();
         listSongs();
       } catch (e) {
         if (els.authModal) els.authModal.style.display = 'flex';
@@ -836,12 +1278,86 @@
     window.__importTimer = null;
     window.__importStart = 0;
 
+    // Chip-based import filter state
+    window.__importChipState = { mode: 'billboard', decades: [], genres: [], markets: ['US'], origins: [], limit: 100 };
+
+    function selectImportMode(mode) {
+      window.__importChipState.mode = mode;
+      const billboard = document.getElementById('modeCardBillboard');
+      const search = document.getElementById('modeCardSearch');
+      if (billboard) billboard.classList.toggle('active', mode === 'billboard');
+      if (search) search.classList.toggle('active', mode === 'search');
+      // Hide genre section in Chart mode (genres auto-detected from MusicBrainz)
+      const genresSection = document.getElementById('genresSection');
+      if (genresSection) genresSection.style.display = mode === 'billboard' ? 'none' : '';
+    }
+
+    function toggleDecade(decade) {
+      const state = window.__importChipState;
+      const idx = state.decades.indexOf(decade);
+      if (idx === -1) state.decades.push(decade);
+      else state.decades.splice(idx, 1);
+      state.decades.sort((a, b) => a - b);
+      document.querySelectorAll('#decadeChips .chip').forEach(chip => {
+        chip.classList.toggle('active', state.decades.includes(Number(chip.dataset.decade)));
+      });
+      // Sync custom year inputs
+      if (state.decades.length) {
+        if (els.importYearMin) els.importYearMin.value = state.decades[0];
+        if (els.importYearMax) els.importYearMax.value = state.decades[state.decades.length - 1] + 9;
+      } else {
+        if (els.importYearMin) els.importYearMin.value = '';
+        if (els.importYearMax) els.importYearMax.value = '';
+      }
+    }
+
+    function toggleGenre(genre) {
+      const state = window.__importChipState;
+      const idx = state.genres.indexOf(genre);
+      if (idx === -1) state.genres.push(genre);
+      else state.genres.splice(idx, 1);
+      document.querySelectorAll('#genreChips .chip').forEach(chip => {
+        chip.classList.toggle('active', state.genres.includes(chip.dataset.genre));
+      });
+    }
+
+    function toggleMarket(market) {
+      const state = window.__importChipState;
+      const idx = state.markets.indexOf(market);
+      if (idx === -1) {
+        state.markets.push(market);
+      } else if (state.markets.length > 1) {
+        state.markets.splice(idx, 1);
+      }
+      document.querySelectorAll('#marketChips .chip').forEach(chip => {
+        chip.classList.toggle('active', state.markets.includes(chip.dataset.market));
+      });
+    }
+
+    function toggleOrigin(origin) {
+      const state = window.__importChipState;
+      const idx = state.origins.indexOf(origin);
+      if (idx === -1) state.origins.push(origin);
+      else state.origins.splice(idx, 1);
+      document.querySelectorAll('#originChips .chip').forEach(chip => {
+        chip.classList.toggle('active', state.origins.includes(chip.dataset.origin));
+      });
+    }
+
+    function selectLimit(n) {
+      window.__importChipState.limit = n;
+      [10, 50, 100, 300].forEach(v => {
+        const chip = document.getElementById('limitChip' + v);
+        if (chip) chip.classList.toggle('active', v === n);
+      });
+    }
+
     function renderLoadingRow(message) {
       if (!els.importPreviewTbody) return;
       els.importPreviewTbody.innerHTML = '';
       const tr = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = 11;
+      td.colSpan = 13;
       td.className = 'muted';
       td.textContent = message || 'Fetching preview…';
       tr.appendChild(td);
@@ -849,26 +1365,51 @@
     }
 
     function setImportLoading(loading) {
+      const progressBar = document.getElementById('importProgressBar');
+      const progressText = document.getElementById('importProgressText');
       if (loading) {
         window.__importStart = Date.now();
         if (els.previewImportBtn) els.previewImportBtn.disabled = true;
         if (els.commitImportBtn) els.commitImportBtn.disabled = true;
         if (els.importSelectAll) els.importSelectAll.disabled = true;
         if (els.cancelImportBtn) els.cancelImportBtn.style.display = 'inline-block';
-        if (els.importPreviewCount) els.importPreviewCount.textContent = 'Fetching preview…';
+        if (els.importPreviewCount) els.importPreviewCount.textContent = '';
+        if (progressBar) progressBar.style.display = 'block';
+        if (progressText) progressText.textContent = 'Starting…';
+        // Elapsed timer
         if (window.__importTimer) clearInterval(window.__importTimer);
         window.__importTimer = setInterval(() => {
-          const elapsed = ((Date.now() - window.__importStart) / 1000).toFixed(1);
-          if (els.importPreviewCount) els.importPreviewCount.textContent = `Fetching preview… ${elapsed}s`;
-        }, 200);
+          const elapsed = ((Date.now() - window.__importStart) / 1000).toFixed(0);
+          if (progressText) {
+            const cur = progressText.dataset.stats || 'Searching…';
+            progressText.textContent = `${cur}  (${elapsed}s)`;
+          }
+        }, 1000);
+        // Progress poll
+        if (window.__progressPollId) clearInterval(window.__progressPollId);
+        window.__progressPollId = setInterval(async () => {
+          try {
+            const p = await adminFetch('/api/admin/import/progress');
+            if (!p || !p.active) return;
+            const parts = [`${p.evaluated || 0} evaluated`, `${p.accepted || 0} included`];
+            if (p.droppedOrigin) parts.push(`${p.droppedOrigin} dropped (origin)`);
+            if (p.droppedDupe) parts.push(`${p.droppedDupe} skipped (duplicate)`);
+            const statsStr = parts.join(' · ');
+            if (progressText) {
+              progressText.dataset.stats = statsStr;
+              const elapsed = ((Date.now() - window.__importStart) / 1000).toFixed(0);
+              progressText.textContent = `${statsStr}  (${elapsed}s)`;
+            }
+          } catch (_) {}
+        }, 700);
       } else {
         if (els.previewImportBtn) els.previewImportBtn.disabled = false;
         if (els.importSelectAll) els.importSelectAll.disabled = false;
         if (els.cancelImportBtn) els.cancelImportBtn.style.display = 'none';
-        if (window.__importTimer) {
-          clearInterval(window.__importTimer);
-          window.__importTimer = null;
-        }
+        if (progressBar) progressBar.style.display = 'none';
+        if (progressText) { progressText.textContent = ''; delete progressText.dataset.stats; }
+        if (window.__importTimer) { clearInterval(window.__importTimer); window.__importTimer = null; }
+        if (window.__progressPollId) { clearInterval(window.__progressPollId); window.__progressPollId = null; }
         updateImportCommitState();
       }
     }
@@ -889,12 +1430,13 @@
       const arr = window.__importPreviewItems;
       els.importPreviewTbody.innerHTML = '';
       if (!arr.length) {
-        els.importPreviewTbody.innerHTML = '<tr><td colspan="11" class="muted">No results</td></tr>';
+        els.importPreviewTbody.innerHTML = '<tr><td colspan="13" class="muted">No results</td></tr>';
         updateImportCommitState();
         return;
       }
       arr.forEach((it, idx) => {
         const tr = document.createElement('tr');
+        tr.dataset.index = String(idx);
 
         const tdSel = document.createElement('td');
         const cb = document.createElement('input');
@@ -915,7 +1457,11 @@
         tr.appendChild(tdArtist);
 
         const tdYear = document.createElement('td');
-        tdYear.textContent = it.year || '';
+        if (it.spotifyYear && it.year && it.spotifyYear !== it.year) {
+          tdYear.innerHTML = `<span title="MusicBrainz corrected from ${it.spotifyYear}">${it.year} <span style="color:#f59e0b;font-size:0.75em">↑MB</span></span>`;
+        } else {
+          tdYear.textContent = it.year || '';
+        }
         tr.appendChild(tdYear);
 
         const tdGenre = document.createElement('td');
@@ -923,7 +1469,19 @@
         tr.appendChild(tdGenre);
 
         const tdGeo = document.createElement('td');
-        tdGeo.textContent = it.geography || '';
+        const geoSelect = document.createElement('select');
+        geoSelect.className = 'geo-select';
+        ['', 'SE', 'NO', 'DK', 'FI', 'IS', 'US', 'GB', 'CA', 'AU', 'NZ', 'DE', 'FR', 'IT', 'ES', 'NL', 'BR', 'MX', 'KR', 'JP'].forEach(code => {
+          const opt = document.createElement('option');
+          opt.value = code;
+          opt.textContent = code || '?';
+          if ((it.geography || '') === code) opt.selected = true;
+          geoSelect.appendChild(opt);
+        });
+        geoSelect.addEventListener('change', () => {
+          window.__importPreviewItems[idx].geography = geoSelect.value || null;
+        });
+        tdGeo.appendChild(geoSelect);
         tr.appendChild(tdGeo);
 
         const tdMarket = document.createElement('td');
@@ -942,6 +1500,16 @@
         tdPop.textContent = typeof it.popularity === 'number' ? String(it.popularity) : '';
         tr.appendChild(tdPop);
 
+        const tdLvl = document.createElement('td');
+        tdLvl.textContent = typeof it.difficultyLevel === 'number' ? String(it.difficultyLevel) : '';
+        tr.appendChild(tdLvl);
+
+        const tdPrev = document.createElement('td');
+        tdPrev.className = 'prev-cell';
+        tdPrev.textContent = it.previewUrl ? '✓' : '–';
+        if (it.previewUrl) tdPrev.style.color = '#4caf50';
+        tr.appendChild(tdPrev);
+
         const tdUri = document.createElement('td');
         tdUri.className = 'mono';
         if (it.spotifyUri || it.uri) {
@@ -957,6 +1525,18 @@
         els.importPreviewTbody.appendChild(tr);
       });
 
+      const missingPreviews = arr.filter(it => !it.previewUrl).length;
+      if (els.fetchPreviewsBtn) {
+        if (missingPreviews > 0) {
+          els.fetchPreviewsBtn.style.display = 'inline-block';
+          els.fetchPreviewsBtn.textContent = `Fetch Previews (${missingPreviews} missing)`;
+          els.fetchPreviewsBtn.disabled = false;
+          els.fetchPreviewsBtn.style.color = '';
+        } else {
+          els.fetchPreviewsBtn.style.display = 'none';
+        }
+      }
+
       updateImportCommitState();
     }
 
@@ -970,13 +1550,14 @@
         setImportLoading(true);
         renderLoadingRow('Fetching preview…');
 
-        const mode = (els.importMode?.value || 'billboard').toLowerCase();
-        const yearMin = Number(els.importYearMin?.value);
-        const yearMax = Number(els.importYearMax?.value);
-        const genres = (els.importGenres?.value || '').split(',').map(s => s.trim()).filter(Boolean);
-        const searchMarkets = (els.importSearchMarkets?.value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-        const originCountries = (els.importOriginCountries?.value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-        const limit = Math.max(1, Math.min(500, Number(els.importLimit?.value) || 100));
+        const chipState = window.__importChipState;
+        const mode = chipState.mode || 'billboard';
+        const yearMin = Number(els.importYearMin?.value) || (chipState.decades.length ? chipState.decades[0] : undefined);
+        const yearMax = Number(els.importYearMax?.value) || (chipState.decades.length ? chipState.decades[chipState.decades.length - 1] + 9 : undefined);
+        const genres = chipState.genres.slice();
+        const searchMarkets = chipState.markets.slice();
+        const originCountries = chipState.origins.slice();
+        const limit = Math.max(1, Math.min(500, chipState.limit || 100));
 
         const body = {
           mode,
@@ -998,20 +1579,21 @@
           signal: controller.signal
         });
         renderImportPreview(resp.items || []);
-        
-        // Show duplicate count if any were filtered
-        const duplicatesMsg = resp.duplicatesFiltered > 0 
-          ? ` (${resp.duplicatesFiltered} duplicates filtered)` 
-          : '';
-        
+
+        // Build diagnostics bar
         const diagnostics = resp.diagnostics || {};
-        if (els.importPreviewCount) {
-          const diagMsg = diagnostics.modeCanonical
-            ? ` • mode: ${diagnostics.modeCanonical}`
-            : '';
-          els.importPreviewCount.textContent = `${resp.total || (resp.items?.length || 0)} items${duplicatesMsg}${diagMsg}`;
+        const total = resp.total || (resp.items?.length || 0);
+        const diagParts = [];
+        if (total) diagParts.push({ value: total, label: 'songs found' });
+        if (resp.duplicatesFiltered) diagParts.push({ value: resp.duplicatesFiltered, label: 'duplicates filtered' });
+        if (diagnostics.mbYearAdjusted > 0) diagParts.push({ value: `${diagnostics.mbYearAdjusted}/${diagnostics.mbYearChecks || total}`, label: 'years corrected (MB)' });
+        if (diagnostics.modeCanonical) diagParts.push({ value: diagnostics.modeCanonical, label: 'mode' });
+        if (diagnostics.queriesRun > 0) diagParts.push({ value: diagnostics.queriesRun, label: 'queries run' });
+        if (diagnostics.tracksEvaluated > 0) diagParts.push({ value: diagnostics.tracksEvaluated, label: 'tracks evaluated' });
+        if (els.importDiag) {
+          els.importDiag.innerHTML = diagParts.map(p => `<span class="diag-item"><strong>${p.value}</strong> ${p.label}</span>`).join('');
         }
-        
+
         const statusMsg = resp.duplicatesFiltered > 0
           ? `Preview ready - ${resp.duplicatesFiltered} duplicate${resp.duplicatesFiltered > 1 ? 's' : ''} filtered out`
           : 'Preview ready';
@@ -1058,6 +1640,67 @@
       }
     }
 
+    async function fetchMissingPreviews() {
+      const items = window.__importPreviewItems || [];
+      const missing = items.filter(it => !it.previewUrl && (it.spotifyUri || it.uri));
+      if (!missing.length) {
+        showStatus('All tracks already have preview URLs', 'info');
+        return;
+      }
+      const uris = missing.map(it => it.spotifyUri || it.uri);
+      const estSecs = Math.max(1, Math.round(uris.length * 0.5));
+      if (els.fetchPreviewsBtn) {
+        els.fetchPreviewsBtn.disabled = true;
+        els.fetchPreviewsBtn.textContent = `Fetching… (~${estSecs}s)`;
+        els.fetchPreviewsBtn.style.color = '';
+      }
+      const pollId = setInterval(async () => {
+        try {
+          const p = await adminFetch('/api/admin/import/progress');
+          if (!p || !p.active || p.task !== 'previews') return;
+          if (els.fetchPreviewsBtn) {
+            els.fetchPreviewsBtn.textContent = `Fetching previews… (${p.done}/${p.total})`;
+          }
+        } catch (_) {}
+      }, 700);
+      try {
+        const resp = await adminFetch('/api/admin/import/fetch-previews', {
+          method: 'POST',
+          body: JSON.stringify({ uris })
+        });
+        clearInterval(pollId);
+        let updated = 0;
+        if (resp.results) {
+          items.forEach((it, idx) => {
+            const uri = it.spotifyUri || it.uri || '';
+            if (!uri || it.previewUrl) return;
+            const url = resp.results[uri];
+            if (url) {
+              it.previewUrl = url;
+              updated++;
+              const row = els.importPreviewTbody.querySelector(`tr[data-index="${idx}"]`);
+              if (row) {
+                const prevCell = row.children[11];
+                if (prevCell) { prevCell.textContent = '✓'; prevCell.style.color = '#4caf50'; }
+              }
+            }
+          });
+        }
+        if (els.fetchPreviewsBtn) {
+          els.fetchPreviewsBtn.textContent = `✓ ${updated} previews found`;
+          els.fetchPreviewsBtn.style.color = '#4caf50';
+        }
+      } catch (e) {
+        clearInterval(pollId);
+        showStatus(e.message || 'Failed to fetch previews', 'error');
+        if (els.fetchPreviewsBtn) {
+          els.fetchPreviewsBtn.disabled = false;
+          els.fetchPreviewsBtn.textContent = `Fetch Previews (${missing.length} missing)`;
+          els.fetchPreviewsBtn.style.color = '';
+        }
+      }
+    }
+
     // ===== Spotify URI Helper Functions =====
     function createSpotifyLink(spotifyUri) {
       if (!spotifyUri) return null;
@@ -1085,9 +1728,11 @@
     function buildFilterParams() {
       const params = new URLSearchParams();
       if (els.filterQ.value) params.set('q', els.filterQ.value);
-      if (els.filterGenre.value) params.set('genre', els.filterGenre.value);
-      if (els.filterGeo.value) params.set('geography', els.filterGeo.value);
-      if (els.filterDiff.value) params.set('difficulty', els.filterDiff.value);
+      // Multi-select genres — send first selected (API supports one genre at a time; client filters client-side for multi)
+      if (filterState.genres.size === 1) params.set('genre', [...filterState.genres][0]);
+      // Multi-select origins — send first; rest filtered client-side
+      if (filterState.origins.size === 1) params.set('geography', [...filterState.origins][0]);
+      if (filterState.diff) params.set('difficulty', filterState.diff);
       if (els.filterYearMin.value) params.set('yearMin', els.filterYearMin.value);
       if (els.filterYearMax.value) params.set('yearMax', els.filterYearMax.value);
       return params;
@@ -1109,9 +1754,23 @@
           adminFetch('/api/admin/curated-songs?limit=1&offset=0')
         ]);
 
-        const filteredItems = filteredResp.items || [];
+        let filteredItems = filteredResp.items || [];
         const filteredTotal = Number(filteredResp.total || 0);
         const dbTotal = Number(totalResp.total || 0);
+
+        // Client-side extra filters (multi-select genres/origins, missing-data chips)
+        if (filterState.genres.size > 1) {
+          filteredItems = filteredItems.filter(s => {
+            const sg = new Set([...(s.genres || []), s.genre].filter(Boolean).map(g => String(g).toLowerCase()));
+            return [...filterState.genres].some(g => sg.has(g));
+          });
+        }
+        if (filterState.origins.size > 1) {
+          filteredItems = filteredItems.filter(s => filterState.origins.has(String(s.geography || '').toUpperCase()));
+        }
+        if (filterState.missingGenre) filteredItems = filteredItems.filter(s => !s.genre);
+        if (filterState.missingOrigin) filteredItems = filteredItems.filter(s => !s.geography);
+        if (filterState.missingPreview) filteredItems = filteredItems.filter(s => !s.previewUrl);
 
         pageState.filteredTotal = filteredTotal;
         pageState.dbTotal = dbTotal;
@@ -1123,6 +1782,97 @@
         renderSongs([]);
         showStatus(e.message || 'List failed', 'error');
       }
+    }
+
+    // ===== Column group toggle =====
+    function toggleColPanel() {
+      const panel = document.getElementById('colTogglePanel');
+      if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+    // Close column panel when clicking outside
+    document.addEventListener('click', e => {
+      const wrap = document.querySelector('.col-toggle-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        const panel = document.getElementById('colTogglePanel');
+        if (panel) panel.style.display = 'none';
+      }
+    });
+
+    function applyColGroups() {
+      const showChart = document.getElementById('colChartToggle')?.checked ?? false;
+      const showMeta = document.getElementById('colMetaToggle')?.checked ?? false;
+      // Toggle header cells
+      document.querySelectorAll('th[data-col-group]').forEach(th => {
+        const g = th.dataset.colGroup;
+        th.classList.toggle('col-group-hidden', g === 'chart' ? !showChart : !showMeta);
+      });
+      // Toggle body cells
+      document.querySelectorAll('td[data-col-group]').forEach(td => {
+        const g = td.dataset.colGroup;
+        td.classList.toggle('col-group-hidden', g === 'chart' ? !showChart : !showMeta);
+      });
+      localStorage.setItem('admin_col_chart', showChart ? '1' : '0');
+      localStorage.setItem('admin_col_meta', showMeta ? '1' : '0');
+    }
+
+    function initColGroups() {
+      const chartEl = document.getElementById('colChartToggle');
+      const metaEl = document.getElementById('colMetaToggle');
+      if (chartEl) chartEl.checked = localStorage.getItem('admin_col_chart') === '1';
+      if (metaEl) metaEl.checked = localStorage.getItem('admin_col_meta') === '1';
+      applyColGroups();
+    }
+
+    // ===== Filter chip state =====
+    const filterState = { genres: new Set(), origins: new Set(), diff: '', missingGenre: false, missingOrigin: false, missingPreview: false };
+
+    function toggleFilterGenre(g) {
+      if (filterState.genres.has(g)) filterState.genres.delete(g);
+      else filterState.genres.add(g);
+      document.querySelectorAll('#filterGenreChips .chip').forEach(c => c.classList.toggle('active', filterState.genres.has(c.dataset.genre)));
+      els.filterGenre.value = [...filterState.genres].join(',');
+      pageState.page = 1; listSongs();
+    }
+
+    function toggleFilterOrigin(o) {
+      if (filterState.origins.has(o)) filterState.origins.delete(o);
+      else filterState.origins.add(o);
+      document.querySelectorAll('#filterOriginChips .chip').forEach(c => c.classList.toggle('active', filterState.origins.has(c.dataset.origin)));
+      els.filterGeo.value = [...filterState.origins].join(',');
+      pageState.page = 1; listSongs();
+    }
+
+    function setFilterDiff(v) {
+      filterState.diff = v;
+      document.querySelectorAll('#filterDiffChips .chip').forEach(c => c.classList.toggle('active', c.dataset.diff === v));
+      els.filterDiff.value = v;
+      pageState.page = 1; listSongs();
+    }
+
+    function setDecadeFilter(decade) {
+      const decadeEl = document.querySelector(`[data-decade="${decade}"]`);
+      const isActive = decadeEl && decadeEl.classList.contains('active');
+      // Single-select decade chip
+      document.querySelectorAll('[data-decade]').forEach(c => c.classList.remove('active'));
+      if (!isActive) {
+        if (decadeEl) decadeEl.classList.add('active');
+        if (els.filterYearMin) els.filterYearMin.value = String(decade);
+        if (els.filterYearMax) els.filterYearMax.value = String(decade + 9);
+      } else {
+        if (els.filterYearMin) els.filterYearMin.value = '';
+        if (els.filterYearMax) els.filterYearMax.value = '';
+      }
+      pageState.page = 1; listSongs();
+    }
+
+    function toggleMissingFilter(field) {
+      if (field === 'genre') filterState.missingGenre = !filterState.missingGenre;
+      else if (field === 'origin') filterState.missingOrigin = !filterState.missingOrigin;
+      else if (field === 'preview') filterState.missingPreview = !filterState.missingPreview;
+      document.getElementById('missingGenreChip')?.classList.toggle('active', filterState.missingGenre);
+      document.getElementById('missingOriginChip')?.classList.toggle('active', filterState.missingOrigin);
+      document.getElementById('missingPreviewChip')?.classList.toggle('active', filterState.missingPreview);
+      pageState.page = 1; listSongs();
     }
 
     function updateResultCount() {
@@ -1143,15 +1893,18 @@
       localStorage.setItem('admin_page', String(pageState.page));
     }
 
+    function cg(group) { return group; } // helper to set colGroup
+
     function renderSongs(items) {
-        els.songsTbody.innerHTML = '';
-        if (!items.length) {
-          els.songsTbody.innerHTML = '<tr><td colspan="19" class="muted">No results</td></tr>';
-          return;
-        }
+      els.songsTbody.innerHTML = '';
+      if (!items.length) {
+        els.songsTbody.innerHTML = '<tr><td colspan="22" class="muted">No results</td></tr>';
+        return;
+      }
       for (const s of items) {
         const tr = document.createElement('tr');
 
+        // Cover
         const tdCover = document.createElement('td');
         const img = document.createElement('img');
         img.className = 'img';
@@ -1160,17 +1913,12 @@
         tdCover.appendChild(img);
         tr.appendChild(tdCover);
 
-        // Spotify URI link column
+        // Spotify URI link
         const tdSpotify = document.createElement('td');
-        if (s.spotifyUri) {
-          const spotifyLink = createSpotifyLink(s.spotifyUri);
-          if (spotifyLink) {
-            tdSpotify.appendChild(spotifyLink);
-          }
-        }
+        if (s.spotifyUri) { const sl = createSpotifyLink(s.spotifyUri); if (sl) tdSpotify.appendChild(sl); }
         tr.appendChild(tdSpotify);
 
-        // Preview audio player column
+        // Preview player
         const tdPreview = document.createElement('td');
         if (s.previewUrl) {
           const playBtn = document.createElement('button');
@@ -1178,157 +1926,140 @@
           playBtn.textContent = '▶';
           playBtn.title = 'Play 30s preview';
           playBtn.style.minWidth = '40px';
-          
-          let audio = null;
-          let isPlaying = false;
-          
+          let audio = null, isPlaying = false;
           playBtn.onclick = () => {
             if (isPlaying) {
-              // Stop playback
-              if (audio) {
-                audio.pause();
-                audio.currentTime = 0;
-              }
-              playBtn.textContent = '▶';
-              playBtn.className = 'secondary small';
-              isPlaying = false;
+              if (audio) { audio.pause(); audio.currentTime = 0; }
+              playBtn.textContent = '▶'; playBtn.className = 'secondary small'; isPlaying = false;
             } else {
-              // Start playback
               if (!audio) {
                 audio = new Audio(s.previewUrl);
-                audio.addEventListener('ended', () => {
-                  playBtn.textContent = '▶';
-                  playBtn.className = 'secondary small';
-                  isPlaying = false;
-                });
-                audio.addEventListener('error', () => {
-                  playBtn.textContent = '✗';
-                  playBtn.title = 'Preview URL failed to load';
-                  playBtn.disabled = true;
-                  isPlaying = false;
-                });
+                audio.addEventListener('ended', () => { playBtn.textContent = '▶'; playBtn.className = 'secondary small'; isPlaying = false; });
+                audio.addEventListener('error', () => { playBtn.textContent = '✗'; playBtn.title = 'Preview URL failed'; playBtn.disabled = true; isPlaying = false; });
               }
-              audio.play();
-              playBtn.textContent = '⏸';
-              playBtn.className = 'secondary small success';
-              isPlaying = true;
+              audio.play(); playBtn.textContent = '⏸'; playBtn.className = 'secondary small success'; isPlaying = true;
             }
           };
-          
           tdPreview.appendChild(playBtn);
         } else {
-          tdPreview.textContent = '-';
-          tdPreview.className = 'muted';
+          tdPreview.textContent = '-'; tdPreview.className = 'muted';
         }
         tr.appendChild(tdPreview);
 
+        // Title / Artist + missing-data dot
         const tdTitle = document.createElement('td');
-        const strong = document.createElement('div');
-        strong.textContent = s.title || '';
-        const small = document.createElement('div');
-        small.className = 'muted';
-        small.textContent = s.artist || '';
-        tdTitle.appendChild(strong);
-        tdTitle.appendChild(small);
+        const titleRow = document.createElement('div');
+        titleRow.style.display = 'flex'; titleRow.style.alignItems = 'center'; titleRow.style.gap = '4px';
+        const titleText = document.createElement('span');
+        titleText.textContent = s.title || '';
+        titleRow.appendChild(titleText);
+        const missingFields = [];
+        if (!s.genre) missingFields.push('genre');
+        if (!s.geography) missingFields.push('origin');
+        if (!s.previewUrl) missingFields.push('preview');
+        if (missingFields.length) {
+          const dot = document.createElement('span');
+          dot.className = 'missing-dot';
+          dot.title = 'Missing: ' + missingFields.join(', ');
+          titleRow.appendChild(dot);
+        }
+        const artistDiv = document.createElement('div');
+        artistDiv.className = 'muted'; artistDiv.textContent = s.artist || '';
+        tdTitle.appendChild(titleRow); tdTitle.appendChild(artistDiv);
         tr.appendChild(tdTitle);
 
+        // Year
         const tdYear = document.createElement('td');
-        tdYear.className = 'num';
-        tdYear.textContent = s.year || '';
+        tdYear.className = 'num'; tdYear.textContent = s.year || '';
         tr.appendChild(tdYear);
 
+        // Genre
         const tdGenre = document.createElement('td');
-        if (Array.isArray(s.genres) && s.genres.length) {
-          tdGenre.innerHTML = s.genres
-            .map(g => '<span class="pill">' + String(g) + '</span>')
-            .join(' ');
-        } else {
-          tdGenre.innerHTML = s.genre ? '<span class="pill">' + s.genre + '</span>' : '';
-        }
+        const genres = Array.isArray(s.genres) && s.genres.length ? s.genres : (s.genre ? [s.genre] : []);
+        tdGenre.innerHTML = genres.map(g => '<span class="pill">' + String(g) + '</span>').join(' ');
         tr.appendChild(tdGenre);
 
+        // Origin
         const tdGeo = document.createElement('td');
-        // Show the actual origin (geography field), not markets
-        const originCode = s.geography || '';
-        tdGeo.innerHTML = originCode ? '<span class="pill">' + originCode + '</span>' : '';
+        tdGeo.innerHTML = s.geography ? '<span class="pill">' + s.geography + '</span>' : '';
         tr.appendChild(tdGeo);
 
-        const tdMarkets = document.createElement('td');
-        tdMarkets.textContent = (Array.isArray(s.markets) && s.markets.length)
-          ? s.markets.join(', ')
-          : (s.geography || '');
-        tr.appendChild(tdMarkets);
+        // International
+        const tdIntl = document.createElement('td');
+        tdIntl.className = 'num';
+        tdIntl.innerHTML = s.isInternational ? '<span class="pill success">✓</span>' : '';
+        tr.appendChild(tdIntl);
 
-        const tdBill = document.createElement('td');
-        tdBill.className = 'num';
-        tdBill.innerHTML = s.isBillboardChart ? '<span class="pill">✓</span>' : '';
-        tr.appendChild(tdBill);
-
-        const tdMultiCountry = document.createElement('td');
-        tdMultiCountry.className = 'num';
-        tdMultiCountry.innerHTML = s.hasMultiCountryCharts ? '<span class="pill">✓</span>' : '';
-        tr.appendChild(tdMultiCountry);
-
-        const tdInternational = document.createElement('td');
-        tdInternational.className = 'num';
-        tdInternational.innerHTML = s.isInternational ? '<span class="pill success">✓</span>' : '';
-        tr.appendChild(tdInternational);
-
-        const tdRank = document.createElement('td');
-        tdRank.className = 'num';
-        tdRank.textContent = (s.chartInfo && (s.chartInfo.rank ?? '') !== '' ? s.chartInfo.rank : '');
-        tr.appendChild(tdRank);
-
-        const tdPeak = document.createElement('td');
-        tdPeak.className = 'num';
-        tdPeak.textContent = (s.chartInfo && (s.chartInfo.peakPos ?? '') !== '' ? s.chartInfo.peakPos : '');
-        tr.appendChild(tdPeak);
-
-        const tdWeeks = document.createElement('td');
-        tdWeeks.className = 'num';
-        tdWeeks.textContent = (s.chartInfo && (s.chartInfo.weeksOnChart ?? '') !== '' ? s.chartInfo.weeksOnChart : '');
-        tr.appendChild(tdWeeks);
-
-        const tdChartDate = document.createElement('td');
-        tdChartDate.className = 'nowrap';
-        tdChartDate.textContent = (s.chartInfo && s.chartInfo.chartDate) ? s.chartInfo.chartDate : '';
-        tr.appendChild(tdChartDate);
-
+        // Difficulty
         const tdDiff = document.createElement('td');
         tdDiff.className = 'num';
         tdDiff.innerHTML = '<span class="pill">' + (s.difficultyLevel || 2) + '</span>';
         tr.appendChild(tdDiff);
 
+        // Popularity
         const tdPop = document.createElement('td');
         tdPop.className = 'num';
-        tdPop.textContent = (typeof s.popularity === 'number') ? s.popularity : '';
+        tdPop.textContent = typeof s.popularity === 'number' ? s.popularity : '';
         tr.appendChild(tdPop);
 
+        // --- Chart group ---
+        const tdBill = document.createElement('td');
+        tdBill.className = 'num'; tdBill.dataset.colGroup = 'chart';
+        tdBill.innerHTML = s.isBillboardChart ? '<span class="pill">✓</span>' : '';
+        tr.appendChild(tdBill);
+
+        const tdMulti = document.createElement('td');
+        tdMulti.className = 'num'; tdMulti.dataset.colGroup = 'chart';
+        tdMulti.innerHTML = s.hasMultiCountryCharts ? '<span class="pill">✓</span>' : '';
+        tr.appendChild(tdMulti);
+
+        const tdRank = document.createElement('td');
+        tdRank.className = 'num'; tdRank.dataset.colGroup = 'chart';
+        tdRank.textContent = s.chartInfo?.rank ?? '';
+        tr.appendChild(tdRank);
+
+        const tdPeak = document.createElement('td');
+        tdPeak.className = 'num'; tdPeak.dataset.colGroup = 'chart';
+        tdPeak.textContent = s.chartInfo?.peakPos ?? '';
+        tr.appendChild(tdPeak);
+
+        const tdWeeks = document.createElement('td');
+        tdWeeks.className = 'num'; tdWeeks.dataset.colGroup = 'chart';
+        tdWeeks.textContent = s.chartInfo?.weeksOnChart ?? '';
+        tr.appendChild(tdWeeks);
+
+        const tdChartDate = document.createElement('td');
+        tdChartDate.className = 'nowrap'; tdChartDate.dataset.colGroup = 'chart';
+        tdChartDate.textContent = s.chartInfo?.chartDate || '';
+        tr.appendChild(tdChartDate);
+
+        // --- Meta group ---
+        const tdMarkets = document.createElement('td');
+        tdMarkets.dataset.colGroup = 'meta';
+        tdMarkets.textContent = Array.isArray(s.markets) && s.markets.length ? s.markets.join(', ') : '';
+        tr.appendChild(tdMarkets);
+
         const tdTags = document.createElement('td');
+        tdTags.dataset.colGroup = 'meta';
         tdTags.textContent = Array.isArray(s.tags) ? s.tags.join(', ') : '';
         tr.appendChild(tdTags);
 
         const tdVer = document.createElement('td');
-        tdVer.innerHTML = s.verified ? '<span class="pill">Yes</span>' : '<span class="pill">No</span>';
+        tdVer.dataset.colGroup = 'meta';
+        tdVer.innerHTML = s.verified ? '<span class="pill">Yes</span>' : '<span class="pill muted">No</span>';
         tr.appendChild(tdVer);
 
         const tdAdded = document.createElement('td');
-        tdAdded.className = 'nowrap';
+        tdAdded.className = 'nowrap'; tdAdded.dataset.colGroup = 'meta';
         tdAdded.textContent = s.addedDate ? String(s.addedDate).slice(0, 10) : '';
         tr.appendChild(tdAdded);
 
         const tdUri = document.createElement('td');
-        tdUri.className = 'mono';
-        if (s.spotifyUri) {
-          const spotifyLink = createSpotifyLink(s.spotifyUri);
-          if (spotifyLink) {
-            tdUri.appendChild(spotifyLink);
-          }
-        } else {
-          tdUri.textContent = '';
-        }
+        tdUri.className = 'mono'; tdUri.dataset.colGroup = 'meta';
+        if (s.spotifyUri) { const sl = createSpotifyLink(s.spotifyUri); if (sl) tdUri.appendChild(sl); }
         tr.appendChild(tdUri);
 
+        // Actions
         const tdActions = document.createElement('td');
         tdActions.className = 'right nowrap actions';
 
@@ -1337,32 +2068,20 @@
         enrichBtn.textContent = 'Enrich';
         enrichBtn.title = 'Fetch missing genre, geography, or preview URL';
         enrichBtn.onclick = async () => {
-          if (!confirm(`Enrich "${s.title}" by ${s.artist}?\n\nThis will fetch missing genre, geography, and preview URL.`)) return;
           try {
-            enrichBtn.disabled = true;
-            enrichBtn.textContent = 'Enriching...';
+            enrichBtn.disabled = true; enrichBtn.textContent = 'Enriching…';
             const result = await adminFetch('/api/admin/curated-songs/enrich/' + encodeURIComponent(s.id), { method: 'POST' });
-            
-            // Show what changed
             const changes = [];
             if (result.changes?.genre) changes.push('genre');
             if (result.changes?.geography) changes.push('geography');
             if (result.changes?.previewUrl) changes.push('preview URL');
             if (result.changes?.isInternational) changes.push('international flag');
-            
-            if (changes.length > 0) {
-              showStatus(`Enriched: ${changes.join(', ')}`, 'success');
-            } else {
-              showStatus('No changes needed - song already has all data', 'success');
-            }
-            
-            // Refresh to show updated data
+            showStatus(changes.length ? `Enriched: ${changes.join(', ')}` : 'No changes needed', 'success');
             listSongs();
           } catch (e) {
             showStatus(e.message || 'Enrichment failed', 'error');
           } finally {
-            enrichBtn.disabled = false;
-            enrichBtn.textContent = 'Enrich';
+            enrichBtn.disabled = false; enrichBtn.textContent = 'Enrich';
           }
         };
         tdActions.appendChild(enrichBtn);
@@ -1380,81 +2099,239 @@
           if (!confirm('Delete this song?')) return;
           try {
             await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(s.id), { method: 'DELETE' });
-            showStatus('Deleted', 'success');
-            // refresh respecting current page
-            listSongs();
-          } catch (e) {
-            showStatus(e.message || 'Delete failed', 'error');
-          }
+            showStatus('Deleted', 'success'); listSongs();
+          } catch (e) { showStatus(e.message || 'Delete failed', 'error'); }
         };
         tdActions.appendChild(delBtn);
 
         tr.appendChild(tdActions);
-
         els.songsTbody.appendChild(tr);
+      }
+
+      // Apply current column visibility to newly rendered rows
+      applyColGroups();
+    }
+
+    let _emSongId = null;
+    let _emGenres = new Set();
+
+    function openEditDialog(song) {
+      _emSongId = song.id;
+      _emGenres = new Set();
+
+      document.getElementById('emTitle').value = song.title || '';
+      document.getElementById('emArtist').value = song.artist || '';
+      document.getElementById('emYear').value = song.year ?? '';
+      document.getElementById('emPreviewUrl').value = song.previewUrl || '';
+      document.getElementById('emAlbumArt').value = song.albumArt || '';
+      document.getElementById('emBillboard').checked = !!song.isBillboardChart;
+      document.getElementById('emVerified').checked = !!song.verified;
+      document.getElementById('emRank').value = song.chartInfo?.rank ?? '';
+      document.getElementById('emPeak').value = song.chartInfo?.peakPos ?? '';
+      document.getElementById('emWeeks').value = song.chartInfo?.weeksOnChart ?? '';
+      document.getElementById('emChartDate').value = song.chartInfo?.chartDate || '';
+      document.getElementById('emTags').value = Array.isArray(song.tags) ? song.tags.join(', ') : '';
+
+      // Genre: chip or custom
+      const knownGenres = ['pop','rock','hip-hop','electronic','indie','country','r&b','latin'];
+      const rawGenre = (song.genre || '').toLowerCase();
+      document.querySelectorAll('#emGenreChips .chip').forEach(c => c.classList.remove('active'));
+      document.getElementById('emGenreCustom').value = '';
+      if (knownGenres.includes(rawGenre)) {
+        _emGenres.add(rawGenre);
+        const chip = document.querySelector(`#emGenreChips [data-genre="${rawGenre}"]`);
+        if (chip) chip.classList.add('active');
+      } else if (rawGenre) {
+        document.getElementById('emGenreCustom').value = rawGenre;
+      }
+
+      // Difficulty
+      setEmDiff(song.difficultyLevel ?? 2);
+
+      // Origin
+      document.getElementById('emGeo').value = song.geography || '';
+
+      // Album art thumb
+      updateEmArtThumb();
+
+      // Stop any playing preview
+      const audio = document.getElementById('emPreviewAudio');
+      audio.pause(); audio.src = '';
+
+      document.getElementById('editModalOverlay').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModalOverlay').style.display = 'none';
+      const audio = document.getElementById('emPreviewAudio');
+      audio.pause(); audio.src = '';
+    }
+
+    function setEmDiff(n) {
+      document.querySelectorAll('#emDiffBtns .diff-btn').forEach(b => {
+        b.classList.toggle('active', Number(b.dataset.diff) === n);
+      });
+    }
+
+    function getEmDiff() {
+      const active = document.querySelector('#emDiffBtns .diff-btn.active');
+      return active ? Number(active.dataset.diff) : 2;
+    }
+
+    function toggleEmGenre(g) {
+      if (_emGenres.has(g)) {
+        _emGenres.delete(g);
+      } else {
+        _emGenres.clear(); // single-select for edit
+        _emGenres.add(g);
+      }
+      document.querySelectorAll('#emGenreChips .chip').forEach(c => {
+        c.classList.toggle('active', _emGenres.has(c.dataset.genre));
+      });
+      if (_emGenres.size > 0) document.getElementById('emGenreCustom').value = '';
+    }
+
+    function updateEmArtThumb() {
+      const url = document.getElementById('emAlbumArt').value.trim();
+      const thumb = document.getElementById('emArtThumb');
+      if (url) { thumb.src = url; thumb.style.display = 'block'; }
+      else { thumb.style.display = 'none'; thumb.src = ''; }
+    }
+
+    function testEmPreview() {
+      const url = document.getElementById('emPreviewUrl').value.trim();
+      const audio = document.getElementById('emPreviewAudio');
+      if (!url) return;
+      if (!audio.paused && audio.src === url) { audio.pause(); return; }
+      audio.src = url;
+      audio.play().catch(() => {});
+    }
+
+    async function saveEditModal() {
+      if (!_emSongId) return;
+      const btn = document.getElementById('emSaveBtn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      const toNum = (id) => { const n = Number(document.getElementById(id).value); return Number.isFinite(n) && document.getElementById(id).value !== '' ? n : null; };
+
+      const genreVal = _emGenres.size > 0
+        ? [..._emGenres][0]
+        : (document.getElementById('emGenreCustom').value.trim().toLowerCase() || null);
+
+      const patch = {
+        title: document.getElementById('emTitle').value.trim(),
+        artist: document.getElementById('emArtist').value.trim(),
+        year: toNum('emYear'),
+        genre: genreVal,
+        geography: document.getElementById('emGeo').value || null,
+        difficultyLevel: getEmDiff(),
+        albumArt: document.getElementById('emAlbumArt').value.trim() || null,
+        previewUrl: document.getElementById('emPreviewUrl').value.trim() || null,
+        isBillboardChart: document.getElementById('emBillboard').checked,
+        verified: document.getElementById('emVerified').checked,
+        chartInfo: {
+          rank: toNum('emRank'),
+          peakPos: toNum('emPeak'),
+          weeksOnChart: toNum('emWeeks'),
+          chartDate: document.getElementById('emChartDate').value.trim() || null
+        },
+        tags: document.getElementById('emTags').value.split(',').map(s => s.trim()).filter(Boolean)
+      };
+
+      try {
+        await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(_emSongId), {
+          method: 'PUT',
+          body: JSON.stringify(patch)
+        });
+        showStatus('Updated', 'success');
+        closeEditModal();
+        listSongs();
+      } catch (e) {
+        showStatus(e.message || 'Update failed', 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Changes';
       }
     }
 
-    function openEditDialog(song) {
-      const title = prompt('Title', song.title || '') ?? song.title;
-      const artist = prompt('Artist', song.artist || '') ?? song.artist;
-      const yearIn = prompt('Year', (song.year ?? '') + '');
-      const year = Number(yearIn);
-      const genre = prompt('Genre', song.genre || '') ?? song.genre;
-      const geography = prompt('Geography (Market)', song.geography || '') ?? song.geography;
-      const diffIn = prompt('Difficulty (1-5)', (song.difficultyLevel ?? 2) + '');
-      const difficultyLevel = Number(diffIn);
-      const albumArt = prompt('Album Art URL', song.albumArt || '') ?? song.albumArt;
-      const previewUrl = prompt('Preview URL', song.previewUrl || '') ?? song.previewUrl;
+    // ===== Database Health =====
+    let enrichLimit = 0; // 0 = All
 
-      const billIn = prompt('Billboard chart? (true/false)', song.isBillboardChart ? 'true' : 'false') || '';
-      const isBillboardChart = /^y|t|1|true$/i.test(billIn.trim());
-      const rankIn = prompt('Chart Rank (number)', (song.chartInfo?.rank ?? '') + '');
-      const peakIn = prompt('Peak Position (number)', (song.chartInfo?.peakPos ?? '') + '');
-      const weeksIn = prompt('Weeks on Chart (number)', (song.chartInfo?.weeksOnChart ?? '') + '');
-      const chartDate = prompt('Chart Date (YYYY-MM-DD)', song.chartInfo?.chartDate || '') ?? (song.chartInfo?.chartDate || '');
+    function setEnrichLimit(n) {
+      enrichLimit = n;
+      ['10', '50', '100', 'All'].forEach(v => {
+        const el = document.getElementById('enrichLimit' + v);
+        if (el) el.classList.toggle('active', (v === 'All' ? 0 : Number(v)) === n);
+      });
+    }
 
-      const tagsIn = prompt('Tags (comma separated)', Array.isArray(song.tags) ? song.tags.join(',') : '') || '';
-      const verIn = prompt('Verified? (true/false)', song.verified ? 'true' : 'false') || '';
-      const verified = /^y|t|1|true$/i.test(verIn.trim());
-
-      const toNum = (v) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? n : null;
-      };
-
-      const patch = {
-        title,
-        artist,
-        year: Number.isFinite(year) ? year : null,
-        genre,
-        geography,
-        difficultyLevel: Number.isFinite(difficultyLevel) ? difficultyLevel : 2,
-        albumArt,
-        previewUrl,
-        isBillboardChart,
-        chartInfo: {
-          rank: toNum(rankIn),
-          peakPos: toNum(peakIn),
-          weeksOnChart: toNum(weeksIn),
-          chartDate: chartDate || null
-        },
-        tags: tagsIn.split(',').map(s => s.trim()).filter(Boolean),
-        verified
-      };
-
-      (async () => {
-        try {
-          await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(song.id), {
-            method: 'PUT',
-            body: JSON.stringify(patch)
-          });
-          showStatus('Updated', 'success');
-          listSongs();
-        } catch (e) {
-          showStatus(e.message || 'Update failed', 'error');
+    async function loadEnrichmentStatus() {
+      try {
+        const data = await adminFetch('/api/admin/enrichment-status');
+        if (document.getElementById('enrichTotal')) document.getElementById('enrichTotal').textContent = data.total.toLocaleString();
+        if (document.getElementById('enrichMissingGenre')) document.getElementById('enrichMissingGenre').textContent = data.missingGenre.toLocaleString();
+        if (document.getElementById('enrichMissingGeo')) document.getElementById('enrichMissingGeo').textContent = data.missingGeo.toLocaleString();
+        if (document.getElementById('enrichMissingPreview')) {
+          const estSecs = Math.max(1, Math.round(data.missingPreview * 0.5));
+          document.getElementById('enrichMissingPreview').textContent = data.missingPreview.toLocaleString();
+          if (els.enrichPreviewBtn) els.enrichPreviewBtn.textContent = `Fetch Previews (~${estSecs}s)`;
         }
-      })();
+        // Enable/disable buttons based on counts
+        if (els.enrichGenreBtn) els.enrichGenreBtn.disabled = data.missingGenre === 0;
+        if (els.enrichGeoBtn) els.enrichGeoBtn.disabled = data.missingGeo === 0;
+        if (els.enrichPreviewBtn) els.enrichPreviewBtn.disabled = data.missingPreview === 0;
+        if (els.enrichAllBtn) els.enrichAllBtn.disabled = (data.missingGenre + data.missingGeo + data.missingPreview) === 0;
+      } catch (e) {
+        showStatus('Failed to load enrichment status: ' + e.message, 'error');
+      }
+    }
+
+    async function runBatchEnrich(fields) {
+      const enrichBtns = [els.enrichGenreBtn, els.enrichGeoBtn, els.enrichPreviewBtn, els.enrichAllBtn, els.enrichRefreshBtn].filter(Boolean);
+      enrichBtns.forEach(b => { b.disabled = true; });
+      const progressBar = document.getElementById('enrichProgressBar');
+      const progressText = document.getElementById('enrichProgressText');
+      if (progressBar) progressBar.style.display = 'block';
+      if (progressText) progressText.textContent = 'Starting…';
+
+      const pollId = setInterval(async () => {
+        try {
+          const p = await adminFetch('/api/admin/import/progress');
+          if (!p || !p.active || p.task !== 'enrich-batch') return;
+          const label = fields.length === 1
+            ? { genre: 'genre', geo: 'origin', preview: 'previews' }[fields[0]] || fields[0]
+            : 'fields';
+          if (progressText) progressText.textContent = `Enriching ${label}: ${p.done}/${p.total} done · ${p.found} filled`;
+        } catch (_) {}
+      }, 700);
+
+      try {
+        const body = { fields };
+        if (enrichLimit > 0) body.limit = enrichLimit;
+        const resp = await adminFetch('/api/admin/enrich-batch', { method: 'POST', body: JSON.stringify(body) });
+
+        // Wait for background enrichment to complete by polling until inactive
+        await new Promise(resolve => {
+          const waitId = setInterval(async () => {
+            try {
+              const p = await adminFetch('/api/admin/import/progress');
+              if (!p || !p.active) { clearInterval(waitId); resolve(); }
+            } catch (_) { clearInterval(waitId); resolve(); }
+          }, 700);
+          // Safety timeout: stop waiting after 10 minutes
+          setTimeout(() => { clearInterval(waitId); resolve(); }, 600000);
+        });
+
+        clearInterval(pollId);
+        if (progressText) progressText.textContent = `Done — ${resp.total} songs processed`;
+        await loadEnrichmentStatus();
+      } catch (e) {
+        clearInterval(pollId);
+        showStatus(e.message || 'Enrichment failed', 'error');
+      } finally {
+        if (progressBar) progressBar.style.display = 'none';
+        enrichBtns.forEach(b => { b.disabled = false; });
+        await loadEnrichmentStatus(); // re-enable buttons based on actual counts
+      }
     }
 
     function exportJson() {
@@ -1826,12 +2703,71 @@
     if (els.bulkImportBtn) {
       els.bulkImportBtn.onclick = () => switchView('import');
     }
+    if (els.healthBtn) {
+      els.healthBtn.onclick = () => switchView('health');
+    }
     if (els.analyticsBtn) {
       els.analyticsBtn.onclick = () => switchView('analytics');
     }
+    const backFromHealthBtn = document.getElementById('backFromHealthBtn');
+    if (backFromHealthBtn) backFromHealthBtn.onclick = () => switchView('admin');
+    if (els.enrichRefreshBtn) els.enrichRefreshBtn.onclick = loadEnrichmentStatus;
+    if (els.enrichGenreBtn) els.enrichGenreBtn.onclick = () => runBatchEnrich(['genre']);
+    if (els.enrichGeoBtn) els.enrichGeoBtn.onclick = () => runBatchEnrich(['geo']);
+    if (els.enrichPreviewBtn) els.enrichPreviewBtn.onclick = () => runBatchEnrich(['preview']);
+    if (els.enrichAllBtn) els.enrichAllBtn.onclick = () => runBatchEnrich(['genre', 'geo', 'preview']);
     const usageAnalyticsBtn = document.getElementById('usageAnalyticsBtn');
     if (usageAnalyticsBtn) {
       usageAnalyticsBtn.onclick = () => switchView('usage');
+    }
+    const yearAuditBtn = document.getElementById('yearAuditBtn');
+    if (yearAuditBtn) {
+      yearAuditBtn.onclick = () => switchView('yearAudit');
+    }
+    const backFromYearAuditBtn = document.getElementById('backFromYearAuditBtn');
+    if (backFromYearAuditBtn) {
+      backFromYearAuditBtn.onclick = () => switchView('admin');
+    }
+    const runYearAuditBtn = document.getElementById('runYearAuditBtn');
+    if (runYearAuditBtn) {
+      runYearAuditBtn.onclick = async () => {
+        const statusEl = document.getElementById('yearAuditStatus');
+        const resultsEl = document.getElementById('yearAuditResults');
+        const summaryEl = document.getElementById('yearAuditSummary');
+        const tbodyEl = document.getElementById('yearAuditTbody');
+        runYearAuditBtn.disabled = true;
+        if (statusEl) statusEl.textContent = 'Running… this may take several minutes';
+        if (resultsEl) resultsEl.style.display = 'none';
+        try {
+          const filter = {};
+          const yMin = Number(document.getElementById('yearAuditYearMin')?.value);
+          const yMax = Number(document.getElementById('yearAuditYearMax')?.value);
+          const geo = document.getElementById('yearAuditGeo')?.value?.trim();
+          if (Number.isFinite(yMin) && yMin > 0) filter.yearMin = yMin;
+          if (Number.isFinite(yMax) && yMax > 0) filter.yearMax = yMax;
+          if (geo) filter.geography = geo;
+          const resp = await adminFetch('/api/admin/curated-songs/batch-fix-years', {
+            method: 'POST',
+            body: JSON.stringify({ filter })
+          });
+          if (statusEl) statusEl.textContent = '';
+          if (summaryEl) summaryEl.textContent = `Checked ${resp.checked} songs — ${resp.updated} year${resp.updated !== 1 ? 's' : ''} corrected, ${resp.unchanged} unchanged, ${resp.errors} errors`;
+          if (tbodyEl) {
+            if (resp.changes && resp.changes.length > 0) {
+              tbodyEl.innerHTML = resp.changes.map(c =>
+                `<tr><td>${c.artist || ''}</td><td>${c.title || ''}</td><td>${c.oldYear ?? ''}</td><td>${c.newYear ?? ''}</td></tr>`
+              ).join('');
+            } else {
+              tbodyEl.innerHTML = '<tr><td colspan="4" class="muted">No corrections needed</td></tr>';
+            }
+          }
+          if (resultsEl) resultsEl.style.display = 'block';
+        } catch (e) {
+          if (statusEl) statusEl.textContent = 'Error: ' + (e.message || 'Failed');
+        } finally {
+          runYearAuditBtn.disabled = false;
+        }
+      };
     }
     if (els.backToAdminBtn) {
       els.backToAdminBtn.onclick = () => switchView('admin');
@@ -1876,20 +2812,33 @@
       });
     }
 
-    // Filters
-    els.applyFiltersBtn.onclick = () => {
-      pageState.page = 1;
-      listSongs();
-    };
+    // Close edit modal on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlay = document.getElementById('editModalOverlay');
+        if (overlay && overlay.style.display !== 'none') closeEditModal();
+      }
+    });
+
+    // Filters — auto-apply on search input change
+    if (els.filterQ) {
+      let qTimer;
+      els.filterQ.oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(() => { pageState.page = 1; listSongs(); }, 300); };
+    }
+    if (els.filterYearMin) els.filterYearMin.onchange = () => { pageState.page = 1; listSongs(); };
+    if (els.filterYearMax) els.filterYearMax.onchange = () => { pageState.page = 1; listSongs(); };
+
     els.resetFiltersBtn.onclick = () => {
       els.filterQ.value = '';
-      els.filterGenre.value = '';
-      els.filterGeo.value = '';
-      els.filterDiff.value = '';
-      els.filterYearMin.value = '';
-      els.filterYearMax.value = '';
-      pageState.page = 1;
-      listSongs();
+      filterState.genres.clear(); filterState.origins.clear();
+      filterState.diff = ''; filterState.missingGenre = false; filterState.missingOrigin = false; filterState.missingPreview = false;
+      els.filterGenre.value = ''; els.filterGeo.value = ''; els.filterDiff.value = '';
+      els.filterYearMin.value = ''; els.filterYearMax.value = '';
+      document.querySelectorAll('#filterGenreChips .chip, #filterOriginChips .chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('#filterDiffChips .chip').forEach(c => c.classList.toggle('active', c.dataset.diff === ''));
+      document.querySelectorAll('[data-decade]').forEach(c => c.classList.remove('active'));
+      ['missingGenreChip', 'missingOriginChip', 'missingPreviewChip'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+      pageState.page = 1; listSongs();
     };
 
     // Pagination wiring
@@ -1928,6 +2877,7 @@
     // Bulk import wiring
     if (els.previewImportBtn) els.previewImportBtn.onclick = previewImport;
     if (els.commitImportBtn) els.commitImportBtn.onclick = commitSelected;
+    if (els.fetchPreviewsBtn) els.fetchPreviewsBtn.onclick = fetchMissingPreviews;
     if (els.cancelImportBtn) els.cancelImportBtn.onclick = () => {
       try { if (window.__importAbort) window.__importAbort.abort(); } catch (_) {}
     };

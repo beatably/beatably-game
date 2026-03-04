@@ -519,10 +519,6 @@ function selectForGame(criteria = {}) {
     previewMode = false,
   } = criteria;
 
-  // Map difficulty to difficultyLevel filter
-  const diffMap = { easy: [1, 2], normal: [2, 3], hard: [3, 4, 5] };
-  const allowedLevels = diffMap[difficulty] || [2, 3];
-
   let pool = _songs.slice();
 
   // CRITICAL: Filter out songs without preview URLs ONLY if in preview mode
@@ -539,8 +535,8 @@ function selectForGame(criteria = {}) {
     pool = pool.filter((s) => (Number.isFinite(s.year) ? s.year <= yearRange.max : true));
   }
 
-  // Filter by genres (if supplied) - supports multi-genre (genres[]), with fallback to single genre
-  if (Array.isArray(genres) && genres.length) {
+  // Filter by genres (Advanced mode only - skip if Easy)
+  if (difficulty !== 'easy' && Array.isArray(genres) && genres.length) {
     const gset = new Set(genres.map((g) => String(g || '').toLowerCase()));
     pool = pool.filter((s) => {
       const sg = (s.genre || '').toLowerCase();
@@ -551,45 +547,33 @@ function selectForGame(criteria = {}) {
   }
 
   // Filter by music mode (geography/international)
-  // markets parameter now controls which songs to include based on isInternational flag
   if (Array.isArray(markets) && markets.length) {
     const mset = new Set(markets.map((m) => String(m || '').toLowerCase()));
-    
     pool = pool.filter((s) => {
-      // Handle three game modes:
-      // 1. "se" - Swedish songs only (geography = "SE")
-      // 2. "international" - International songs only (isInternational = true)
-      // 3. "intl-se" or "se-intl" - Both international AND Swedish (isInternational = true OR geography = "SE")
-      
       const geo = (s.geography || '').toLowerCase();
       const isIntl = s.isInternational === true;
-      
-      // If "se" is in the markets list
       if (mset.has('se')) {
-        // SE-only mode
-        if (mset.size === 1) {
-          return geo === 'se';
-        }
-        // SE + International mode (contains both "se" and "international")
-        if (mset.has('international') || mset.has('intl')) {
-          return geo === 'se' || isIntl;
-        }
+        if (mset.size === 1) return geo === 'se';
+        if (mset.has('international') || mset.has('intl')) return geo === 'se' || isIntl;
       }
-      
-      // International-only mode
       if (mset.has('international') || mset.has('intl')) {
-        if (mset.size === 1 || !mset.has('se')) {
-          return isIntl;
-        }
+        if (mset.size === 1 || !mset.has('se')) return isIntl;
       }
-      
-      // Fallback: accept all if markets filter doesn't match our expected values
       return true;
     });
   }
 
-  // Filter by difficultyLevel
-  pool = pool.filter((s) => allowedLevels.includes(Number(s.difficultyLevel || 2)));
+  // Filter by difficulty:
+  // easy     → well-known chart hits: isBillboardChart OR (popularity >= 70 AND difficultyLevel <= 2)
+  // advanced → all songs (no restriction)
+  if (difficulty === 'easy') {
+    pool = pool.filter((s) => {
+      const lvl = Number(s.difficultyLevel || 2);
+      return s.isBillboardChart === true || (lvl <= 2 && (s.popularity || 0) >= 70);
+    });
+  }
+  // legacy support: treat 'normal' as advanced, 'hard' as advanced
+  // (no filter needed for advanced/normal/hard)
 
   // Shuffle
   pool = pool.sort(() => 0.5 - Math.random());

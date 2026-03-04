@@ -36,7 +36,7 @@ async function fetchPreviewUrl(spotifyUri) {
   const trackId = spotifyUri.replace('spotify:track:', '');
   
   try {
-    const response = await axios.get(`https://open.spotify.com/track/${trackId}`, {
+    const response = await axios.get(`https://open.spotify.com/embed/track/${trackId}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
       },

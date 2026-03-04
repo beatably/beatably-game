@@ -205,12 +205,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     }
   }, [playerName, roomCode, playerId, isCreator, view]);
   const [gameSettings, setGameSettings] = useState({
-    difficulty: "normal",
+    difficulty: "easy",
     winCondition: 10,
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
       yearRange: { min: 1960, max: 2025 },
-      markets: ['US']
+      markets: ['international']
     }
   });
 
@@ -280,28 +280,6 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     };
   }, []);
 
-
-  // Initialize feature flags (e.g., default chart mode) from backend so UI reflects server defaults
-  useEffect(() => {
-    const loadFlags = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/feature-flags`);
-        if (!res.ok) return;
-        const json = await res.json();
-        const enableChartMode = json?.featureFlags?.enableChartMode;
-        if (typeof enableChartMode === 'boolean') {
-          setGameSettings(s => ({
-            ...s,
-            // Only set useChartMode from server if client hasn't explicitly set it yet
-            useChartMode: (s.useChartMode === undefined || s.useChartMode === null) ? enableChartMode : s.useChartMode
-          }));
-        }
-      } catch (e) {
-        console.warn('[App] Failed to load feature flags:', e);
-      }
-    };
-    loadFlags();
-  }, []);
 
   // Check for existing session on app load
   useEffect(() => {

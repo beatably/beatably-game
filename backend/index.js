@@ -491,6 +491,61 @@ app.post('/api/admin/curated-songs/enrich/:id', requireAdmin, async (req, res) =
   }
 });
 
+// Batch-fix release years using MusicBrainz (admin)
+app.post('/api/admin/curated-songs/batch-fix-years', requireAdmin, async (req, res) => {
+  try {
+    if (!config.featureFlags.enableMusicBrainz) {
+      return res.status(400).json({ ok: false, error: 'MusicBrainz is disabled' });
+    }
+    const { resolveOriginalYear } = require('./musicbrainz');
+    const filter = req.body?.filter || {};
+    curatedDb.load(true);
+    const { items: all } = curatedDb.list({
+      limit: 99999,
+      yearMin: filter.yearMin ? Number(filter.yearMin) : undefined,
+      yearMax: filter.yearMax ? Number(filter.yearMax) : undefined,
+      genre: filter.genre || undefined,
+      geography: filter.geography || undefined,
+    });
+
+    let checked = 0, updated = 0, unchanged = 0, errors = 0;
+    const changes = [];
+
+    for (const song of all) {
+      if (!song.artist || !song.title) { unchanged++; continue; }
+      checked++;
+      try {
+        const mb = await resolveOriginalYear({ artist: song.artist, title: song.title });
+        if (mb?.earliestYear && mb.confidence >= config.musicbrainz.minConfidence) {
+          const mbYear = Number(mb.earliestYear);
+          const oldYear = Number(song.year);
+          if (Number.isFinite(mbYear) && (!Number.isFinite(oldYear) ||
+              Math.abs(oldYear - mbYear) >= config.musicbrainz.yearDiffThreshold)) {
+            curatedDb.update(song.id, { year: mbYear });
+            changes.push({ id: song.id, artist: song.artist, title: song.title, oldYear, newYear: mbYear });
+            updated++;
+          } else {
+            unchanged++;
+          }
+        } else {
+          unchanged++;
+        }
+        // Respect MusicBrainz rate limit
+        await new Promise(r => setTimeout(r, 1100));
+      } catch (e) {
+        console.error(`[Admin] batch-fix-years error for ${song.artist} - ${song.title}:`, e?.message);
+        errors++;
+      }
+    }
+
+    console.log(`[Admin] batch-fix-years complete: checked=${checked} updated=${updated} unchanged=${unchanged} errors=${errors}`);
+    res.json({ ok: true, checked, updated, unchanged, errors, changes });
+  } catch (e) {
+    console.error('[Admin] batch-fix-years failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message });
+  }
+});
+
 // --- Curated DB Analytics (admin) ---
 app.get('/api/admin/analytics', requireAdmin, (req, res) => {
   try {
@@ -658,7 +713,113 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
  * }
  * Returns curated-like items without saving to DB.
  */
+app.get('/api/admin/import/progress', requireAdmin, (req, res) => {
+  res.json(importProgress || { active: false });
+});
+
+/**
+ * Admin - Enrichment Status
+ * Returns counts of songs with missing metadata fields.
+ */
+app.get('/api/admin/enrichment-status', requireAdmin, (_req, res) => {
+  try {
+    const songs = curatedDb.list({ limit: 999999 }).items;
+    res.json({
+      total: songs.length,
+      missingGenre: songs.filter(s => !s.genre).length,
+      missingGeo: songs.filter(s => !s.geography).length,
+      missingPreview: songs.filter(s => !s.previewUrl).length
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message });
+  }
+});
+
+/**
+ * Admin - Batch Enrichment
+ * Body: { fields: ('genre'|'geo'|'preview')[], limit?: number }
+ * Responds immediately, runs enrichment fire-and-forget in background.
+ */
+app.post('/api/admin/enrich-batch', requireAdmin, (req, res) => {
+  const { enrichSong } = require('./songEnrichment');
+  const fields = Array.isArray(req.body?.fields) ? req.body.fields : ['genre', 'geo', 'preview'];
+  const limit = Number.isFinite(Number(req.body?.limit)) && Number(req.body.limit) > 0 ? Number(req.body.limit) : null;
+
+  let songs = curatedDb.list({ limit: 999999 }).items;
+  // Filter to songs missing at least one requested field
+  songs = songs.filter(s => {
+    if (fields.includes('genre') && !s.genre) return true;
+    if (fields.includes('geo') && !s.geography) return true;
+    if (fields.includes('preview') && !s.previewUrl) return true;
+    return false;
+  });
+  if (limit) songs = songs.slice(0, limit);
+
+  importProgress = { active: true, task: 'enrich-batch', done: 0, total: songs.length, found: 0 };
+  res.json({ ok: true, total: songs.length });
+
+  (async () => {
+    for (const s of songs) {
+      try {
+        const song = curatedDb.get(s.id);
+        if (!song) { importProgress.done++; continue; }
+        const enriched = await enrichSong(song, {
+          fetchMusicBrainz: fields.includes('genre') || fields.includes('geo'),
+          fetchPreview: fields.includes('preview'),
+          rateLimit: true
+        });
+        curatedDb.update(song.id, enriched);
+        if (fields.includes('genre') && !s.genre && enriched.genre) importProgress.found++;
+        if (fields.includes('geo') && !s.geography && enriched.geography) importProgress.found++;
+        if (fields.includes('preview') && !s.previewUrl && enriched.previewUrl) importProgress.found++;
+      } catch (e) {
+        console.error('[AdminEnrich][batch] failed for', s.id, e?.message);
+      }
+      importProgress.done++;
+    }
+    console.log(`[AdminEnrich][batch] Done: ${importProgress.found}/${songs.length} filled`);
+    importProgress = null;
+  })();
+});
+
+/**
+ * Admin Bulk Import - Fetch Preview URLs
+ * Body: { uris: string[] }
+ * Scrapes Spotify web pages to get 30s preview URLs for the given Spotify track URIs.
+ * Returns: { found, total, results: { [uri]: url | null } }
+ */
+app.post('/api/admin/import/fetch-previews', requireAdmin, async (req, res) => {
+  const { fetchPreviewUrl } = require('./songEnrichment');
+  const uris = Array.isArray(req.body?.uris)
+    ? req.body.uris.filter(u => u && String(u).startsWith('spotify:track:'))
+    : [];
+  const results = {};
+  let found = 0;
+  importProgress = { active: true, task: 'previews', done: 0, total: uris.length };
+  try {
+    for (let i = 0; i < uris.length; i++) {
+      const uri = uris[i];
+      if (i > 0) await new Promise(r => setTimeout(r, 500));
+      const url = await fetchPreviewUrl(uri);
+      results[uri] = url || null;
+      if (url) found++;
+      importProgress.done = i + 1;
+    }
+    res.json({ found, total: uris.length, results });
+  } catch (e) {
+    console.error('[AdminImport][fetch-previews] failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Failed to fetch previews' });
+  } finally {
+    importProgress = null;
+  }
+});
+
 app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
+  // Cancellation: res.on('close') fires when client disconnects before response is sent.
+  // (req.on('close') fires too early in newer Node.js — after body is consumed, not client disconnect)
+  let cancelled = false;
+  res.on('close', () => { cancelled = true; });
+
   try {
     // Force reload database to ensure we have latest migrated data
     console.log('[Admin] Force reloading curated database for import preview request');
@@ -723,11 +884,12 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     const needsOriginMatch = originCountries.length > 0;
 
     const toDifficultyFromRankPop = (rank, pop) => {
-      // Map to curated difficultyLevel (1-5); we keep 2-4 range primary
+      // Map to curated difficultyLevel (1-5)
+      // Level 1-2 = well-known chart hits (easy mode); 3-5 = less known (advanced mode)
       if (Number.isFinite(rank)) {
-        if (rank <= 10) return 2;
-        if (rank <= 50) return 3;
-        if (rank <= 100) return 4;
+        if (rank <= 10) return 1;  // Top 10 peak hit → easiest
+        if (rank <= 50) return 2;  // Top 50 chart hit
+        if (rank <= 100) return 3; // Top 100 chart hit
       }
       const p = Number(pop || 0);
       if (p >= 85) return 2;
@@ -740,41 +902,39 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     const seen = new Set(); // by spotifyUri
     const artistOriginCache = new Map();
     const mbYearCache = new Map();
-    const resolveArtistOrigin = async (artistName, fallbackCountry) => {
-      const fallback = String(fallbackCountry || 'US').toUpperCase();
+    const resolveArtistOrigin = async (artistName) => {
       const key = String(artistName || '').trim().toLowerCase();
-      if (!key) return fallback;
+      if (!key) return null;
       if (artistOriginCache.has(key)) return artistOriginCache.get(key);
       try {
         const r = await detectGeographyForArtist(artistName);
-        const geo = String(r?.geography || fallback).toUpperCase();
+        const geo = r?.geography ? String(r.geography).toUpperCase() : null;
         artistOriginCache.set(key, geo);
         return geo;
       } catch (_) {
-        artistOriginCache.set(key, fallback);
-        return fallback;
+        artistOriginCache.set(key, null);
+        return null;
       }
     };
-    const maybeResolveOriginalYearForImport = async ({ artist, title, album, spotifyYear }) => {
+    const maybeResolveOriginalYearForImport = async ({ artist, title, spotifyYear }) => {
       if (!config.featureFlags.enableMusicBrainz) return spotifyYear;
-      const hasYearFilter = Number.isFinite(yearMin) || Number.isFinite(yearMax);
-      const outsideYearFilter = hasYearFilter && (
-        (Number.isFinite(yearMin) && Number.isFinite(spotifyYear) && spotifyYear < yearMin) ||
-        (Number.isFinite(yearMax) && Number.isFinite(spotifyYear) && spotifyYear > yearMax)
-      );
-      const suspicious = isSuspiciousTrack({ title: title || '', album: album || '' });
-      if (!outsideYearFilter && !suspicious) return spotifyYear;
 
       const cacheKey = `${String(artist || '').toLowerCase()}::${normalizeTitle(String(title || '').toLowerCase())}`;
       if (mbYearCache.has(cacheKey)) {
         return mbYearCache.get(cacheKey);
       }
 
+      // Always check MusicBrainz — Spotify album years are unreliable for songs on compilations
       diagnostics.mbYearChecks += 1;
       try {
         const mb = await resolveOriginalYear({ artist, title });
         if (mb?.earliestYear && mb?.confidence >= config.musicbrainz.minConfidence) {
           const mbYear = Number(mb.earliestYear);
+          const hasYearFilter = Number.isFinite(yearMin) || Number.isFinite(yearMax);
+          const outsideYearFilter = hasYearFilter && (
+            (Number.isFinite(yearMin) && Number.isFinite(spotifyYear) && spotifyYear < yearMin) ||
+            (Number.isFinite(yearMax) && Number.isFinite(spotifyYear) && spotifyYear > yearMax)
+          );
           const shouldAdjust = !Number.isFinite(spotifyYear) ||
             Math.abs(Number(spotifyYear) - mbYear) >= config.musicbrainz.yearDiffThreshold ||
             outsideYearFilter;
@@ -811,6 +971,9 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       errors: 0,
     };
 
+    // Live progress state (polled by frontend)
+    importProgress = { active: true, evaluated: 0, accepted: 0, droppedOrigin: 0, droppedDupe: 0, startedAt: Date.now() };
+
     // Genre mapping: map Spotify's detailed genres to game categories used in game settings
     const artistGenresCache = new Map();
     function mapSpotifyGenres(genresArr) {
@@ -840,7 +1003,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
 
       const token = await getClientToken();
       for (const entry of chartEntries) {
-        if (items.length >= cap) break;
+        if (items.length >= cap || cancelled) break;
         try {
           const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
           const resp = await spotifyGet('https://api.spotify.com/v1/search', {
@@ -858,12 +1021,17 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           }
           seen.add(spotifyUri);
           diagnostics.tracksEvaluated += 1;
+          if (importProgress) {
+            importProgress.evaluated = diagnostics.tracksEvaluated;
+            importProgress.accepted = items.length;
+            importProgress.droppedOrigin = diagnostics.droppedByOriginFilter;
+            importProgress.droppedDupe = diagnostics.droppedAsDuplicatesInPreview;
+          }
 
           const spotifyYear = new Date(t.album.release_date).getFullYear();
           const year = await maybeResolveOriginalYearForImport({
             artist: t.artists[0]?.name || entry.artist,
             title: t.name,
-            album: t.album?.name || '',
             spotifyYear,
           });
           const popularity = t.popularity;
@@ -913,9 +1081,11 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           }
 
           // Detect origin country (artist-based)
-          const origin = await resolveArtistOrigin(t.artists[0]?.name || entry.artist, searchMarkets[0] || 'US');
+          const origin = await resolveArtistOrigin(t.artists[0]?.name || entry.artist);
 
-          if (originCountries.length && !originCountries.includes(String(origin || '').toUpperCase())) {
+          // Only drop tracks with a *confirmed* non-matching origin.
+          // null means origin couldn't be determined — pass through rather than discard.
+          if (originCountries.length && origin !== null && !originCountries.includes(String(origin).toUpperCase())) {
             diagnostics.droppedByOriginFilter += 1;
             continue;
           }
@@ -937,6 +1107,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             title: t.name,
             artist: t.artists[0]?.name || entry.artist,
             year,
+            spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
             genre: genreTag,
             genres: genresArr,
             geography: origin,
@@ -994,10 +1165,11 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       diagnostics.trackEvaluationBudget = maxTracksToEvaluate;
 
       let stopEarly = false;
+      console.log(`[AdminImport][search] Starting loops: queries=${queries.length} markets=${JSON.stringify(searchMarkets)} cancelled=${cancelled} cap=${cap}`);
 
       for (const market of searchMarkets) {
         for (const q of queries) {
-          if (items.length >= cap) { stopEarly = true; break; }
+          if (items.length >= cap || cancelled) { stopEarly = true; break; }
           if (diagnostics.queriesAttempted >= maxQueries) {
             diagnostics.truncated = true;
             diagnostics.truncationReason = 'query_budget_reached';
@@ -1029,12 +1201,20 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
                 break;
               }
               diagnostics.tracksEvaluated += 1;
+              if (importProgress) {
+                importProgress.evaluated = diagnostics.tracksEvaluated;
+                importProgress.accepted = items.length;
+                importProgress.droppedOrigin = diagnostics.droppedByOriginFilter;
+                importProgress.droppedDupe = diagnostics.droppedAsDuplicatesInPreview;
+              }
+              if (diagnostics.tracksEvaluated % 50 === 0) {
+                console.log(`[AdminImport][search] evaluated=${diagnostics.tracksEvaluated} accepted=${items.length} droppedOrigin=${diagnostics.droppedByOriginFilter} droppedYear=${diagnostics.droppedByYearFilter} droppedDupe=${diagnostics.droppedAsDuplicatesInPreview} errors=${diagnostics.errors}`);
+              }
 
               const spotifyYear = new Date(track.album.release_date).getFullYear();
               const trackYear = await maybeResolveOriginalYearForImport({
                 artist: track.artists[0]?.name || '',
                 title: track.name,
-                album: track.album?.name || '',
                 spotifyYear,
               });
               if ((Number.isFinite(yrRange.min) && trackYear < yrRange.min) ||
@@ -1059,10 +1239,11 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
               const genreTag = q.includes('genre:') ? q.split('genre:')[1].split(' ')[0] : (genres[0] || 'general');
 
               const origin = needsOriginMatch
-                ? await resolveArtistOrigin(track.artists[0]?.name || '', market)
+                ? await resolveArtistOrigin(track.artists[0]?.name || '')
                 : String(market).toUpperCase();
 
-              if (originCountries.length && !originCountries.includes(String(origin || '').toUpperCase())) {
+              // Only drop tracks with a *confirmed* non-matching origin.
+              if (originCountries.length && origin !== null && !originCountries.includes(String(origin).toUpperCase())) {
                 diagnostics.droppedByOriginFilter += 1;
                 continue;
               }
@@ -1072,6 +1253,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
                 title: track.name,
                 artist: track.artists[0]?.name || '',
                 year: trackYear,
+                spotifyYear: trackYear !== spotifyYear ? spotifyYear : undefined,
                 genre: genreTag,
                 genres: Array.from(new Set([genreTag].filter(Boolean))),
                 geography: origin,
@@ -1095,6 +1277,8 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
         }
         if (stopEarly) break;
       }
+
+      console.log(`[AdminImport][search] Done: evaluated=${diagnostics.tracksEvaluated} accepted=${items.length} droppedOrigin=${diagnostics.droppedByOriginFilter} droppedYear=${diagnostics.droppedByYearFilter} droppedDupe=${diagnostics.droppedAsDuplicatesInPreview} queries=${diagnostics.queriesAttempted} errors=${diagnostics.errors}`);
 
       // diversify by artist and cap
       const diversified = diversifyByArtist(items, 1);
@@ -1122,7 +1306,9 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     });
   } catch (e) {
     console.error('[AdminImport][preview] failed:', e && e.message);
-    res.status(500).json({ ok: false, error: e?.message || 'Preview failed' });
+    if (!res.headersSent) res.status(500).json({ ok: false, error: e?.message || 'Preview failed' });
+  } finally {
+    importProgress = null;
   }
 });
 
@@ -1323,6 +1509,9 @@ app.post('/api/curated/select', (req, res) => {
     res.status(500).json({ ok: false, error: e?.message || 'Selection failed' });
   }
 });
+
+// Single in-flight import preview progress (reset between runs)
+let importProgress = null;
 
 // Store fetched songs for debugging (in production, consider using Redis or database)
 let lastFetchedSongs = null;
