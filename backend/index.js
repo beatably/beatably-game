@@ -1219,8 +1219,12 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             genresArr = ['pop'];
           }
 
+          // Detect actual artist origin via MusicBrainz (SE is always in markets since it charted there)
+          const origin = await resolveArtistOrigin(t.artists[0]?.name || entry.artist);
+
           const marketsArr = Array.from(new Set([
             'SE',
+            origin ? String(origin).toUpperCase() : null,
             Number(popularity) >= 85 ? 'INTL' : null
           ].filter(Boolean)));
 
@@ -1232,7 +1236,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
             genre: genreTag,
             genres: genresArr,
-            geography: 'SE',
+            geography: origin,
             markets: marketsArr,
             searchMarket: 'SE',
             difficultyLevel,
@@ -1304,6 +1308,8 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             } catch (_) { /* ignore */ }
             if (!genreTag) { genreTag = 'pop'; genresArr = ['pop']; }
 
+            const originPlaylist = await resolveArtistOrigin(t.artists[0]?.name || '');
+
             items.push({
               spotifyUri: t.uri,
               title: t.name,
@@ -1312,8 +1318,12 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
               spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
               genre: genreTag,
               genres: genresArr,
-              geography: 'SE',
-              markets: Array.from(new Set(['SE', Number(popularity) >= 85 ? 'INTL' : null].filter(Boolean))),
+              geography: originPlaylist,
+              markets: Array.from(new Set([
+                'SE',
+                originPlaylist ? String(originPlaylist).toUpperCase() : null,
+                Number(popularity) >= 85 ? 'INTL' : null
+              ].filter(Boolean))),
               searchMarket: 'SE',
               difficultyLevel: toDifficultyFromRankPop(null, popularity),
               popularity,
