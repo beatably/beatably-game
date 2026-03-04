@@ -79,7 +79,7 @@ async function spotifyGet(url, opts = {}, label = '') {
 // Feature flags, thresholds, and providers
 const { config } = require('./config');
 const { resolveOriginalYear, isRemasterMarker, normalizeTitle } = require('./musicbrainz');
-const { getChartEntries } = require('./chartProvider');
+const { getChartEntries, getSwedishChartEntries } = require('./chartProvider');
 
 const app = express();
 const discovery = require('./discovery');
@@ -830,6 +830,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     const mode = (function normalizeImportMode(m) {
       if (m === 'spotify' || m === 'spotify-search' || m === 'search') return 'search';
       if (m === 'billboard') return 'billboard';
+      if (m === 'sweden') return 'sweden';
       return 'billboard';
     })(modeRaw);
     const filters = body.filters || {};
@@ -1131,6 +1132,203 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
         } catch (e) {
           // ignore individual failures
           diagnostics.errors += 1;
+        }
+      }
+    } else if (mode === 'sweden') {
+      // Swedish charts: resolve local scraped data to Spotify, then supplement with live playlist
+      let chartEntries = await getSwedishChartEntries({
+        difficulty: 'normal',
+        yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
+        yearMax: Number.isFinite(yearMax) ? yearMax : undefined,
+      });
+
+      const token = await getClientToken();
+
+      if (chartEntries.length === 0) {
+        console.warn('[AdminImport][sweden] No local chart data — falling back to Spotify Sweden playlist only');
+      }
+
+      // Shuffle so we get variety across decades, not just the best-ranked songs first
+      chartEntries = chartEntries.sort(() => Math.random() - 0.5);
+
+      for (const entry of chartEntries) {
+        if (items.length >= cap || cancelled) break;
+        try {
+          const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
+          const resp = await spotifyGet('https://api.spotify.com/v1/search', {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { q, type: 'track', limit: 5, market: 'SE' }
+          }, 'search:sweden');
+          diagnostics.queriesAttempted += 1;
+          const t = (resp.data.tracks.items || [])[0];
+          if (!t) continue;
+
+          const spotifyUri = t.uri;
+          if (seen.has(spotifyUri)) {
+            diagnostics.droppedAsDuplicatesInPreview += 1;
+            continue;
+          }
+          seen.add(spotifyUri);
+          diagnostics.tracksEvaluated += 1;
+          if (importProgress) {
+            importProgress.evaluated = diagnostics.tracksEvaluated;
+            importProgress.accepted = items.length;
+            importProgress.droppedOrigin = diagnostics.droppedByOriginFilter;
+            importProgress.droppedDupe = diagnostics.droppedAsDuplicatesInPreview;
+          }
+
+          const spotifyYear = new Date(t.album.release_date).getFullYear();
+          const year = await maybeResolveOriginalYearForImport({
+            artist: t.artists[0]?.name || entry.artist,
+            title: t.name,
+            spotifyYear,
+          });
+          const popularity = t.popularity;
+          const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
+
+          let genreTag = null;
+          let genresArr = [];
+          try {
+            const genreResult = await detectGenresForArtist(t.artists[0]?.name || entry.artist);
+            if (genreResult && genreResult.genres.length > 0) {
+              genresArr = genreResult.genres;
+              genreTag = genreResult.genres[0];
+            }
+          } catch (e) {
+            console.warn(`[AdminImport][sweden] Genre detection failed for ${entry.artist}:`, e.message);
+          }
+          if (!genreTag) {
+            try {
+              const artistId = t.artists?.[0]?.id || null;
+              if (artistId) {
+                let artistGenres = artistGenresCache.get(artistId);
+                if (!artistGenres) {
+                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  }, 'artist:genres:sweden');
+                  artistGenres = artResp?.data?.genres || [];
+                  artistGenresCache.set(artistId, artistGenres);
+                }
+                genreTag = mapSpotifyGenres(artistGenres);
+                if (genreTag) genresArr = [genreTag];
+              }
+            } catch (_) { /* ignore */ }
+          }
+          if (!genreTag) {
+            genreTag = 'pop';
+            genresArr = ['pop'];
+          }
+
+          const marketsArr = Array.from(new Set([
+            'SE',
+            Number(popularity) >= 85 ? 'INTL' : null
+          ].filter(Boolean)));
+
+          items.push({
+            spotifyUri,
+            title: t.name,
+            artist: t.artists[0]?.name || entry.artist,
+            year,
+            spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
+            genre: genreTag,
+            genres: genresArr,
+            geography: 'SE',
+            markets: marketsArr,
+            searchMarket: 'SE',
+            difficultyLevel,
+            popularity,
+            albumArt: t.album.images?.[0]?.url || null,
+            previewUrl: t.preview_url || null,
+            tags: [],
+            verified: true,
+            addedBy: 'import',
+            isBillboardChart: false,
+            isSwedishChart: true,
+            chartInfo: {
+              rank: entry.rank ?? null,
+              peakPos: entry.peakPos ?? null,
+              weeksOnChart: entry.weeksOnChart ?? null,
+              chartDate: entry.chartDate ?? null,
+              source: 'sweden',
+            }
+          });
+        } catch (e) {
+          diagnostics.errors += 1;
+        }
+      }
+
+      // Supplement with live Spotify Sweden Top 50 playlist if room remains
+      if (items.length < cap && !cancelled) {
+        try {
+          const playlistResp = await spotifyGet(
+            `https://api.spotify.com/v1/playlists/${config.swedish.spotifyPlaylistId}/tracks`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              params: { market: 'SE', limit: 50, fields: 'items(track(uri,name,artists,album,popularity,preview_url))' }
+            },
+            'playlist:sweden50'
+          );
+          diagnostics.queriesAttempted += 1;
+          for (const item of playlistResp.data.items || []) {
+            if (items.length >= cap || cancelled) break;
+            const t = item.track;
+            if (!t || !t.uri) continue;
+            if (seen.has(t.uri)) { diagnostics.droppedAsDuplicatesInPreview += 1; continue; }
+            seen.add(t.uri);
+            diagnostics.tracksEvaluated += 1;
+
+            const spotifyYear = new Date(t.album.release_date).getFullYear();
+            const year = await maybeResolveOriginalYearForImport({
+              artist: t.artists[0]?.name || '',
+              title: t.name,
+              spotifyYear,
+            });
+            const popularity = t.popularity;
+
+            let genreTag = null;
+            let genresArr = [];
+            try {
+              const artistId = t.artists?.[0]?.id || null;
+              if (artistId) {
+                let artistGenres = artistGenresCache.get(artistId);
+                if (!artistGenres) {
+                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  }, 'artist:genres:sweden50');
+                  artistGenres = artResp?.data?.genres || [];
+                  artistGenresCache.set(artistId, artistGenres);
+                }
+                genreTag = mapSpotifyGenres(artistGenres);
+                if (genreTag) genresArr = [genreTag];
+              }
+            } catch (_) { /* ignore */ }
+            if (!genreTag) { genreTag = 'pop'; genresArr = ['pop']; }
+
+            items.push({
+              spotifyUri: t.uri,
+              title: t.name,
+              artist: t.artists[0]?.name || '',
+              year,
+              spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
+              genre: genreTag,
+              genres: genresArr,
+              geography: 'SE',
+              markets: Array.from(new Set(['SE', Number(popularity) >= 85 ? 'INTL' : null].filter(Boolean))),
+              searchMarket: 'SE',
+              difficultyLevel: toDifficultyFromRankPop(null, popularity),
+              popularity,
+              albumArt: t.album.images?.[0]?.url || null,
+              previewUrl: t.preview_url || null,
+              tags: [],
+              verified: true,
+              addedBy: 'import',
+              isBillboardChart: false,
+              isSwedishChart: true,
+              chartInfo: { source: 'sweden-spotify' }
+            });
+          }
+        } catch (e) {
+          console.warn('[AdminImport][sweden] Spotify playlist fetch failed:', e.message);
         }
       }
     } else {

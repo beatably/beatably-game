@@ -73,6 +73,14 @@ const config = {
       path.resolve(process.cwd(), 'data', 'chart-hits-sample.json'),
     timeoutMs: num(process.env.CHART_FETCH_TIMEOUT_MS, 12000),
   },
+
+  swedish: {
+    localDataPath:
+      process.env.SWEDISH_CHART_DATA_PATH ||
+      path.resolve(process.cwd(), 'data', 'swedish-charts.json'),
+    spotifyPlaylistId:
+      process.env.SWEDISH_SPOTIFY_PLAYLIST_ID || '37i9dQZEVXbLoATJ81JYXz',
+  },
 };
 
 function ensureCacheDir() {

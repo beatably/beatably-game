@@ -513,6 +513,10 @@
             <div class="mode-title">Chart Hits</div>
             <div class="mode-desc">Billboard Hot 100 entries matched to Spotify. Best for chart-verified songs with rank data. <strong style="color:#f59e0b;">US chart — use Spotify Search for non-US origin filters.</strong></div>
           </div>
+          <div class="import-mode-card" id="modeCardSweden" onclick="selectImportMode('sweden')">
+            <div class="mode-title">Swedish Charts</div>
+            <div class="mode-desc">Swedish singles chart history (1960s–present) matched to Spotify, supplemented by the live Spotify Sweden Top 50. Geography pre-set to SE.</div>
+          </div>
           <div class="import-mode-card" id="modeCardSearch" onclick="selectImportMode('search')">
             <div class="mode-title">Spotify Search</div>
             <div class="mode-desc">Genre + year + market queries against Spotify API. Best for broader variety — and for non-US markets/origins (e.g. SE, NO).</div>
@@ -1284,12 +1288,14 @@
     function selectImportMode(mode) {
       window.__importChipState.mode = mode;
       const billboard = document.getElementById('modeCardBillboard');
+      const sweden = document.getElementById('modeCardSweden');
       const search = document.getElementById('modeCardSearch');
       if (billboard) billboard.classList.toggle('active', mode === 'billboard');
+      if (sweden) sweden.classList.toggle('active', mode === 'sweden');
       if (search) search.classList.toggle('active', mode === 'search');
-      // Hide genre section in Chart mode (genres auto-detected from MusicBrainz)
+      // Hide genre section in Chart/Swedish modes (genres auto-detected from MusicBrainz)
       const genresSection = document.getElementById('genresSection');
-      if (genresSection) genresSection.style.display = mode === 'billboard' ? 'none' : '';
+      if (genresSection) genresSection.style.display = (mode === 'billboard' || mode === 'sweden') ? 'none' : '';
     }
 
     function toggleDecade(decade) {
