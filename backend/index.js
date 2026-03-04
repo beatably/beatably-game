@@ -1222,6 +1222,12 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           // Detect actual artist origin via MusicBrainz (SE is always in markets since it charted there)
           const origin = await resolveArtistOrigin(t.artists[0]?.name || entry.artist);
 
+          // Strict origin filter: drop unknown origins too (unlike billboard which passes unknowns through)
+          if (needsOriginMatch && (origin === null || !originCountries.includes(String(origin).toUpperCase()))) {
+            diagnostics.droppedByOriginFilter += 1;
+            continue;
+          }
+
           const marketsArr = Array.from(new Set([
             'SE',
             origin ? String(origin).toUpperCase() : null,
@@ -1309,6 +1315,11 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
             if (!genreTag) { genreTag = 'pop'; genresArr = ['pop']; }
 
             const originPlaylist = await resolveArtistOrigin(t.artists[0]?.name || '');
+
+            if (needsOriginMatch && (originPlaylist === null || !originCountries.includes(String(originPlaylist).toUpperCase()))) {
+              diagnostics.droppedByOriginFilter += 1;
+              continue;
+            }
 
             items.push({
               spotifyUri: t.uri,
