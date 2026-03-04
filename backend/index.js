@@ -356,7 +356,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json()); // Add JSON body parser
+app.use(express.json({ limit: '10mb' })); // Add JSON body parser
 
 // --- Admin password middleware for curated DB ---
 function requireAdmin(req, res, next) {
