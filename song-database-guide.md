@@ -5,7 +5,8 @@ This guide explains how the Beatably song database works, how to enrich songs wi
 ## Overview
 
 The song database consists of:
-- **Billboard hits**: Chart data from 1960-2024
+- **Billboard hits**: Chart data from 1960-2024 (US Hot 100)
+- **Swedish chart hits**: Historical singles chart data from swedishcharts.com (1977–present)
 - **Spotify discoveries**: Genre and market-specific songs
 - **Enriched metadata**: Genre, geography, preview URLs, and international classification
 
@@ -16,8 +17,9 @@ Song Data Flow:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. Initial Import
-   Billboard API → chartProvider.js
-   Spotify Search → discovery.js
+   Billboard API     → chartProvider.js  (US chart mode)
+   Swedish Charts    → chartProvider.js  (Sweden chart mode, local JSON)
+   Spotify Search    → discovery.js
                     ↓
 2. Storage
    curated-songs.json (via curatedDb.js)
@@ -77,6 +79,66 @@ const enriched = await enrichSong(song, {
 // Enrich multiple songs
 const enriched = await enrichBatch(songs, options, progressCallback);
 ```
+
+---
+
+## Admin Bulk Import Modes
+
+The admin UI (`/admin`) can bulk-import songs into the database from three sources. Access requires the `x-admin-secret` header (set via `ADMIN_SECRET` env var).
+
+### Billboard (US Hot 100)
+
+Fetches chart history from a GitHub-hosted mirror of the Billboard Hot 100. Searches each entry on Spotify and enriches with genre detection and MusicBrainz geography.
+
+- Geography: determined via MusicBrainz (can be anything)
+- Market: `INTL` for popular songs, plus country of origin
+- Flag: `isBillboardChart: true`
+
+### Swedish Charts
+
+Imports songs from Swedish singles chart history (1977–present), sourced from a locally committed JSON file built from [swedishcharts.com](https://www.swedishcharts.com). After working through the historical data, supplemented with the live Spotify Sweden Top 50 playlist.
+
+- **Data file**: `backend/data/swedish-charts.json` (~4,400 unique tracks)
+- Geography: always `SE` (no MusicBrainz call needed)
+- Market: `SE`, plus `INTL` if Spotify popularity ≥ 85
+- Flag: `isSwedishChart: true`
+
+This mode is ideal for building a Swedish-language and Swedish-market-focused song pool spanning pop, rock, schlager, hip-hop, and international hits that charted in Sweden.
+
+#### Refreshing the Swedish Chart data
+
+The data file is committed to the repo and does not require runtime scraping. To update it:
+
+```bash
+# Refresh recent years only (fast, ~50 requests)
+node backend/scripts/scrape-swedish-charts.js --yearMin=2023 --yearMax=2025 --merge
+
+# Full rescrape (200 requests, ~4 minutes)
+node backend/scripts/scrape-swedish-charts.js --yearMin=1975 --yearMax=2025
+
+# Dry run to verify parsing before writing
+node backend/scripts/scrape-swedish-charts.js --dry-run --yearMin=2024 --yearMax=2024
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--yearMin=YYYY` | Start year (default: 1975) |
+| `--yearMax=YYYY` | End year (default: last year) |
+| `--decade=YYYY` | Scrape one decade only (e.g. `--decade=1990` → 1990–1999) |
+| `--merge` | Merge with existing file instead of overwriting |
+| `--output=PATH` | Custom output path |
+| `--delay=MS` | Delay between requests in ms (default: 1200) |
+| `--dry-run` | Fetch 2 sample weeks and print without writing |
+
+After running, commit the updated `backend/data/swedish-charts.json`.
+
+### Spotify Search
+
+Dynamic Spotify searches using artist/genre/year queries. Useful for targeted additions. Geography is determined via MusicBrainz.
+
+---
 
 ## CLI Tools
 

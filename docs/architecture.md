@@ -133,7 +133,7 @@ tailwindcss-animate            —     — Animations
 | `songEnrichment.js` | Pipeline: MusicBrainz metadata + preview URLs + geography |
 | `geographyDetection.js` | Artist origin detection (MusicBrainz + Spotify genre hints) |
 | `musicbrainz.js` | MusicBrainz API integration with rate limiting + local cache |
-| `chartProvider.js` | Billboard Hot 100 fetcher (remote GitHub JSON or local fallback) |
+| `chartProvider.js` | Chart data provider: Billboard Hot 100 (remote GitHub JSON) + Swedish chart history (local JSON) |
 | `discovery.js` | Local network device discovery (mDNS/Bonjour + SSDP) |
 
 ### Game State
@@ -149,6 +149,7 @@ tailwindcss-animate            —     — Animations
 - Songs are enriched with: Spotify preview URL, MusicBrainz year, genre tags, `isInternational` flag
 - Smart migration between deployed DB and persistent disk (avoids overwriting newer data)
 - Admin API for managing songs (requires `x-admin-secret` header)
+- Swedish chart history: `backend/data/swedish-charts.json` (~4,400 tracks, 1977–present) committed to repo
 
 ### Feature Flags (`config.js`)
 
@@ -157,6 +158,8 @@ tailwindcss-animate            —     — Animations
 | Chart mode (Billboard) | `CHART_MODE_ENABLE` | `false` |
 | MusicBrainz enrichment | `MUSICBRAINZ_ENABLE` | `true` |
 | Remaster filter | `REMASTER_FILTER_ENABLE` | `true` |
+| Swedish chart data path | `SWEDISH_CHART_DATA_PATH` | `backend/data/swedish-charts.json` |
+| Swedish Spotify playlist | `SWEDISH_SPOTIFY_PLAYLIST_ID` | `37i9dQZEVXbLoATJ81JYXz` (Sweden Top 50) |
 
 ### HTTP API Routes
 
