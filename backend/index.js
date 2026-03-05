@@ -714,7 +714,16 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
  * Returns curated-like items without saving to DB.
  */
 app.get('/api/admin/import/progress', requireAdmin, (req, res) => {
-  res.json(importProgress || { active: false });
+  res.json(importProgress || { active: false, done: false });
+});
+
+app.get('/api/admin/import/results', requireAdmin, (req, res) => {
+  res.json(importResults || { ok: false, items: [] });
+});
+
+app.post('/api/admin/import/cancel', requireAdmin, (req, res) => {
+  importJobCancelled = true;
+  res.json({ ok: true });
 });
 
 /**
@@ -814,18 +823,9 @@ app.post('/api/admin/import/fetch-previews', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
-  // Cancellation: res.on('close') fires when client disconnects before response is sent.
-  // (req.on('close') fires too early in newer Node.js — after body is consumed, not client disconnect)
-  let cancelled = false;
-  res.on('close', () => { cancelled = true; });
-
-  try {
-    // Force reload database to ensure we have latest migrated data
-    console.log('[Admin] Force reloading curated database for import preview request');
-    curatedDb.load();
-    
-    const body = req.body || {};
+app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
+  // Parse params synchronously then respond immediately — job runs in background.
+  const body = req.body || {};
     const modeRaw = String(body.mode || 'billboard').toLowerCase();
     const mode = (function normalizeImportMode(m) {
       if (m === 'spotify' || m === 'spotify-search' || m === 'search') return 'search';
@@ -972,8 +972,16 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       errors: 0,
     };
 
-    // Live progress state (polled by frontend)
-    importProgress = { active: true, evaluated: 0, accepted: 0, droppedOrigin: 0, droppedDupe: 0, startedAt: Date.now() };
+    // Respond immediately — background job updates importProgress and sets importResults when done
+    importResults = null;
+    importJobCancelled = false;
+    importProgress = { active: true, done: false, evaluated: 0, accepted: 0, droppedOrigin: 0, droppedDupe: 0, startedAt: Date.now() };
+    curatedDb.load();
+    res.json({ ok: true, started: true });
+
+    // Run the import in background — browser can disconnect without losing work
+    (async () => {
+    try {
 
     // Genre mapping: map Spotify's detailed genres to game categories used in game settings
     const artistGenresCache = new Map();
@@ -1004,7 +1012,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
 
       const token = await getClientToken();
       for (const entry of chartEntries) {
-        if (items.length >= cap || cancelled) break;
+        if (items.length >= cap || importJobCancelled) break;
         try {
           const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
           const resp = await spotifyGet('https://api.spotify.com/v1/search', {
@@ -1152,7 +1160,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       chartEntries = chartEntries.sort(() => Math.random() - 0.5);
 
       for (const entry of chartEntries) {
-        if (items.length >= cap || cancelled) break;
+        if (items.length >= cap || importJobCancelled) break;
         try {
           const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
           const resp = await spotifyGet('https://api.spotify.com/v1/search', {
@@ -1268,7 +1276,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       }
 
       // Supplement with live Spotify Sweden Top 50 playlist if room remains
-      if (items.length < cap && !cancelled) {
+      if (items.length < cap && !importJobCancelled) {
         try {
           const playlistResp = await spotifyGet(
             `https://api.spotify.com/v1/playlists/${config.swedish.spotifyPlaylistId}/tracks`,
@@ -1280,7 +1288,7 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
           );
           diagnostics.queriesAttempted += 1;
           for (const item of playlistResp.data.items || []) {
-            if (items.length >= cap || cancelled) break;
+            if (items.length >= cap || importJobCancelled) break;
             const t = item.track;
             if (!t || !t.uri) continue;
             if (seen.has(t.uri)) { diagnostics.droppedAsDuplicatesInPreview += 1; continue; }
@@ -1384,11 +1392,11 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
       diagnostics.trackEvaluationBudget = maxTracksToEvaluate;
 
       let stopEarly = false;
-      console.log(`[AdminImport][search] Starting loops: queries=${queries.length} markets=${JSON.stringify(searchMarkets)} cancelled=${cancelled} cap=${cap}`);
+      console.log(`[AdminImport][search] Starting loops: queries=${queries.length} markets=${JSON.stringify(searchMarkets)} cancelled=${importJobCancelled} cap=${cap}`);
 
       for (const market of searchMarkets) {
         for (const q of queries) {
-          if (items.length >= cap || cancelled) { stopEarly = true; break; }
+          if (items.length >= cap || importJobCancelled) { stopEarly = true; break; }
           if (diagnostics.queriesAttempted >= maxQueries) {
             diagnostics.truncated = true;
             diagnostics.truncationReason = 'query_budget_reached';
@@ -1515,20 +1523,14 @@ app.post('/api/admin/import/preview', requireAdmin, async (req, res) => {
     
     console.log(`[AdminImport] Filtered ${duplicateCount} duplicates, ${newItems.length} new songs`);
 
-    res.json({ 
-      ok: true, 
-      mode,
-      total: newItems.length, 
-      items: newItems,
-      duplicatesFiltered: duplicateCount,
-      diagnostics,
-    });
-  } catch (e) {
-    console.error('[AdminImport][preview] failed:', e && e.message);
-    if (!res.headersSent) res.status(500).json({ ok: false, error: e?.message || 'Preview failed' });
-  } finally {
-    importProgress = null;
-  }
+    importResults = { ok: true, mode, total: newItems.length, items: newItems, duplicatesFiltered: duplicateCount, diagnostics };
+    importProgress = { active: false, done: true };
+    } catch (e) {
+      console.error('[AdminImport][preview] background job failed:', e && e.message);
+      importResults = { ok: false, error: e?.message || 'Preview failed', items: [] };
+      importProgress = { active: false, done: true, error: e?.message };
+    }
+    })(); // end background import job
 });
 
 /**
@@ -1731,6 +1733,8 @@ app.post('/api/curated/select', (req, res) => {
 
 // Single in-flight import preview progress (reset between runs)
 let importProgress = null;
+let importResults = null;   // persists after job completes so client can fetch results
+let importJobCancelled = false;
 
 // Store fetched songs for debugging (in production, consider using Redis or database)
 let lastFetchedSongs = null;

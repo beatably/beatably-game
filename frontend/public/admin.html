@@ -1278,7 +1278,8 @@
 
     // ===== Bulk import (preview & commit) =====
     window.__importPreviewItems = [];
-    window.__importAbort = null;
+    window.__importInProgress = false;
+    window.__importResultPollId = null;
     window.__importTimer = null;
     window.__importStart = 0;
 
@@ -1547,15 +1548,17 @@
     }
 
     async function previewImport() {
-      try {
-        if (window.__importAbort) {
-          try { window.__importAbort.abort(); } catch (_) {}
-        }
-        const controller = new AbortController();
-        window.__importAbort = controller;
-        setImportLoading(true);
-        renderLoadingRow('Fetching preview…');
+      // Cancel any in-progress job before starting a new one
+      if (window.__importInProgress) {
+        try { await adminFetch('/api/admin/import/cancel', { method: 'POST' }); } catch (_) {}
+        window.__importInProgress = false;
+        if (window.__importResultPollId) { clearInterval(window.__importResultPollId); window.__importResultPollId = null; }
+      }
+      setImportLoading(true);
+      renderLoadingRow('Fetching preview…');
+      window.__importInProgress = true;
 
+      try {
         const chipState = window.__importChipState;
         const mode = chipState.mode || 'billboard';
         const yearMin = Number(els.importYearMin?.value) || (chipState.decades.length ? chipState.decades[0] : undefined);
@@ -1579,11 +1582,33 @@
           limit
         };
 
-        const resp = await adminFetch('/api/admin/import/preview', {
-          method: 'POST',
-          body: JSON.stringify(body),
-          signal: controller.signal
+        // Start background job — backend responds immediately with {ok:true, started:true}
+        await adminFetch('/api/admin/import/preview', { method: 'POST', body: JSON.stringify(body) });
+
+        // Wait for the background job to finish by polling /progress for done:true
+        await new Promise((resolve, reject) => {
+          window.__importResultPollId = setInterval(async () => {
+            try {
+              const p = await adminFetch('/api/admin/import/progress');
+              if (p && p.done) {
+                clearInterval(window.__importResultPollId);
+                window.__importResultPollId = null;
+                resolve();
+              }
+            } catch (_) {}
+          }, 800);
         });
+
+        // If cancelled while waiting, bail out
+        if (!window.__importInProgress) {
+          showStatus('Preview cancelled', 'warning');
+          return;
+        }
+
+        // Fetch completed results
+        const resp = await adminFetch('/api/admin/import/results');
+        if (resp.ok === false) throw new Error(resp.error || 'Preview failed');
+
         renderImportPreview(resp.items || []);
 
         // Build diagnostics bar
@@ -1605,15 +1630,12 @@
           : 'Preview ready';
         showStatus(statusMsg, 'success');
       } catch (e) {
-        if (e.name === 'AbortError') {
-          showStatus('Preview cancelled', 'warning');
-        } else {
-          renderImportPreview([]);
-          showStatus(e.message || 'Preview failed', 'error');
-        }
+        renderImportPreview([]);
+        showStatus(e.message || 'Preview failed', 'error');
       } finally {
+        window.__importInProgress = false;
+        if (window.__importResultPollId) { clearInterval(window.__importResultPollId); window.__importResultPollId = null; }
         setImportLoading(false);
-        window.__importAbort = null;
       }
     }
 
@@ -2884,8 +2906,12 @@
     if (els.previewImportBtn) els.previewImportBtn.onclick = previewImport;
     if (els.commitImportBtn) els.commitImportBtn.onclick = commitSelected;
     if (els.fetchPreviewsBtn) els.fetchPreviewsBtn.onclick = fetchMissingPreviews;
-    if (els.cancelImportBtn) els.cancelImportBtn.onclick = () => {
-      try { if (window.__importAbort) window.__importAbort.abort(); } catch (_) {}
+    if (els.cancelImportBtn) els.cancelImportBtn.onclick = async () => {
+      window.__importInProgress = false;
+      if (window.__importResultPollId) { clearInterval(window.__importResultPollId); window.__importResultPollId = null; }
+      try { await adminFetch('/api/admin/import/cancel', { method: 'POST' }); } catch (_) {}
+      showStatus('Preview cancelled', 'warning');
+      setImportLoading(false);
     };
     if (els.importSelectAll) {
       els.importSelectAll.onclick = () => {
