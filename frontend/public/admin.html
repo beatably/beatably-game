@@ -521,6 +521,10 @@
             <div class="mode-title">Spotify Search</div>
             <div class="mode-desc">Genre + year + market queries against Spotify API. Best for broader variety — and for non-US markets/origins (e.g. SE, NO).</div>
           </div>
+          <div class="import-mode-card" id="modeCardSvensktoppen" onclick="selectImportMode('svensktoppen')">
+            <div class="mode-title">Svensktoppen</div>
+            <div class="mode-desc">Swedish Wikipedia chart data 1962–present. All entries are Swedish origin by definition — no origin filtering needed. Best for classic Swedish domestic music.</div>
+          </div>
         </div>
 
         <!-- Filter grid row 1: Year Range | Genres -->
@@ -1291,12 +1295,14 @@
       const billboard = document.getElementById('modeCardBillboard');
       const sweden = document.getElementById('modeCardSweden');
       const search = document.getElementById('modeCardSearch');
+      const svt = document.getElementById('modeCardSvensktoppen');
       if (billboard) billboard.classList.toggle('active', mode === 'billboard');
       if (sweden) sweden.classList.toggle('active', mode === 'sweden');
       if (search) search.classList.toggle('active', mode === 'search');
+      if (svt) svt.classList.toggle('active', mode === 'svensktoppen');
       // Hide genre section in Chart/Swedish modes (genres auto-detected from MusicBrainz)
       const genresSection = document.getElementById('genresSection');
-      if (genresSection) genresSection.style.display = (mode === 'billboard' || mode === 'sweden') ? 'none' : '';
+      if (genresSection) genresSection.style.display = (mode === 'billboard' || mode === 'sweden' || mode === 'svensktoppen') ? 'none' : '';
     }
 
     function toggleDecade(decade) {

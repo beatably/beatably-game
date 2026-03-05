@@ -428,7 +428,79 @@ async function getSwedishChartEntries({ difficulty = 'normal', yearMin, yearMax 
   return filtered;
 }
 
+/**
+ * Load Svensktoppen Wikipedia chart data from the local scraped JSON file.
+ * Returns [] with a warning if the file is missing (run scrape-svensktoppen-wikipedia.js first).
+ */
+function loadSvenskToppenData() {
+  try {
+    const p = config.swedish.svtLocalDataPath;
+    dbg('Loading Svensktoppen data from', p);
+    if (fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, 'utf-8');
+      const data = JSON.parse(raw);
+      dbg('Loaded Svensktoppen entries:', Array.isArray(data) ? data.length : 0);
+      if (Array.isArray(data) && data.length && data[0].artist && data[0].title) {
+        return data.map((row) => ({
+          title: row.title,
+          artist: row.artist,
+          year: Number.isFinite(row.year) ? row.year : null,
+          rank: Number.isFinite(row.rank) ? row.rank : null,
+          source: 'svensktoppen-wiki',
+          chartDate: row.chartDate || null,
+          peakPos: row.peakPos ?? row.rank ?? null,
+          weeksOnChart: row.weeksOnChart ?? null,
+          lastWeek: null,
+        }));
+      }
+    }
+    console.warn('[ChartProvider] Svensktoppen data not found at', p, '— run backend/scripts/scrape-svensktoppen-wikipedia.js first');
+  } catch (e) {
+    console.warn('[ChartProvider] Failed to load Svensktoppen data:', e.message);
+  }
+  return [];
+}
+
+/**
+ * Get Svensktoppen entries from local scraped data.
+ * All entries are Swedish origin by definition — no origin filtering needed at this stage.
+ * Supports year range filtering and difficulty ceilings (same as getSwedishChartEntries).
+ */
+async function getSvenskToppenEntries({ difficulty = 'normal', yearMin, yearMax } = {}) {
+  dbg('getSvenskToppenEntries:', { difficulty, yearMin, yearMax });
+
+  let entries = loadSvenskToppenData();
+
+  if (!entries.length) {
+    return [];
+  }
+
+  if (Number.isFinite(yearMin) || Number.isFinite(yearMax)) {
+    const before = entries.length;
+    entries = entries.filter((e) => {
+      if (Number.isFinite(yearMin) && e.year < yearMin) return false;
+      if (Number.isFinite(yearMax) && e.year > yearMax) return false;
+      return true;
+    });
+    dbg('After year filter:', entries.length, 'before:', before);
+  }
+
+  const deduped = dedupeByBestRank(entries);
+  const filtered = filterByDifficulty(deduped, difficulty);
+  dbg('Svensktoppen: raw', entries.length, 'deduped', deduped.length, 'after difficulty', filtered.length);
+
+  filtered.sort((a, b) => {
+    const aMetric = Number.isFinite(a.peakPos) ? a.peakPos : (Number.isFinite(a.rank) ? a.rank : 9999);
+    const bMetric = Number.isFinite(b.peakPos) ? b.peakPos : (Number.isFinite(b.rank) ? b.rank : 9999);
+    if (aMetric !== bMetric) return aMetric - bMetric;
+    return String(a.title).localeCompare(String(b.title));
+  });
+
+  return filtered;
+}
+
 module.exports = {
   getChartEntries,
   getSwedishChartEntries,
+  getSvenskToppenEntries,
 };

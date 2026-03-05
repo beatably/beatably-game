@@ -79,7 +79,7 @@ async function spotifyGet(url, opts = {}, label = '') {
 // Feature flags, thresholds, and providers
 const { config } = require('./config');
 const { resolveOriginalYear, isRemasterMarker, normalizeTitle } = require('./musicbrainz');
-const { getChartEntries, getSwedishChartEntries } = require('./chartProvider');
+const { getChartEntries, getSwedishChartEntries, getSvenskToppenEntries } = require('./chartProvider');
 
 const app = express();
 const discovery = require('./discovery');
@@ -831,6 +831,7 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
       if (m === 'spotify' || m === 'spotify-search' || m === 'search') return 'search';
       if (m === 'billboard') return 'billboard';
       if (m === 'sweden') return 'sweden';
+      if (m === 'svensktoppen') return 'svensktoppen';
       return 'billboard';
     })(modeRaw);
     const filters = body.filters || {};
@@ -1358,6 +1359,128 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
           }
         } catch (e) {
           console.warn('[AdminImport][sweden] Spotify playlist fetch failed:', e.message);
+        }
+      }
+    } else if (mode === 'svensktoppen') {
+      // Svensktoppen: Swedish Wikipedia chart data 1962–present.
+      // All entries are Swedish origin by definition — skip MusicBrainz origin lookup.
+      let chartEntries = await getSvenskToppenEntries({
+        difficulty: 'normal',
+        yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
+        yearMax: Number.isFinite(yearMax) ? yearMax : undefined,
+      });
+
+      const token = await getClientToken();
+
+      if (chartEntries.length === 0) {
+        console.warn('[AdminImport][svensktoppen] No local chart data — run backend/scripts/scrape-svensktoppen-wikipedia.js first');
+      }
+
+      // Shuffle for variety across decades
+      chartEntries = chartEntries.sort(() => Math.random() - 0.5);
+
+      for (const entry of chartEntries) {
+        if (items.length >= cap || importJobCancelled) break;
+        try {
+          const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
+          const resp = await spotifyGet('https://api.spotify.com/v1/search', {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { q, type: 'track', limit: 5, market: 'SE' }
+          }, 'search:svensktoppen');
+          diagnostics.queriesAttempted += 1;
+          const t = (resp.data.tracks.items || [])[0];
+          if (!t) continue;
+
+          const spotifyUri = t.uri;
+          if (seen.has(spotifyUri)) {
+            diagnostics.droppedAsDuplicatesInPreview += 1;
+            continue;
+          }
+          seen.add(spotifyUri);
+          diagnostics.tracksEvaluated += 1;
+          if (importProgress) {
+            importProgress.evaluated = diagnostics.tracksEvaluated;
+            importProgress.accepted = items.length;
+            importProgress.droppedOrigin = diagnostics.droppedByOriginFilter;
+            importProgress.droppedDupe = diagnostics.droppedAsDuplicatesInPreview;
+          }
+
+          const spotifyYear = new Date(t.album.release_date).getFullYear();
+          const year = await maybeResolveOriginalYearForImport({
+            artist: t.artists[0]?.name || entry.artist,
+            title: t.name,
+            spotifyYear,
+          });
+          const popularity = t.popularity;
+          const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
+
+          let genreTag = null;
+          let genresArr = [];
+          try {
+            const genreResult = await detectGenresForArtist(t.artists[0]?.name || entry.artist);
+            if (genreResult && genreResult.genres.length > 0) {
+              genresArr = genreResult.genres;
+              genreTag = genreResult.genres[0];
+            }
+          } catch (e) {
+            console.warn(`[AdminImport][svensktoppen] Genre detection failed for ${entry.artist}:`, e.message);
+          }
+          if (!genreTag) {
+            try {
+              const artistId = t.artists?.[0]?.id || null;
+              if (artistId) {
+                let artistGenres = artistGenresCache.get(artistId);
+                if (!artistGenres) {
+                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  }, 'artist:genres:svensktoppen');
+                  artistGenres = artResp?.data?.genres || [];
+                  artistGenresCache.set(artistId, artistGenres);
+                }
+                genreTag = mapSpotifyGenres(artistGenres);
+                if (genreTag) genresArr = [genreTag];
+              }
+            } catch (_) { /* ignore */ }
+          }
+          if (!genreTag) {
+            genreTag = 'pop';
+            genresArr = ['pop'];
+          }
+
+          // Svensktoppen = Swedish origin by definition. Skip MusicBrainz lookup.
+          const marketsArr = ['SE'];
+          if (Number(popularity) >= 85) marketsArr.push('INTL');
+
+          items.push({
+            spotifyUri,
+            title: t.name,
+            artist: t.artists[0]?.name || entry.artist,
+            year,
+            spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
+            genre: genreTag,
+            genres: genresArr,
+            geography: 'SE',
+            markets: marketsArr,
+            searchMarket: 'SE',
+            difficultyLevel,
+            popularity,
+            albumArt: t.album.images?.[0]?.url || null,
+            previewUrl: t.preview_url || null,
+            tags: [],
+            verified: true,
+            addedBy: 'import',
+            isBillboardChart: false,
+            isSwedishChart: true,
+            chartInfo: {
+              rank: entry.rank ?? null,
+              peakPos: entry.peakPos ?? null,
+              weeksOnChart: entry.weeksOnChart ?? null,
+              chartDate: entry.chartDate ?? null,
+              source: 'svensktoppen-wiki',
+            }
+          });
+        } catch (e) {
+          diagnostics.errors += 1;
         }
       }
     } else {

@@ -78,6 +78,9 @@ const config = {
     localDataPath:
       process.env.SWEDISH_CHART_DATA_PATH ||
       path.resolve(process.cwd(), 'data', 'swedish-charts.json'),
+    svtLocalDataPath:
+      process.env.SVT_CHART_DATA_PATH ||
+      path.resolve(process.cwd(), 'data', 'svensktoppen-wiki.json'),
     spotifyPlaylistId:
       process.env.SWEDISH_SPOTIFY_PLAYLIST_ID || '37i9dQZEVXbLoATJ81JYXz',
   },
