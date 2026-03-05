@@ -394,15 +394,20 @@ function add(song) {
     year: Number(song.year) || null,
     // Backward-compatible single genre; prefer first from genres[]
     genre: (Array.isArray(song.genres) && song.genres.length ? String(song.genres[0]) : (song.genre || '')),
+    // Secondary genre (optional); only present when a meaningful secondary was detected
+    genreSecondary: song.genreSecondary || null,
     // Backward-compatible single geography; prefer explicit origin (geography) first
     geography: (song.geography || (Array.isArray(song.markets) && song.markets.length ? String(song.markets[0]) : '')),
     // New multi-fields for markets (success regions) and genres
     markets: Array.isArray(song.markets)
       ? Array.from(new Set(song.markets.map((m) => String(m || '').toUpperCase()).filter(Boolean)))
       : (song.geography ? [String(song.geography).toUpperCase()] : []),
-    genres: Array.isArray(song.genres)
-      ? Array.from(new Set(song.genres.map((g) => String(g || '').toLowerCase()).filter(Boolean)))
-      : (song.genre ? [String(song.genre).toLowerCase()] : []),
+    // genres array: derived from genre + genreSecondary (max 2 elements)
+    genres: (() => {
+      const primary = Array.isArray(song.genres) && song.genres.length ? String(song.genres[0]) : (song.genre || '');
+      const secondary = song.genreSecondary || (Array.isArray(song.genres) && song.genres.length > 1 ? String(song.genres[1]) : null);
+      return [primary, secondary].filter(Boolean).map(g => String(g).toLowerCase());
+    })(),
     difficultyLevel: Number(song.difficultyLevel) || 1,
     popularity: Number.isFinite(song.popularity) ? Number(song.popularity) : null,
     albumArt: song.albumArt || null,
@@ -657,4 +662,6 @@ module.exports = {
   update,
   remove,
   selectForGame,
+  CACHE_DIR,
+  DB_FILE,
 };

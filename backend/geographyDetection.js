@@ -99,47 +99,69 @@ const MB_BASE = 'https://musicbrainz.org/ws/2';
 // MusicBrainz tag to canonical genre mapping
 const MB_GENRE_MAP = [
   // Electronic/Dance
-  { tags: ['electronic', 'edm', 'house', 'techno', 'trance', 'dubstep', 'drum and bass', 'dnb', 'electro', 'synthpop', 'electropop', 'dance'], genre: 'electronic' },
-  
+  { tags: ['electronic', 'edm', 'house', 'techno', 'trance', 'dubstep', 'drum and bass', 'dnb', 'electro', 'synthpop', 'electropop', 'dance', 'disco', 'dance-pop'], genre: 'electronic' },
+
   // Hip-Hop/Rap
   { tags: ['hip hop', 'hip-hop', 'rap', 'trap', 'grime', 'drill', 'gangsta rap', 'conscious hip hop', 'old school hip hop'], genre: 'hip-hop' },
-  
-  // Rock variants
-  { tags: ['rock', 'hard rock', 'classic rock', 'alternative rock', 'punk rock', 'punk', 'metal', 'heavy metal', 'death metal', 'black metal', 'thrash metal', 'progressive rock', 'grunge', 'emo', 'post-rock', 'garage rock'], genre: 'rock' },
-  
+
+  // Rock variants (including metal, post-hardcore, blues rock etc.)
+  { tags: ['rock', 'hard rock', 'classic rock', 'alternative rock', 'punk rock', 'punk', 'metal', 'heavy metal', 'death metal', 'black metal', 'thrash metal', 'progressive rock', 'grunge', 'emo', 'post-rock', 'garage rock', 'blues rock', 'post-grunge', 'nu metal', 'rap rock', 'rap metal', 'neo-psychedelia', 'psychedelic rock', 'psychedelic pop', 'post-hardcore', 'melodic hardcore', 'easycore', 'power metal', 'speed metal', 'stoner rock', 'doom metal', 'glam rock', 'indie metal'], genre: 'rock' },
+
   // Pop variants
   { tags: ['pop', 'pop rock', 'dance pop', 'teen pop', 'k-pop', 'j-pop', 'europop', 'bubblegum pop', 'power pop'], genre: 'pop' },
-  
+
   // Indie/Alternative
   { tags: ['indie', 'indie rock', 'indie pop', 'alternative', 'indie folk', 'indie electronic', 'lo-fi', 'lofi', 'shoegaze', 'dream pop', 'art rock'], genre: 'indie' },
-  
-  // R&B/Soul/Funk
-  { tags: ['r&b', 'rnb', 'soul', 'funk', 'neo-soul', 'contemporary r&b', 'motown'], genre: 'pop' }, // Map to pop for game simplicity
-  
-  // Country/Folk
-  { tags: ['country', 'folk', 'americana', 'bluegrass', 'country rock', 'folk rock', 'singer-songwriter'], genre: 'indie' }, // Map to indie for game simplicity
-  
-  // Jazz/Blues
-  { tags: ['jazz', 'blues', 'smooth jazz', 'bebop', 'swing', 'fusion'], genre: 'indie' }, // Map to indie for game simplicity
-  
-  // Classical/Instrumental
-  { tags: ['classical', 'orchestral', 'instrumental', 'ambient', 'new age', 'soundtrack'], genre: 'indie' } // Map to indie for game simplicity
+
+  // R&B/Soul/Funk → pop
+  { tags: ['r&b', 'rnb', 'soul', 'funk', 'neo-soul', 'contemporary r&b', 'motown'], genre: 'pop' },
+
+  // Country/Folk → indie
+  { tags: ['country', 'folk', 'americana', 'bluegrass', 'country rock', 'folk rock', 'singer-songwriter', 'folk pop', 'indie folk', 'stomp and holler'], genre: 'indie' },
+
+  // Jazz/Blues → indie
+  { tags: ['jazz', 'blues', 'smooth jazz', 'bebop', 'swing', 'fusion'], genre: 'indie' },
+
+  // Classical/Instrumental → indie
+  { tags: ['classical', 'orchestral', 'instrumental', 'ambient', 'new age', 'soundtrack'], genre: 'indie' }
 ];
 
-function mapMusicBrainzTagsToGenres(tags = []) {
-  const normalizedTags = tags.map(tag => norm(String(tag || '')));
-  const matchedGenres = new Set();
-  
-  for (const mapping of MB_GENRE_MAP) {
-    for (const tagPattern of mapping.tags) {
-      if (normalizedTags.some(tag => tag.includes(tagPattern) || tagPattern.includes(tag))) {
-        matchedGenres.add(mapping.genre);
-        break; // Found match for this mapping, move to next
+// Takes array of {name, count} tag objects (or plain strings for backward compat).
+// Accumulates votes per genre bucket and returns { primary, secondary }.
+// secondary is only set if its vote total is ≥25% of primary's.
+function mapMusicBrainzTagsToGenres(tagObjects = []) {
+  const bucketVotes = {};
+
+  for (const tagObj of tagObjects) {
+    const tagName = norm(String(tagObj.name || tagObj || ''));
+    const votes = Number(tagObj.count) || 1;
+
+    for (const mapping of MB_GENRE_MAP) {
+      let matched = false;
+      for (const tagPattern of mapping.tags) {
+        if (tagName.includes(tagPattern) || tagPattern.includes(tagName)) {
+          bucketVotes[mapping.genre] = (bucketVotes[mapping.genre] || 0) + votes;
+          matched = true;
+          break; // one tag → first matching bucket only
+        }
       }
+      if (matched) break; // one tag → one bucket total
     }
   }
-  
-  return Array.from(matchedGenres);
+
+  const buckets = Object.keys(bucketVotes);
+  if (buckets.length === 0) return { primary: null, secondary: null };
+
+  // Sort by votes desc; ties broken alphabetically for determinism
+  buckets.sort((a, b) => bucketVotes[b] - bucketVotes[a] || a.localeCompare(b));
+
+  const primary = buckets[0];
+  const primaryVotes = bucketVotes[primary];
+  const secondary = (buckets[1] && bucketVotes[buckets[1]] >= primaryVotes * 0.25)
+    ? buckets[1]
+    : null;
+
+  return { primary, secondary };
 }
 
 async function mbSearchArtistCountry(artistName) {
@@ -193,23 +215,24 @@ async function mbSearchArtistGenres(artistName) {
     let best = arts.find(a => norm(a.name) === n) || arts[0];
     if (!best || !Array.isArray(best.tags)) return null;
 
-    // Extract tag names and their counts
-    const tags = best.tags
-      .filter(tag => tag.count && tag.count >= 1) // Only tags with some usage
-      .sort((a, b) => (b.count || 0) - (a.count || 0)) // Sort by popularity
-      .map(tag => tag.name)
-      .slice(0, 10); // Top 10 tags
+    // Keep tag objects with vote counts for weighted genre detection
+    const tagObjects = best.tags
+      .filter(tag => tag.count && tag.count >= 1)
+      .sort((a, b) => (b.count || 0) - (a.count || 0))
+      .slice(0, 20); // Top 20 — more data improves vote weighting
 
-    if (!tags.length) return null;
+    if (!tagObjects.length) return null;
 
-    const genres = mapMusicBrainzTagsToGenres(tags);
-    
+    const { primary, secondary } = mapMusicBrainzTagsToGenres(tagObjects);
+
     return {
-      genres,
-      rawTags: tags,
+      genres: [primary, secondary].filter(Boolean),
+      primary,
+      secondary,
+      rawTags: tagObjects.map(t => t.name),
       source: 'musicbrainz',
       match: best.name,
-      confidence: genres.length > 0 ? 0.8 : 0.1
+      confidence: primary ? 0.8 : 0.1
     };
   } catch (e) {
     return null;
@@ -285,32 +308,39 @@ async function detectGeographyForItem(item) {
  * Detect genres for an artist using hybrid MusicBrainz + Spotify approach
  */
 async function detectGenresForArtist(artistName) {
-  const results = { artist: artistName, genres: [], sources: [] };
+  const results = { artist: artistName, genres: [], primary: null, secondary: null, sources: [] };
 
-  // 1) Try MusicBrainz first (no rate limits, rich data)
+  // 1) Try MusicBrainz first — vote-weighted, returns primary + optional secondary
   const mbGenres = await mbSearchArtistGenres(artistName);
-  if (mbGenres && mbGenres.genres.length > 0) {
-    results.genres = [...mbGenres.genres];
+  if (mbGenres && mbGenres.primary) {
+    results.primary = mbGenres.primary;
+    results.secondary = mbGenres.secondary || null;
+    results.genres = mbGenres.genres; // [primary] or [primary, secondary]
     results.sources.push({
       source: 'musicbrainz',
       genres: mbGenres.genres,
+      primary: mbGenres.primary,
+      secondary: mbGenres.secondary,
       rawTags: mbGenres.rawTags,
       confidence: mbGenres.confidence
     });
   }
 
-  // 2) Try Spotify as fallback or supplement
-  if (results.genres.length === 0) {
+  // 2) Spotify fallback — only if MusicBrainz found nothing
+  if (!results.primary) {
     try {
       const sp = await spotifySearchArtistByName(artistName);
       if (sp && Array.isArray(sp.genres) && sp.genres.length) {
-        // Use existing Spotify genre mapping from reclassify-batched.js logic
-        const spotifyGenres = mapSpotifyGenres(sp.genres);
-        if (spotifyGenres.length > 0) {
-          results.genres = spotifyGenres;
+        const spotifyMapped = mapSpotifyGenres(sp.genres);
+        if (spotifyMapped.length > 0) {
+          results.primary = spotifyMapped[0];
+          results.secondary = null; // Spotify path: single genre only
+          results.genres = [results.primary];
           results.sources.push({
             source: 'spotify',
-            genres: spotifyGenres,
+            genres: results.genres,
+            primary: results.primary,
+            secondary: null,
             rawGenres: sp.genres,
             confidence: 0.7
           });
@@ -321,12 +351,16 @@ async function detectGenresForArtist(artistName) {
     }
   }
 
-  // 3) Ensure we have at least one genre, fallback to 'pop' if nothing found
-  if (results.genres.length === 0) {
-    results.genres = ['pop']; // Better than 'chart'
+  // 3) Final fallback to 'pop' if nothing found
+  if (!results.primary) {
+    results.primary = 'pop';
+    results.secondary = null;
+    results.genres = ['pop'];
     results.sources.push({
       source: 'fallback',
       genres: ['pop'],
+      primary: 'pop',
+      secondary: null,
       confidence: 0.1,
       reason: 'No genre data found, using pop as fallback'
     });

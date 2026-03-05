@@ -746,26 +746,49 @@ app.get('/api/admin/enrichment-status', requireAdmin, (_req, res) => {
 
 /**
  * Admin - Batch Enrichment
- * Body: { fields: ('genre'|'geo'|'preview')[], limit?: number }
+ * Body: { fields: ('genre'|'geo'|'preview')[], limit?: number, force?: boolean }
+ * When force=true, re-enriches ALL songs (not just those missing fields).
+ * Automatically backs up the database before starting when force=true.
  * Responds immediately, runs enrichment fire-and-forget in background.
  */
-app.post('/api/admin/enrich-batch', requireAdmin, (req, res) => {
+app.post('/api/admin/enrich-batch', requireAdmin, async (req, res) => {
   const { enrichSong } = require('./songEnrichment');
+  const fsPromises = require('fs').promises;
   const fields = Array.isArray(req.body?.fields) ? req.body.fields : ['genre', 'geo', 'preview'];
   const limit = Number.isFinite(Number(req.body?.limit)) && Number(req.body.limit) > 0 ? Number(req.body.limit) : null;
+  const force = req.body?.force === true;
 
   let songs = curatedDb.list({ limit: 999999 }).items;
-  // Filter to songs missing at least one requested field
-  songs = songs.filter(s => {
-    if (fields.includes('genre') && !s.genre) return true;
-    if (fields.includes('geo') && !s.geography) return true;
-    if (fields.includes('preview') && !s.previewUrl) return true;
-    return false;
-  });
+
+  if (force && fields.includes('genre')) {
+    // Re-enrich all songs (not just those missing genre)
+    // no filter needed — process everything
+  } else {
+    // Filter to songs missing at least one requested field
+    songs = songs.filter(s => {
+      if (fields.includes('genre') && !s.genre) return true;
+      if (fields.includes('geo') && !s.geography) return true;
+      if (fields.includes('preview') && !s.previewUrl) return true;
+      return false;
+    });
+  }
   if (limit) songs = songs.slice(0, limit);
 
-  importProgress = { active: true, task: 'enrich-batch', done: 0, total: songs.length, found: 0 };
-  res.json({ ok: true, total: songs.length });
+  // Auto-backup before force re-enrichment
+  let backupFile = null;
+  if (force && curatedDb.DB_FILE) {
+    try {
+      const timestamp = new Date().toISOString().replace(/:/g, '-');
+      backupFile = path.join(curatedDb.CACHE_DIR, `curated-songs.backup-${timestamp}.json`);
+      await fsPromises.copyFile(curatedDb.DB_FILE, backupFile);
+      console.log(`[AdminEnrich][batch] Backup saved: ${backupFile}`);
+    } catch (backupErr) {
+      console.warn(`[AdminEnrich][batch] Backup failed (continuing anyway):`, backupErr.message);
+    }
+  }
+
+  importProgress = { active: true, task: 'enrich-batch', done: 0, total: songs.length, found: 0, force, backupFile };
+  res.json({ ok: true, total: songs.length, force, backupFile });
 
   (async () => {
     for (const s of songs) {
@@ -775,10 +798,11 @@ app.post('/api/admin/enrich-batch', requireAdmin, (req, res) => {
         const enriched = await enrichSong(song, {
           fetchMusicBrainz: fields.includes('genre') || fields.includes('geo'),
           fetchPreview: fields.includes('preview'),
+          forceGenre: force && fields.includes('genre'),
           rateLimit: true
         });
         curatedDb.update(song.id, enriched);
-        if (fields.includes('genre') && !s.genre && enriched.genre) importProgress.found++;
+        if (fields.includes('genre') && enriched.genre) importProgress.found++;
         if (fields.includes('geo') && !s.geography && enriched.geography) importProgress.found++;
         if (fields.includes('preview') && !s.previewUrl && enriched.previewUrl) importProgress.found++;
       } catch (e) {
@@ -786,9 +810,56 @@ app.post('/api/admin/enrich-batch', requireAdmin, (req, res) => {
       }
       importProgress.done++;
     }
-    console.log(`[AdminEnrich][batch] Done: ${importProgress.found}/${songs.length} filled`);
+    console.log(`[AdminEnrich][batch] Done: ${importProgress.found}/${songs.length} enriched`);
     importProgress = null;
   })();
+});
+
+/**
+ * Admin - List DB Backups
+ * Returns available curated-songs backup files on the persistent disk.
+ */
+app.get('/api/admin/backups', requireAdmin, async (req, res) => {
+  const fsPromises = require('fs').promises;
+  try {
+    const dir = curatedDb.CACHE_DIR;
+    const files = await fsPromises.readdir(dir);
+    const backups = [];
+    for (const f of files.filter(f => f.startsWith('curated-songs.backup-') && f.endsWith('.json'))) {
+      try {
+        const stat = await fsPromises.stat(path.join(dir, f));
+        backups.push({ filename: f, sizeBytes: stat.size, createdAt: stat.birthtime || stat.mtime });
+      } catch (_) { /* skip unreadable */ }
+    }
+    backups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json({ ok: true, backups });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/**
+ * Admin - Restore DB from Backup
+ * Body: { filename: 'curated-songs.backup-....json' }
+ * Copies the named backup file over the live database and reloads it in memory.
+ */
+app.post('/api/admin/restore-backup', requireAdmin, async (req, res) => {
+  const fsPromises = require('fs').promises;
+  const filename = req.body?.filename;
+  if (!filename || !filename.startsWith('curated-songs.backup-') || !filename.endsWith('.json')) {
+    return res.status(400).json({ ok: false, error: 'Invalid backup filename' });
+  }
+  try {
+    const backupPath = path.join(curatedDb.CACHE_DIR, filename);
+    await fsPromises.access(backupPath); // throws if not found
+    await fsPromises.copyFile(backupPath, curatedDb.DB_FILE);
+    curatedDb.load(); // reload in-memory songs from restored file
+    const count = curatedDb.list({ limit: 999999 }).total;
+    console.log(`[AdminRestore] Restored from ${filename} — ${count} songs`);
+    res.json({ ok: true, filename, songsRestored: count });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 /**
@@ -1047,47 +1118,21 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
           const popularity = t.popularity;
           const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
 
-          // Enhanced genre detection using hybrid MusicBrainz + Spotify system
-          let genreTag = null;
-          let genresArr = [];
+          // Genre detection via hybrid MusicBrainz + Spotify system (Spotify fallback built in)
+          let genreTag = genres[0] || 'chart';
+          let genreSecondaryTag = null;
+          let genresArr = [genreTag];
           try {
             const genreResult = await detectGenresForArtist(t.artists[0]?.name || entry.artist);
-            if (genreResult && genreResult.genres.length > 0) {
+            if (genreResult && genreResult.primary) {
+              genreTag = genreResult.primary;
+              genreSecondaryTag = genreResult.secondary || null;
               genresArr = genreResult.genres;
-              genreTag = genreResult.genres[0]; // Primary genre
-              console.log(`[AdminImport] Enhanced genre detection for ${entry.artist}: ${genresArr.join(', ')} (sources: ${genreResult.sources.map(s => s.source).join(', ')})`);
+              const label = genreSecondaryTag ? `${genreTag} + ${genreSecondaryTag}` : genreTag;
+              console.log(`[AdminImport] Genre for ${entry.artist}: ${label} (sources: ${genreResult.sources.map(s => s.source).join(', ')})`);
             }
           } catch (e) {
-            console.warn(`[AdminImport] Enhanced genre detection failed for ${entry.artist}:`, e.message);
-          }
-          
-          // Fallback to Spotify artist genres if MusicBrainz didn't provide results
-          if (!genreTag) {
-            try {
-              const artistId = t.artists?.[0]?.id || null;
-              if (artistId) {
-                let artistGenres = artistGenresCache.get(artistId);
-                if (!artistGenres) {
-                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  }, 'artist:genres');
-                  artistGenres = artResp?.data?.genres || [];
-                  artistGenresCache.set(artistId, artistGenres);
-                }
-                genreTag = mapSpotifyGenres(artistGenres);
-                if (genreTag) {
-                  genresArr = [genreTag];
-                }
-              }
-            } catch (e) {
-              // ignore genre fetch failure; we'll fallback below
-            }
-          }
-          
-          // Final fallback
-          if (!genreTag) {
-            genreTag = genres[0] || 'chart';
-            genresArr = [genreTag];
+            console.warn(`[AdminImport] Genre detection failed for ${entry.artist}:`, e.message);
           }
 
           // Detect origin country (artist-based)
@@ -1119,6 +1164,7 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
             year,
             spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
             genre: genreTag,
+            genreSecondary: genreSecondaryTag,
             genres: genresArr,
             geography: origin,
             markets: marketsArr,
@@ -1195,37 +1241,18 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
           const popularity = t.popularity;
           const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
 
-          let genreTag = null;
-          let genresArr = [];
+          let genreTag = 'pop';
+          let genreSecondaryTag = null;
+          let genresArr = ['pop'];
           try {
             const genreResult = await detectGenresForArtist(t.artists[0]?.name || entry.artist);
-            if (genreResult && genreResult.genres.length > 0) {
+            if (genreResult && genreResult.primary) {
+              genreTag = genreResult.primary;
+              genreSecondaryTag = genreResult.secondary || null;
               genresArr = genreResult.genres;
-              genreTag = genreResult.genres[0];
             }
           } catch (e) {
             console.warn(`[AdminImport][sweden] Genre detection failed for ${entry.artist}:`, e.message);
-          }
-          if (!genreTag) {
-            try {
-              const artistId = t.artists?.[0]?.id || null;
-              if (artistId) {
-                let artistGenres = artistGenresCache.get(artistId);
-                if (!artistGenres) {
-                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  }, 'artist:genres:sweden');
-                  artistGenres = artResp?.data?.genres || [];
-                  artistGenresCache.set(artistId, artistGenres);
-                }
-                genreTag = mapSpotifyGenres(artistGenres);
-                if (genreTag) genresArr = [genreTag];
-              }
-            } catch (_) { /* ignore */ }
-          }
-          if (!genreTag) {
-            genreTag = 'pop';
-            genresArr = ['pop'];
           }
 
           // Detect actual artist origin via MusicBrainz (SE is always in markets since it charted there)
@@ -1250,6 +1277,7 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
             year,
             spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
             genre: genreTag,
+            genreSecondary: genreSecondaryTag,
             genres: genresArr,
             geography: origin,
             markets: marketsArr,
@@ -1414,37 +1442,18 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
           const popularity = t.popularity;
           const difficultyLevel = toDifficultyFromRankPop(entry.rank, popularity);
 
-          let genreTag = null;
-          let genresArr = [];
+          let genreTag = 'pop';
+          let genreSecondaryTag = null;
+          let genresArr = ['pop'];
           try {
             const genreResult = await detectGenresForArtist(t.artists[0]?.name || entry.artist);
-            if (genreResult && genreResult.genres.length > 0) {
+            if (genreResult && genreResult.primary) {
+              genreTag = genreResult.primary;
+              genreSecondaryTag = genreResult.secondary || null;
               genresArr = genreResult.genres;
-              genreTag = genreResult.genres[0];
             }
           } catch (e) {
             console.warn(`[AdminImport][svensktoppen] Genre detection failed for ${entry.artist}:`, e.message);
-          }
-          if (!genreTag) {
-            try {
-              const artistId = t.artists?.[0]?.id || null;
-              if (artistId) {
-                let artistGenres = artistGenresCache.get(artistId);
-                if (!artistGenres) {
-                  const artResp = await spotifyGet(`https://api.spotify.com/v1/artists/${artistId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  }, 'artist:genres:svensktoppen');
-                  artistGenres = artResp?.data?.genres || [];
-                  artistGenresCache.set(artistId, artistGenres);
-                }
-                genreTag = mapSpotifyGenres(artistGenres);
-                if (genreTag) genresArr = [genreTag];
-              }
-            } catch (_) { /* ignore */ }
-          }
-          if (!genreTag) {
-            genreTag = 'pop';
-            genresArr = ['pop'];
           }
 
           // Svensktoppen = Swedish origin by definition. Skip MusicBrainz lookup.
@@ -1458,6 +1467,7 @@ app.post('/api/admin/import/preview', requireAdmin, (req, res) => {
             year,
             spotifyYear: year !== spotifyYear ? spotifyYear : undefined,
             genre: genreTag,
+            genreSecondary: genreSecondaryTag,
             genres: genresArr,
             geography: 'SE',
             markets: marketsArr,

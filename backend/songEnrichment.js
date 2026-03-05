@@ -121,7 +121,8 @@ async function enrichSong(song, options = {}) {
   const {
     fetchPreview = true,
     fetchMusicBrainz = true,
-    rateLimit = true
+    rateLimit = true,
+    forceGenre = false  // when true, re-detect genre even if song already has one
   } = options;
 
   console.log(`[SongEnrichment] Enriching: ${song.artist} - "${song.title}"`);
@@ -135,18 +136,20 @@ async function enrichSong(song, options = {}) {
   };
 
   try {
-    // Step 1: Detect genre if missing
-    if (fetchMusicBrainz && !enriched.genre && song.artist) {
+    // Step 1: Detect genre if missing (or forced re-detection)
+    if (fetchMusicBrainz && (!enriched.genre || forceGenre) && song.artist) {
       try {
         if (rateLimit) await sleep(MUSICBRAINZ_DELAY);
-        
+
         const genreData = await detectGenresForArtist(song.artist);
-        
-        if (genreData && genreData.genres && genreData.genres.length > 0) {
-          enriched.genre = genreData.genres[0];
-          enriched.genres = genreData.genres;
+
+        if (genreData && genreData.primary) {
+          enriched.genre = genreData.primary;
+          enriched.genreSecondary = genreData.secondary || null;
+          enriched.genres = genreData.genres; // [primary] or [primary, secondary]
           updates.musicbrainz = true;
-          console.log(`  ✓ Genre: ${genreData.genres.join(', ')}`);
+          const label = genreData.secondary ? `${genreData.primary} + ${genreData.secondary}` : genreData.primary;
+          console.log(`  ✓ Genre: ${label}`);
         }
       } catch (genreError) {
         console.warn(`  ⚠ Genre detection failed:`, genreError.message);
