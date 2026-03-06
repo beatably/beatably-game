@@ -28,7 +28,7 @@ import { usePreviewMode } from './contexts/PreviewModeContext';
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
 
 function App() {
-  const { isPreviewMode, setFullPlayMode } = usePreviewMode();
+  const { isPreviewMode, setFullPlayMode, stopPreview } = usePreviewMode();
   
   // Expose setFullPlayMode globally for auth callback
   useEffect(() => {
@@ -1067,7 +1067,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         }
       })();
     } else {
-      console.log("[App] Not creator, no pause needed");
+      // Preview mode: stop audio so currentTime resets to 0, ensuring next play loads the new song
+      stopPreview();
+      console.log("[App] Preview mode: stopped preview audio for new song");
     }
   });
 
