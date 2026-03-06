@@ -1,8 +1,151 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { API_BASE_URL } from './config';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { usePreviewMode } from './contexts/PreviewModeContext';
+
+const DECADES_NODES = [
+  { year: 1960, label: '1960' },
+  { year: 1970, label: '1970' },
+  { year: 1980, label: '1980' },
+  { year: 1990, label: '1990' },
+  { year: 2000, label: '2000' },
+  { year: 2010, label: '2010' },
+  { year: 2020, label: '2020' },
+  { year: 2025, label: 'Today' },
+];
+
+function nodeMaxYear(idx) {
+  return DECADES_NODES[idx].year === 2025 ? 2025 : DECADES_NODES[idx].year + 9;
+}
+
+function DecadesTimeline({ min, max, onChange }) {
+  const trackRef = useRef(null); // inner div — inset-x-[10px], used for coordinate mapping
+  const dragging = useRef(null);
+  const dragStartX = useRef(null);
+  const didDrag = useRef(false);
+
+  const last = DECADES_NODES.length - 1;
+
+  const minIdx = Math.max(0, DECADES_NODES.findIndex(n => n.year === min));
+  const maxIdx = (() => {
+    for (let i = last; i >= 0; i--) {
+      if (nodeMaxYear(i) === max) return i;
+    }
+    return DECADES_NODES.reduce((best, _, i) =>
+      Math.abs(nodeMaxYear(i) - max) < Math.abs(nodeMaxYear(best) - max) ? i : best, 0);
+  })();
+
+  const xToIndex = (clientX) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return Math.round(ratio * last);
+  };
+
+  const onPointerDown = (e) => {
+    didDrag.current = false;
+    dragStartX.current = e.clientX;
+    const idx = xToIndex(e.clientX);
+    dragging.current = Math.abs(idx - minIdx) <= Math.abs(idx - maxIdx) ? 'min' : 'max';
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragging.current) return;
+    // Only treat as drag after 5px of movement to preserve tap behaviour
+    if (!didDrag.current && Math.abs(e.clientX - dragStartX.current) < 5) return;
+    didDrag.current = true;
+    const idx = xToIndex(e.clientX);
+    if (dragging.current === 'min') {
+      onChange(DECADES_NODES[Math.min(idx, maxIdx)].year, max);
+    } else {
+      onChange(min, nodeMaxYear(Math.max(idx, minIdx)));
+    }
+  };
+
+  const onPointerUp = (e) => {
+    // setPointerCapture prevents click events reaching child nodes,
+    // so handle taps here instead of onClick on node divs.
+    if (!didDrag.current) {
+      const idx = xToIndex(e.clientX);
+      if (idx < minIdx) onChange(DECADES_NODES[idx].year, max);
+      else if (idx > maxIdx) onChange(min, nodeMaxYear(idx));
+    }
+    dragging.current = null;
+  };
+
+  return (
+    <div
+      className="relative select-none touch-none"
+      style={{ height: '44px' }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
+      {/* Inner div — inset-x-[10px] so first/last node centers align with button edges */}
+      <div ref={trackRef} className="absolute inset-x-[10px] top-0 bottom-0">
+        {/* Track background */}
+        <div
+          className="absolute inset-x-0 rounded-full bg-border/40"
+          style={{ height: '1px', top: '10px', transform: 'translateY(-50%)' }}
+        />
+        {/* Active gradient segment */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            height: '1px',
+            top: '10px',
+            transform: 'translateY(-50%)',
+            background: 'linear-gradient(90deg, #08AF9A, #7D3BED)',
+            left: `${(minIdx / last) * 100}%`,
+            width: `${((maxIdx - minIdx) / last) * 100}%`,
+          }}
+        />
+        {/* Nodes */}
+        {DECADES_NODES.map((node, idx) => {
+          const isMin = idx === minIdx;
+          const isMax = idx === maxIdx;
+          const isHandle = isMin || isMax;
+          const isInner = idx > minIdx && idx < maxIdx;
+          return (
+            <div
+              key={node.year}
+              className="absolute flex flex-col items-center"
+              style={{ left: `${(idx / last) * 100}%`, transform: 'translateX(-50%)', top: 0 }}
+            >
+              {/* Centering wrapper: always h-5, keeps circle center at 10px from top */}
+              <div className="h-5 w-5 flex items-center justify-center">
+                <div
+                  className={`rounded-full border-2 bg-background transition-all ${
+                    isInner
+                      ? 'w-3 h-3 opacity-0 pointer-events-none'
+                      : isHandle
+                      ? 'w-5 h-5 cursor-grab active:cursor-grabbing'
+                      : 'w-4 h-4 cursor-pointer'
+                  }`}
+                  style={{
+                    borderColor: isMin ? '#08AF9A' : isMax ? '#7D3BED' : 'hsl(var(--border) / 0.5)',
+                    ...(isHandle && {
+                      boxShadow: `0 0 0 3px ${isMin ? 'rgba(8,175,154,0.2)' : 'rgba(125,59,237,0.2)'}`,
+                    }),
+                  }}
+                />
+              </div>
+              {(isMin || isMax) && (
+                <span
+                  className="absolute text-[10px] font-medium text-foreground/70 whitespace-nowrap"
+                  style={{ top: '22px' }}
+                >
+                  {node.label}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function GameSettings({ settings, onUpdate, isGameStarted }) {
   const [localSettings, setLocalSettings] = useState(settings || {
@@ -126,43 +269,12 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
     }
   };
 
-  // Decade button selection handler
-  // Behavior:
-  // - Clicking a decade lower than the current min extends the min to that decade
-  // - Clicking a decade higher than the current max extends the max to that decade + 9 (end of decade)
-  // - Clicking a decade inside the current range collapses the range to that single decade (decade to decade + 9)
-  const handleDecadeClick = (decade) => {
-    const currentMin = localSettings.musicPreferences.yearRange.min;
-    const currentMax = localSettings.musicPreferences.yearRange.max;
-
-    // CRITICAL FIX: Convert decade to decade range (e.g., 1990 -> 1990-1999, 2020 -> 2020-2029)
-    const decadeEnd = decade + 9;
-
-    if (decade < currentMin) {
-      handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade });
-      return;
-    }
-    if (decadeEnd > currentMax) {
-      handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, max: decadeEnd });
-      return;
-    }
-
-    // Clicked inside current range -> collapse to single decade range
-    handleMusicPreferenceChange('yearRange', { ...localSettings.musicPreferences.yearRange, min: decade, max: decadeEnd });
-  };
-
   const availableGenres = [
     { id: 'pop', label: 'Pop', emoji: '🌟' },
     { id: 'indie', label: 'Indie', emoji: '🎸' },
     { id: 'rock', label: 'Rock', emoji: '🤘' },
     { id: 'electronic', label: 'Electronic', emoji: '🎛️' },
     { id: 'hip-hop', label: 'Hip-Hop', emoji: '🎤' },
-  ];
-
-  const availableGameModes = [
-    { code: 'se', name: 'Swedish Only', description: 'Local Swedish hits' },
-    { code: 'intl-se', name: 'International + Swedish', description: 'Mix of both' },
-    { code: 'international', name: 'International Only', description: 'Global hits' }
   ];
 
   const isAdvanced = localSettings.difficulty === 'advanced';
@@ -175,96 +287,97 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
         <Label className="text-xl font-semibold text-foreground">Difficulty</Label>
         <div className="grid grid-cols-2 gap-2">
           {[
-            { value: 'easy', label: 'Easy', description: 'Top chart hits' },
-            { value: 'advanced', label: 'Advanced', description: 'All songs + genres' }
-          ].map(({ value, label, description }) => (
+            { value: 'easy', label: 'Easy' },
+            { value: 'advanced', label: 'Advanced' }
+          ].map(({ value, label }) => (
             <Button
               key={value}
               variant={localSettings.difficulty === value ? "default" : "ghost"}
               size="sm"
-              className="h-auto py-3 flex flex-col touch-button setting-button border border-border"
+              className="h-10 touch-button setting-button border border-border"
               onClick={() => handleChange('difficulty', value)}
             >
               <span className="font-semibold">{label}</span>
-              <span className="text-xs opacity-70 mt-0.5">{description}</span>
             </Button>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground text-center pt-1">
+          {localSettings.difficulty === 'easy'
+            ? <><strong>Easy mode</strong> pulls from popular chart hits — great for casual play and mixed groups where everyone can join in.</>
+            : <><strong>Advanced</strong> unlocks the full song catalogue across all genres, including deeper cuts. Best for music obsessives who want a real challenge.</>}
+        </p>
       </div>
 
       {/* Music Selection - visible in both modes */}
-      <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { code: 'international', name: 'International', description: 'Global hits', img: '/img/intl.svg' },
-            { code: 'intl-se', name: 'Mix', description: 'International + Swedish', img: '/img/mix.svg' },
-            { code: 'se', name: 'Swedish Only', description: 'Local Swedish hits', img: '/img/se.svg' }
-          ].map(mode => {
-            const currentMarkets = localSettings.musicPreferences.markets || [];
-            const isActive = (() => {
-              if (mode.code === 'se') {
-                return currentMarkets.length === 1 && currentMarkets.includes('SE');
-              } else if (mode.code === 'international') {
-                return !currentMarkets.includes('SE') &&
-                       (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
-              } else if (mode.code === 'intl-se') {
-                return currentMarkets.includes('SE') &&
-                       (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
-              }
-              return false;
-            })();
-            return (
-              <button
-                key={mode.code}
-                style={{ aspectRatio: '4/3' }}
-                className="relative overflow-hidden rounded-md touch-button setting-button w-full"
-                onClick={() => {
-                  let newMarkets;
-                  if (mode.code === 'se') newMarkets = ['SE'];
-                  else if (mode.code === 'international') newMarkets = ['international'];
-                  else if (mode.code === 'intl-se') newMarkets = ['SE', 'international'];
-                  handleMusicPreferenceChange('markets', newMarkets);
-                }}
-              >
-                <img src={mode.img} alt={mode.name} className={`absolute inset-0 w-full h-full object-cover transition-opacity ${isActive ? 'opacity-100' : 'opacity-30'}`} />
-                <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 100%)' }} />
-                <span className="absolute bottom-2 left-0 right-0 text-center font-semibold text-white text-xs leading-tight px-1">{mode.name}</span>
-                {isActive && (
-                  <span className="absolute inset-0 rounded-md pointer-events-none" style={{
-                    background: 'linear-gradient(90deg, #08AF9A, #7D3BED)',
-                    padding: '2px',
-                    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                    WebkitMaskComposite: 'xor',
-                    maskComposite: 'exclude'
-                  }} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {(() => {
+        const currentMarkets = localSettings.musicPreferences.markets || [];
+        const activeMusicMode = (() => {
+          if (currentMarkets.length === 1 && currentMarkets.includes('SE')) return 'se';
+          if (currentMarkets.includes('SE') && (currentMarkets.includes('international') || currentMarkets.includes('INTL'))) return 'intl-se';
+          return 'international';
+        })();
+        const musicDescriptions = {
+          international: <><strong>Internationally</strong> charting hits — songs that made Billboard Hot 100, UK charts, and other global charts. Expect widely recognised hits from around the world.</>,
+          'intl-se': <>A <strong>blend</strong> of international chart hits and Swedish chart favourites. Songs that topped both global and Swedish charts are included.</>,
+          se: <><strong>Swedish artists only</strong> — songs by acts originating from Sweden, from pop exports to homegrown classics.</>,
+        };
+        return (
+          <div className="space-y-3">
+            <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { code: 'international', name: 'International', img: '/img/intl.svg' },
+                { code: 'intl-se', name: 'Mix', img: '/img/mix.svg' },
+                { code: 'se', name: 'Swedish Only', img: '/img/se.svg' }
+              ].map(mode => {
+                const isActive = mode.code === activeMusicMode;
+                return (
+                  <button
+                    key={mode.code}
+                    style={{ aspectRatio: '4/3' }}
+                    className="relative overflow-hidden rounded-md touch-button setting-button w-full"
+                    onClick={() => {
+                      let newMarkets;
+                      if (mode.code === 'se') newMarkets = ['SE'];
+                      else if (mode.code === 'international') newMarkets = ['international'];
+                      else if (mode.code === 'intl-se') newMarkets = ['SE', 'international'];
+                      handleMusicPreferenceChange('markets', newMarkets);
+                    }}
+                  >
+                    <img src={mode.img} alt={mode.name} className={`absolute inset-0 w-full h-full object-cover transition-opacity ${isActive ? 'opacity-100' : 'opacity-30'}`} />
+                    {isActive && (
+                      <span className="absolute inset-0 rounded-md pointer-events-none" style={{
+                        background: 'linear-gradient(90deg, #08AF9A, #7D3BED)',
+                        padding: '2px',
+                        WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                        WebkitMaskComposite: 'xor',
+                        maskComposite: 'exclude'
+                      }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground text-center pt-1">
+              {musicDescriptions[activeMusicMode]}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Decades */}
       <div className="space-y-3">
         <Label className="text-xl font-semibold text-foreground">Decades</Label>
-        <div className="grid grid-cols-4 gap-1">
-          {[1960, 1970, 1980, 1990, 2000, 2010, 2020].map(decade => {
-            const min = localSettings.musicPreferences.yearRange.min;
-            const max = localSettings.musicPreferences.yearRange.max;
-            const active = decade >= min && decade <= max;
-            return (
-              <Button
-                key={decade}
-                variant={active ? "default" : "ghost"}
-                className="h-10 text-sm touch-button setting-button border border-border"
-                onClick={() => handleDecadeClick(decade)}
-              >
-                {decade}s
-              </Button>
-            );
-          })}
+        <div className="pt-[10px]">
+          <DecadesTimeline
+            min={localSettings.musicPreferences.yearRange.min}
+            max={localSettings.musicPreferences.yearRange.max}
+            onChange={(min, max) => handleMusicPreferenceChange('yearRange', { min, max })}
+          />
         </div>
+        <p className="text-xs text-muted-foreground text-center pt-1">
+          Drag the handles to set which era of songs to include
+        </p>
       </div>
 
       {/* Genre Selection - Advanced mode only */}
