@@ -148,7 +148,11 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
   };
 
   const availableGenres = [
-    'pop', 'indie', 'rock', 'electronic', 'hip-hop'
+    { id: 'pop', label: 'Pop', emoji: '🌟' },
+    { id: 'indie', label: 'Indie', emoji: '🎸' },
+    { id: 'rock', label: 'Rock', emoji: '🤘' },
+    { id: 'electronic', label: 'Electronic', emoji: '🎛️' },
+    { id: 'hip-hop', label: 'Hip-Hop', emoji: '🎤' },
   ];
 
   const availableGameModes = [
@@ -183,31 +187,62 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
         </div>
       </div>
 
-      {/* Win Condition */}
+      {/* Music Selection - visible in both modes */}
       <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Cards to Win</Label>
+        <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
         <div className="grid grid-cols-3 gap-2">
-          {[8, 10, 12].map(cardCount => (
-            <Button
-              key={cardCount}
-              variant={(localSettings.winCondition ?? 10) === cardCount ? "default" : "ghost"}
-              size="sm"
-              className="h-10 touch-button border border-border"
-              onClick={() => {
-                const updated = { ...localSettings, winCondition: cardCount };
-                setLocalSettings(updated);
-                onUpdate(updated);
-              }}
-            >
-              {cardCount} cards
-            </Button>
-          ))}
+          {[
+            { code: 'international', name: 'International', description: 'Global hits', img: '/img/intl.svg' },
+            { code: 'intl-se', name: 'Mix', description: 'International + Swedish', img: '/img/mix.svg' },
+            { code: 'se', name: 'Swedish Only', description: 'Local Swedish hits', img: '/img/se.svg' }
+          ].map(mode => {
+            const currentMarkets = localSettings.musicPreferences.markets || [];
+            const isActive = (() => {
+              if (mode.code === 'se') {
+                return currentMarkets.length === 1 && currentMarkets.includes('SE');
+              } else if (mode.code === 'international') {
+                return !currentMarkets.includes('SE') &&
+                       (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
+              } else if (mode.code === 'intl-se') {
+                return currentMarkets.includes('SE') &&
+                       (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
+              }
+              return false;
+            })();
+            return (
+              <button
+                key={mode.code}
+                style={{ aspectRatio: '4/3' }}
+                className="relative overflow-hidden rounded-md touch-button setting-button w-full"
+                onClick={() => {
+                  let newMarkets;
+                  if (mode.code === 'se') newMarkets = ['SE'];
+                  else if (mode.code === 'international') newMarkets = ['international'];
+                  else if (mode.code === 'intl-se') newMarkets = ['SE', 'international'];
+                  handleMusicPreferenceChange('markets', newMarkets);
+                }}
+              >
+                <img src={mode.img} alt={mode.name} className={`absolute inset-0 w-full h-full object-cover transition-opacity ${isActive ? 'opacity-100' : 'opacity-30'}`} />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 100%)' }} />
+                <span className="absolute bottom-2 left-0 right-0 text-center font-semibold text-white text-xs leading-tight px-1">{mode.name}</span>
+                {isActive && (
+                  <span className="absolute inset-0 rounded-md pointer-events-none" style={{
+                    background: 'linear-gradient(90deg, #08AF9A, #7D3BED)',
+                    padding: '2px',
+                    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                    WebkitMaskComposite: 'xor',
+                    maskComposite: 'exclude'
+                  }} />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Year Range */}
+      {/* Decades */}
       <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Year Range</Label>
+        <Label className="text-xl font-semibold text-foreground">Decades</Label>
         <div className="grid grid-cols-4 gap-1">
           {[1960, 1970, 1980, 1990, 2000, 2010, 2020].map(decade => {
             const min = localSettings.musicPreferences.yearRange.min;
@@ -232,62 +267,42 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
         <div className="space-y-3">
           <Label className="text-xl font-semibold text-foreground">Music Genres</Label>
           <div className="grid grid-cols-2 gap-2">
-            {availableGenres.map(genre => (
+            {availableGenres.map(({ id, label, emoji }) => (
               <Button
-                key={genre}
-                variant={localSettings.musicPreferences.genres.includes(genre) ? "default" : "ghost"}
-                className={`h-10 text-sm justify-start touch-button setting-button border border-border ${
-                  !localSettings.musicPreferences.genres.includes(genre) ? 'focus:ring-0 focus:bg-transparent' : ''
+                key={id}
+                variant={localSettings.musicPreferences.genres.includes(id) ? "default" : "ghost"}
+                className={`h-auto py-2 text-sm justify-start touch-button setting-button border border-border ${
+                  !localSettings.musicPreferences.genres.includes(id) ? 'focus:ring-0 focus:bg-transparent' : ''
                 }`}
-                onClick={() => handleGenreToggle(genre)}
+                onClick={() => handleGenreToggle(id)}
               >
-                {genre.charAt(0).toUpperCase() + genre.slice(1)}
+                <span className="text-2xl mr-2">{emoji}</span>
+                {label}
               </Button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Music Selection - visible in both modes */}
+      {/* Hits to Win - always last before Spotify/Reset */}
       <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
-        <div className="grid grid-cols-1 gap-2">
-          {availableGameModes.map(mode => {
-            const currentMarkets = localSettings.musicPreferences.markets || [];
-            const isActive = (() => {
-              if (mode.code === 'se') {
-                return currentMarkets.length === 1 && currentMarkets.includes('SE');
-              } else if (mode.code === 'international') {
-                return !currentMarkets.includes('SE') &&
-                       (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
-              } else if (mode.code === 'intl-se') {
-                return currentMarkets.includes('SE') &&
-                       (currentMarkets.includes('international') || currentMarkets.includes('INTL'));
-              }
-              return false;
-            })();
-            return (
-              <Button
-                key={mode.code}
-                variant={isActive ? "default" : "ghost"}
-                className={`h-auto py-3 text-left justify-start touch-button setting-button border border-border ${
-                  !isActive ? 'focus:ring-0 focus:bg-transparent' : ''
-                }`}
-                onClick={() => {
-                  let newMarkets;
-                  if (mode.code === 'se') newMarkets = ['SE'];
-                  else if (mode.code === 'international') newMarkets = ['international'];
-                  else if (mode.code === 'intl-se') newMarkets = ['SE', 'international'];
-                  handleMusicPreferenceChange('markets', newMarkets);
-                }}
-              >
-                <div className="flex flex-col gap-1">
-                  <span className="font-semibold">{mode.name}</span>
-                  <span className="text-xs text-muted-foreground">{mode.description}</span>
-                </div>
-              </Button>
-            );
-          })}
+        <Label className="text-xl font-semibold text-foreground">Hits to Win</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {[8, 10, 12].map(count => (
+            <Button
+              key={count}
+              variant={(localSettings.winCondition ?? 10) === count ? "default" : "ghost"}
+              size="sm"
+              className="h-10 touch-button border border-border"
+              onClick={() => {
+                const updated = { ...localSettings, winCondition: count };
+                setLocalSettings(updated);
+                onUpdate(updated);
+              }}
+            >
+              {count} hits
+            </Button>
+          ))}
         </div>
       </div>
 

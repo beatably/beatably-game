@@ -117,4 +117,41 @@ On each deploy, the backend compares the bundled `backend/cache/curated-songs.js
 
 To manage songs, use the admin API or the admin panel at `/admin`.
 
-See [SONG_DATABASE_GUIDE.md](../SONG_DATABASE_GUIDE.md) for details on enrichment and management.
+---
+
+## Genre Re-enrichment
+
+Songs store a primary `genre` and optional `genreSecondary` derived from vote-weighted MusicBrainz tag analysis. If you need to re-run genre detection across the entire database (e.g. after updating the genre mapping rules):
+
+**1. Deploy the updated code first** (git push → Render auto-deploys)
+
+**2. Trigger re-enrichment on production** (auto-backs up the DB before starting):
+```bash
+curl -X POST https://beatably-backend.onrender.com/api/admin/enrich-batch \
+  -H "Content-Type: application/json" \
+  -H "x-admin-secret: $ADMIN_PASSWORD" \
+  -d '{"fields": ["genre"], "force": true}'
+```
+
+Returns: `{ ok, total, backupFile }` — runs async in background at ~1 req/sec (MusicBrainz rate limit).
+
+**3. Monitor progress:**
+```bash
+curl https://beatably-backend.onrender.com/api/admin/import/progress \
+  -H "x-admin-secret: $ADMIN_PASSWORD"
+```
+
+Returns: `{ active, done, total }` — `active` becomes `null` when finished.
+
+**4. Roll back if needed:**
+```bash
+# List available backups
+curl https://beatably-backend.onrender.com/api/admin/backups \
+  -H "x-admin-secret: $ADMIN_PASSWORD"
+
+# Restore a specific backup
+curl -X POST https://beatably-backend.onrender.com/api/admin/restore-backup \
+  -H "Content-Type: application/json" \
+  -H "x-admin-secret: $ADMIN_PASSWORD" \
+  -d '{"filename": "curated-songs.backup-2026-03-05T22-13-04.186Z.json"}'
+```

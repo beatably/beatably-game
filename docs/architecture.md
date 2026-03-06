@@ -146,10 +146,27 @@ tailwindcss-animate            —     — Animations
 ### Song Database
 
 - File: `cache/curated-songs.json`
-- Songs are enriched with: Spotify preview URL, MusicBrainz year, genre tags, `isInternational` flag
+- Songs are enriched with: Spotify preview URL, MusicBrainz year, genre, `isInternational` flag
 - Smart migration between deployed DB and persistent disk (avoids overwriting newer data)
 - Admin API for managing songs (requires `x-admin-secret` header)
 - Swedish chart history: `backend/data/swedish-charts.json` (~4,400 tracks, 1977–present) committed to repo
+
+**Genre schema per song:**
+
+| Field | Type | Description |
+|---|---|---|
+| `genre` | string | Primary genre (backward-compatible) |
+| `genreSecondary` | string \| null | Secondary genre, only set when ≥25% of primary's MusicBrainz vote weight |
+| `genres` | string[] | Derived array: `[genre, genreSecondary].filter(Boolean)` — always max 2 elements |
+
+**Genre detection pipeline** (`geographyDetection.js`):
+1. Query MusicBrainz for the artist's tags (top 20 by vote count)
+2. Accumulate votes per canonical bucket (`pop`, `rock`, `hip-hop`, `electronic`, `indie`)
+3. Bucket with highest total votes → `genre` (primary)
+4. Second bucket qualifies as `genreSecondary` only if its votes ≥ 25% of primary's
+5. Fallback to Spotify artist genres if MusicBrainz returns nothing (single genre, no secondary)
+
+The `genres` array is what the game filter checks — filtering on "Rock" matches songs where `genres` includes `"rock"`, regardless of whether it's primary or secondary.
 
 ### Feature Flags (`config.js`)
 
@@ -180,7 +197,10 @@ tailwindcss-animate            —     — Animations
 - `GET/POST/PUT/DELETE /api/admin/curated-songs` — Database CRUD
 - `POST /api/admin/curated-songs/enrich/:id` — Enrich one song
 - `GET /api/admin/analytics` — Analytics overview
-- `POST /api/admin/import/preview` + `/commit` — Bulk import
+- `POST /api/admin/import/preview` + `/commit` — Bulk import (Billboard, Swedish Charts, Svensktoppen)
+- `POST /api/admin/enrich-batch` — Batch enrich missing fields; `force: true` re-enriches all songs (auto-backs up DB first)
+- `GET /api/admin/backups` — List available database backups on persistent disk
+- `POST /api/admin/restore-backup` — Restore DB from a named backup file
 - `GET /api/admin/usage-stats`, `/game-sessions`, `/error-logs`
 
 **Debug**
