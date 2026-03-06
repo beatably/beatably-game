@@ -408,6 +408,7 @@
               <span class="chip" id="missingGenreChip" onclick="toggleMissingFilter('genre')">Missing Genre</span>
               <span class="chip" id="missingOriginChip" onclick="toggleMissingFilter('origin')">Missing Origin</span>
               <span class="chip" id="missingPreviewChip" onclick="toggleMissingFilter('preview')">Missing Preview</span>
+              <span class="chip" id="suspiciousChip" onclick="toggleMissingFilter('suspicious')" title="Remixes, covers, live versions, tribute bands, children's music, low-popularity chart songs">⚠ Suspicious</span>
             </div>
           </div>
           <button id="resetFiltersBtn" class="secondary" style="margin-left:auto;">Reset</button>
@@ -1805,6 +1806,7 @@
         if (filterState.missingGenre) filteredItems = filteredItems.filter(s => !s.genre);
         if (filterState.missingOrigin) filteredItems = filteredItems.filter(s => !s.geography);
         if (filterState.missingPreview) filteredItems = filteredItems.filter(s => !s.previewUrl);
+        if (filterState.suspicious) filteredItems = filteredItems.filter(s => isSuspiciousSong(s));
 
         pageState.filteredTotal = filteredTotal;
         pageState.dbTotal = dbTotal;
@@ -1858,7 +1860,52 @@
     }
 
     // ===== Filter chip state =====
-    const filterState = { genres: new Set(), origins: new Set(), diff: '', missingGenre: false, missingOrigin: false, missingPreview: false };
+    const filterState = { genres: new Set(), origins: new Set(), diff: '', missingGenre: false, missingOrigin: false, missingPreview: false, suspicious: false };
+
+    // ===== Suspicious song detection =====
+    // Identifies songs that may not belong in Easy mode: remixes, covers, live versions,
+    // tribute/karaoke artists, children's music, white noise, and low-popularity chart songs.
+    const SUSPICIOUS_TITLE_PATTERNS = [
+      /\bremix\b/i, /\bcover\b/i, /\blive\b/i, /\bremaster(ed)?\b/i,
+      /\bacoustic\b/i, /\binstrumental\b/i, /\btribute\b/i, /\bkaraoke\b/i,
+      /\bmedley\b/i, /\bextended\b/i, /\bradio edit\b/i, /\bdemo\b/i,
+      /\bstripped\b/i, /\bpiano version\b/i, /\bslowed\b/i, /\bsped[ -]up\b/i,
+      /\bnightcore\b/i, /\bbootleg\b/i, /\bclub mix\b/i, /\bvip mix\b/i,
+      /\bwhite noise\b/i, /\brain sounds?\b/i, /\bambient sounds?\b/i,
+      /\bnursery rhyme\b/i, /\blullaby\b/i, /\blullabies\b/i,
+      /\bbaby sleep\b/i, /\bbaby songs?\b/i, /\bkids?\s+songs?\b/i,
+    ];
+    const SUSPICIOUS_ARTIST_PATTERNS = [
+      /\btribute\b/i, /\bkaraoke\b/i, /\bperformed by\b/i,
+      /\bas made famous\b/i, /\bin the style of\b/i, /\bsoundalike\b/i,
+      /\bcover band\b/i, /\bcover versions?\b/i,
+    ];
+    const SUSPICIOUS_GENRE_PATTERNS = [
+      /\bchildren\b/i, /\bkids?\b/i, /\bnursery\b/i,
+      /\blullaby\b/i, /\bbaby\b/i, /\btoddler\b/i,
+    ];
+    const SUSPICIOUS_POP_THRESHOLD = 20;
+
+    function getSuspiciousReason(s) {
+      const title = s.title || '';
+      const artist = s.artist || '';
+      const genres = [s.genre, s.genreSecondary, ...(s.genres || [])].filter(Boolean).join(' ');
+      for (const p of SUSPICIOUS_GENRE_PATTERNS) {
+        if (p.test(genres)) return `Genre: "${genres}" matches children/novelty pattern`;
+      }
+      for (const p of SUSPICIOUS_ARTIST_PATTERNS) {
+        if (p.test(artist)) return `Artist "${artist}" matches tribute/karaoke pattern`;
+      }
+      for (const p of SUSPICIOUS_TITLE_PATTERNS) {
+        if (p.test(title)) return `Title "${title}" contains variant keyword`;
+      }
+      if (s.isBillboardChart && (s.popularity || 0) < SUSPICIOUS_POP_THRESHOLD) {
+        return `Billboard chart song but popularity is ${s.popularity ?? 'null'} (threshold: ${SUSPICIOUS_POP_THRESHOLD})`;
+      }
+      return null;
+    }
+
+    function isSuspiciousSong(s) { return getSuspiciousReason(s) !== null; }
 
     function toggleFilterGenre(g) {
       if (filterState.genres.has(g)) filterState.genres.delete(g);
@@ -1903,9 +1950,11 @@
       if (field === 'genre') filterState.missingGenre = !filterState.missingGenre;
       else if (field === 'origin') filterState.missingOrigin = !filterState.missingOrigin;
       else if (field === 'preview') filterState.missingPreview = !filterState.missingPreview;
+      else if (field === 'suspicious') filterState.suspicious = !filterState.suspicious;
       document.getElementById('missingGenreChip')?.classList.toggle('active', filterState.missingGenre);
       document.getElementById('missingOriginChip')?.classList.toggle('active', filterState.missingOrigin);
       document.getElementById('missingPreviewChip')?.classList.toggle('active', filterState.missingPreview);
+      document.getElementById('suspiciousChip')?.classList.toggle('active', filterState.suspicious);
       pageState.page = 1; listSongs();
     }
 
@@ -1996,6 +2045,14 @@
           dot.className = 'missing-dot';
           dot.title = 'Missing: ' + missingFields.join(', ');
           titleRow.appendChild(dot);
+        }
+        const suspiciousReason = getSuspiciousReason(s);
+        if (suspiciousReason) {
+          const badge = document.createElement('span');
+          badge.textContent = '⚠';
+          badge.title = 'Suspicious: ' + suspiciousReason;
+          badge.style.cssText = 'color:#f59e0b; font-size:12px; cursor:default; flex-shrink:0;';
+          titleRow.appendChild(badge);
         }
         const artistDiv = document.createElement('div');
         artistDiv.className = 'muted'; artistDiv.textContent = s.artist || '';
@@ -2865,13 +2922,13 @@
     els.resetFiltersBtn.onclick = () => {
       els.filterQ.value = '';
       filterState.genres.clear(); filterState.origins.clear();
-      filterState.diff = ''; filterState.missingGenre = false; filterState.missingOrigin = false; filterState.missingPreview = false;
+      filterState.diff = ''; filterState.missingGenre = false; filterState.missingOrigin = false; filterState.missingPreview = false; filterState.suspicious = false;
       els.filterGenre.value = ''; els.filterGeo.value = ''; els.filterDiff.value = '';
       els.filterYearMin.value = ''; els.filterYearMax.value = '';
       document.querySelectorAll('#filterGenreChips .chip, #filterOriginChips .chip').forEach(c => c.classList.remove('active'));
       document.querySelectorAll('#filterDiffChips .chip').forEach(c => c.classList.toggle('active', c.dataset.diff === ''));
       document.querySelectorAll('[data-decade]').forEach(c => c.classList.remove('active'));
-      ['missingGenreChip', 'missingOriginChip', 'missingPreviewChip'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+      ['missingGenreChip', 'missingOriginChip', 'missingPreviewChip', 'suspiciousChip'].forEach(id => document.getElementById(id)?.classList.remove('active'));
       pageState.page = 1; listSongs();
     };
 

@@ -569,12 +569,17 @@ function selectForGame(criteria = {}) {
   }
 
   // Filter by difficulty:
-  // easy     → well-known chart hits: isBillboardChart OR (popularity >= 70 AND difficultyLevel <= 2)
+  // easy     → well-known chart hits: (isBillboardChart AND popularity >= 20) OR (popularity >= 70 AND difficultyLevel <= 2)
+  //            The popularity floor on chart songs prevents obscure/low-quality recordings (covers, remixes,
+  //            old novelty tracks) from appearing even if they carry the Billboard flag.
   // advanced → all songs (no restriction)
   if (difficulty === 'easy') {
     pool = pool.filter((s) => {
       const lvl = Number(s.difficultyLevel || 2);
-      return s.isBillboardChart === true || (lvl <= 2 && (s.popularity || 0) >= 70);
+      const pop = s.popularity || 0;
+      const isValidChart = s.isBillboardChart === true && pop >= 20;
+      const isPopularNonChart = lvl <= 2 && pop >= 70;
+      return isValidChart || isPopularNonChart;
     });
   }
   // legacy support: treat 'normal' as advanced, 'hard' as advanced
