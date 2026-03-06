@@ -90,13 +90,13 @@ function WaitingRoom({
 
   return (
     <div
-      className="waiting-room-container flex flex-col items-center justify-center text-foreground px-6"
+      className="waiting-room-container flex flex-col items-center text-foreground px-6"
       style={{
         backgroundColor: "hsl(var(--background))",
-        // Use min-height instead of fixed height to allow scrolling
-        minHeight: "100dvh",
+        // Fixed height creates a real scroll container (min-height grows with content and never scrolls)
+        height: "100dvh",
         // Allow scrolling when content exceeds viewport
-        overflow: "auto",
+        overflowY: "auto",
         // iOS optimizations
         WebkitOverflowScrolling: "touch",
         overscrollBehavior: "contain",
@@ -105,7 +105,7 @@ function WaitingRoom({
         paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
       }}
     >
-      <div className="w-full max-w-sm space-y-6">
+      <div className="w-full max-w-sm space-y-6 my-auto py-8">
         {/* Header */}
         <div className="text-center">
           <h2 className="text-5xl font-bold chewy-regular text-foreground mb-2">Waiting Room</h2>

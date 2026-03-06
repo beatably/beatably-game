@@ -76,7 +76,7 @@ function DecadesTimeline({ min, max, onChange }) {
 
   return (
     <div
-      className="relative select-none touch-none"
+      className="relative select-none touch-pan-y"
       style={{ height: '44px' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
