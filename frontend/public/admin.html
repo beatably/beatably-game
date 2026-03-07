@@ -1806,7 +1806,7 @@
         if (filterState.missingGenre) filteredItems = filteredItems.filter(s => !s.genre);
         if (filterState.missingOrigin) filteredItems = filteredItems.filter(s => !s.geography);
         if (filterState.missingPreview) filteredItems = filteredItems.filter(s => !s.previewUrl);
-        if (filterState.suspicious) filteredItems = filteredItems.filter(s => isSuspiciousSong(s));
+        if (filterState.suspicious) filteredItems = filteredItems.filter(s => isSuspiciousSong(s) && !s.suspicionCleared);
 
         pageState.filteredTotal = filteredTotal;
         pageState.dbTotal = dbTotal;
@@ -2047,12 +2047,43 @@
           titleRow.appendChild(dot);
         }
         const suspiciousReason = getSuspiciousReason(s);
-        if (suspiciousReason) {
+        if (suspiciousReason && !s.suspicionCleared) {
+          // ⚠ badge
           const badge = document.createElement('span');
           badge.textContent = '⚠';
           badge.title = 'Suspicious: ' + suspiciousReason;
           badge.style.cssText = 'color:#f59e0b; font-size:12px; cursor:default; flex-shrink:0;';
           titleRow.appendChild(badge);
+          // "Mark OK" button — persists cleared state via API
+          const okBtn = document.createElement('button');
+          okBtn.textContent = 'OK';
+          okBtn.title = 'Mark as reviewed — remove from suspicious filter';
+          okBtn.className = 'secondary small';
+          okBtn.style.cssText = 'font-size:10px; padding:1px 5px; line-height:1.4; flex-shrink:0;';
+          okBtn.onclick = async (e) => {
+            e.stopPropagation();
+            try {
+              await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(s.id), { method: 'PUT', body: JSON.stringify({ suspicionCleared: true }) });
+              s.suspicionCleared = true;
+              listSongs();
+            } catch (err) { showStatus(err.message || 'Failed to mark OK', 'error'); }
+          };
+          titleRow.appendChild(okBtn);
+        } else if (suspiciousReason && s.suspicionCleared) {
+          // ✓ cleared indicator — subtle, with undo
+          const clearedBadge = document.createElement('span');
+          clearedBadge.textContent = '✓';
+          clearedBadge.title = 'Reviewed OK — click to re-flag as suspicious';
+          clearedBadge.style.cssText = 'color:#6b7280; font-size:11px; cursor:pointer; flex-shrink:0;';
+          clearedBadge.onclick = async (e) => {
+            e.stopPropagation();
+            try {
+              await adminFetch('/api/admin/curated-songs/' + encodeURIComponent(s.id), { method: 'PUT', body: JSON.stringify({ suspicionCleared: false }) });
+              s.suspicionCleared = false;
+              listSongs();
+            } catch (err) { showStatus(err.message || 'Failed to re-flag', 'error'); }
+          };
+          titleRow.appendChild(clearedBadge);
         }
         const artistDiv = document.createElement('div');
         artistDiv.className = 'muted'; artistDiv.textContent = s.artist || '';

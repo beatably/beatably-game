@@ -418,6 +418,7 @@ function add(song) {
     verified: !!song.verified,
     // New fields: Billboard flag and chart metadata
     isBillboardChart: !!(song.isBillboardChart || song.isBillboard || song.fromBillboard),
+    suspicionCleared: !!song.suspicionCleared,
     chartInfo: (() => {
       const ci = song.chartInfo || {};
       const rank = Number.isFinite(song.rank) ? Number(song.rank) : Number.isFinite(ci.rank) ? Number(ci.rank) : null;

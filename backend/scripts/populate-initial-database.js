@@ -137,15 +137,33 @@ function mapSpotifyGenres(genresArr) {
   return null;
 }
 
-function isSuspiciousTrack({ title, album }) {
+// Broad suspicious detection — mirrors the patterns in admin.html's getSuspiciousReason()
+// Returns a reason string if suspicious, or null if clean.
+function getSuspiciousReason({ title, artist, genre }) {
   const t = `${title || ''}`.toLowerCase();
-  const a = `${album || ''}`.toLowerCase();
-  const hasRemaster = /\b(remaster|remastered|re[-\s]?record|live|karaoke|tribute|instrumental)\b/.test(t) || /\b(remaster|remastered|re[-\s]?record|live|karaoke|tribute|instrumental)\b/.test(a);
-  // Prefer using musicbrainz.isRemasterMarker if available
+  const a = `${artist || ''}`.toLowerCase();
+  const g = `${genre || ''}`.toLowerCase();
+
+  const CHILDREN_GENRE = /\b(children|kids?|nursery|lullaby|lullabies|baby|toddler)\b/;
+  const CHILDREN_TITLE = /\b(nursery rhyme|lullaby|lullabies|white noise|rain sounds?|ambient sounds?|baby sleep|baby songs?|kids?\s+songs?)\b/;
+  const TRIBUTE_ARTIST = /\b(tribute|karaoke|performed by|as made famous|in the style of|soundalike|cover band|cover versions?)\b/;
+  const VARIANT_TITLE = /\b(remix|cover|live|remaster(ed)?|acoustic|instrumental|tribute|karaoke|medley|extended|radio edit|demo|stripped|piano version|slowed|sped[ -]up|nightcore|bootleg|club mix|vip mix)\b/;
+
+  if (CHILDREN_GENRE.test(g)) return `genre "${genre}" matches children/novelty`;
+  if (CHILDREN_TITLE.test(t)) return `title matches children/novelty pattern`;
+  if (TRIBUTE_ARTIST.test(a)) return `artist "${artist}" matches tribute/karaoke pattern`;
+  if (VARIANT_TITLE.test(t)) return `title "${title}" contains variant keyword`;
+
+  // Also check via musicbrainz helper if available
   if (mb && typeof mb.isRemasterMarker === 'function') {
-    return mb.isRemasterMarker(t) || mb.isRemasterMarker(a) || /\blive\b/.test(t);
+    if (mb.isRemasterMarker(t)) return `title matches remaster/live marker`;
   }
-  return hasRemaster;
+
+  return null;
+}
+
+function isSuspiciousTrack({ title, album, artist, genre }) {
+  return getSuspiciousReason({ title: title || album, artist, genre }) !== null;
 }
 
 // Year-based searches to diversify Spotify results (replicated from backend)
@@ -211,6 +229,7 @@ async function importFromBillboard({ cap, difficulty, yearMin, yearMax, market }
   const items = [];
   const seen = new Set(); // by spotifyUri
   const artistGenresCache = new Map();
+  const suspiciousItems = []; // songs that passed the filter but match suspicious patterns
   let processed = 0, saved = 0, updated = 0, skipped = 0;
 
   for (const entry of entries) {
@@ -310,6 +329,10 @@ async function importFromBillboard({ cap, difficulty, yearMin, yearMax, market }
         }
       };
 
+      // Track suspicious songs for end-of-import report (even if we imported them)
+      const suspReason = getSuspiciousReason({ title: record.title, artist: record.artist, genre: record.genre });
+      if (suspReason) suspiciousItems.push({ title: record.title, artist: record.artist, popularity, reason: suspReason });
+
       if (opt.dryRun) {
         items.push(record);
       } else {
@@ -333,7 +356,7 @@ async function importFromBillboard({ cap, difficulty, yearMin, yearMax, market }
   }
 
   console.log(`[Billboard] Done. Processed=${processed}, Saved=${saved}, Updated=${updated}, Skipped=${skipped}, Collected=${items.length}`);
-  return { collected: items.length, processed, saved, updated, skipped };
+  return { collected: items.length, processed, saved, updated, skipped, suspiciousItems };
 }
 
 async function supplementByGenres({ cap, yearMin, yearMax, markets, genres }) {
@@ -341,6 +364,7 @@ async function supplementByGenres({ cap, yearMin, yearMax, markets, genres }) {
   const token = await getClientToken();
   const items = [];
   const seen = new Set();
+  const suspiciousItems = [];
   let processed = 0, saved = 0, updated = 0, skipped = 0;
 
   const yr = {
@@ -410,6 +434,10 @@ async function supplementByGenres({ cap, yearMin, yearMax, markets, genres }) {
             chartInfo: null
           };
 
+          // Track suspicious songs for end-of-import report
+          const suspReason = getSuspiciousReason({ title: record.title, artist: record.artist, genre: record.genre });
+          if (suspReason) suspiciousItems.push({ title: record.title, artist: record.artist, popularity, reason: suspReason });
+
           if (opt.dryRun) {
             items.push(record);
           } else {
@@ -434,7 +462,7 @@ async function supplementByGenres({ cap, yearMin, yearMax, markets, genres }) {
   }
 
   console.log(`[Supplement] Done. Processed=${processed}, Saved=${saved}, Updated=${updated}, Skipped=${skipped}, Collected=${items.length}`);
-  return { collected: items.length, processed, saved, updated, skipped };
+  return { collected: items.length, processed, saved, updated, skipped, suspiciousItems };
 }
 
 async function main() {
@@ -483,6 +511,19 @@ async function main() {
 
   console.log('\n=== Population Report ===');
   console.log(JSON.stringify(report, null, 2));
+
+  // Print suspicious songs found during import so admin knows to review them
+  const allSuspicious = [
+    ...(report.billboard?.suspiciousItems || []),
+    ...(report.supplement?.suspiciousItems || []),
+  ];
+  if (allSuspicious.length > 0) {
+    console.log(`\n=== Suspicious Songs Imported (${allSuspicious.length}) — review in admin with the ⚠ filter ===`);
+    allSuspicious.forEach(s => {
+      console.log(`  [pop:${s.popularity ?? '??'}] "${s.title}" — ${s.artist}  (${s.reason})`);
+    });
+    console.log('');
+  }
 
   if (opt.dryRun) {
     console.log('\n[DRY RUN] No changes were written to the curated DB.');
