@@ -1,6 +1,6 @@
 # Beatably — Architecture
 
-A multiplayer music timeline guessing game. Players take turns placing songs on a chronological timeline, competing to build the most accurate timeline.
+A turn-based multiplayer music game. Players take turns placing songs on their personal chronological timeline. Correctly placed songs build your score. Guess the artist/title to earn credits; spend credits to skip hard songs or challenge other players' placements. First to reach the target song count wins.
 
 ---
 
@@ -44,10 +44,14 @@ A multiplayer music timeline guessing game. Players take turns placing songs on 
 
 ### Game Phases
 
-Within the `game` view, state progresses through these phases:
+Within the `game` view, state progresses through these phases per turn:
 - `setup` — Initial load
-- `player-turn` — Active player places a card on the timeline
-- `reveal` — Card placement is revealed and scored
+- `player-turn` — Active player places a card on their timeline
+- `song-guess` — Active player can guess artist/title for a credit reward
+- `challenge-window` — Other players can spend a credit to challenge the placement
+- `challenge` — Challenger re-places the same card; if correct and original wrong, they steal it
+- `challenge-resolved` — Outcome of challenge shown to all players
+- `reveal` — Final placement correctness revealed to all
 - `game-over` — Final scores, winner display
 
 ### Key Components

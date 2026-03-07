@@ -10,6 +10,7 @@ const axios = require('axios');
 const querystring = require('querystring');
 const curatedDb = require('./curatedDb');
 const analytics = require('./analytics');
+const feedback = require('./feedback');
 
 // Initialize curated database at startup to trigger migration if needed
 console.log('[Startup] ===== CURATED DATABASE INITIALIZATION START =====');
@@ -5528,6 +5529,50 @@ app.delete('/api/admin/analytics-data', requireAdmin, (req, res) => {
   } catch (e) {
     console.error('[Admin] Clear analytics failed:', e?.message);
     res.status(500).json({ ok: false, error: e?.message || 'Clear failed' });
+  }
+});
+
+// --- Feedback Endpoints ---
+
+// Public: submit feedback
+app.post('/api/feedback', (req, res) => {
+  try {
+    const { message, context } = req.body || {};
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ ok: false, error: 'Message is required' });
+    }
+    const entry = feedback.recordFeedback({ message: String(message).trim(), context: context || '' });
+    res.json({ ok: true, id: entry.id });
+  } catch (e) {
+    console.error('[Feedback] Submit failed:', e?.message);
+    res.status(500).json({ ok: false, error: 'Failed to save feedback' });
+  }
+});
+
+// Admin: list feedback
+app.get('/api/admin/feedback', requireAdmin, (req, res) => {
+  try {
+    const { limit, offset } = req.query;
+    const result = feedback.getFeedback({
+      limit: Number(limit) || 100,
+      offset: Number(offset) || 0,
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('[Admin] Feedback list failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Failed to load feedback' });
+  }
+});
+
+// Admin: delete feedback entry
+app.delete('/api/admin/feedback/:id', requireAdmin, (req, res) => {
+  try {
+    const deleted = feedback.deleteFeedback(req.params.id);
+    if (!deleted) return res.status(404).json({ ok: false, error: 'Not found' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[Admin] Feedback delete failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Failed to delete feedback' });
   }
 });
 

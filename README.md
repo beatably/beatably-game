@@ -9,13 +9,13 @@ A multiplayer music timeline game. Players take turns placing songs in chronolog
 ## How to Play
 
 1. **Create a room** — one player creates a lobby and shares the room code
-2. **Join** — other players join with the code (no account required to join)
-3. **Listen** — a song plays; place it in the correct spot on the timeline
-4. **Challenge** — other players can challenge your placement
-5. **Win** — first to 10 correctly placed songs wins
+2. **Join** — other players join with the code (no account required)
+3. **Listen** — a song plays; tap your timeline to place it in the correct chronological position
+4. **Guess** — after placing, guess the artist/title to earn a credit; spend credits to skip hard songs
+5. **Challenge** — spend a credit to challenge another player's placement and steal their song if you're right
+6. **Win** — first to reach the target number of correctly placed songs wins (8, 10, or 12)
 
-**Preview Mode** — play without Spotify Premium using 30-second previews (default)
-**Full Play Mode** — requires Spotify Premium; plays full tracks
+**Settings:** Choose Easy (chart hits) or Advanced (full catalogue + genre filters). Pick International, Swedish-only, or a mix. Set the decade range.
 
 ---
 

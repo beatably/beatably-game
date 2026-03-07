@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function Landing({ onCreate, onJoin }) {
+function Landing({ onCreate, onJoin, onShowHowToPlay }) {
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
@@ -391,6 +391,16 @@ function Landing({ onCreate, onJoin }) {
             {error}
           </div>
         )}
+
+        {/* How to play link */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={onShowHowToPlay}
+            className="text-sm text-muted-foreground underline underline-offset-2 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button"
+          >
+            What is Beatably and how to play?
+          </button>
+        </div>
       </div>
     </div>
   );

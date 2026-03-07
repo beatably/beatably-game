@@ -506,8 +506,8 @@ function diversifyByArtist(tracks, maxPerArtist = 1) {
 /**
  * Apply easy-mode filter to a pool of songs.
  * International songs: must be Billboard chart hits (pop >= 20) OR well-known (difficultyLevel <= 2 AND pop >= 70).
- * Swedish songs: top 33% by Spotify popularity (relative ranking — Swedish songs score lower globally
- * but are well-known to Swedish audiences, so absolute thresholds don't apply).
+ * Swedish songs: difficultyLevel <= 2 (curator-set, context-aware — Spotify popularity is recency-biased
+ * and doesn't reflect how well-known a Swedish song is to Swedish audiences).
  */
 function applyEasyFilter(pool, isSwedish) {
   if (!isSwedish) {
@@ -519,11 +519,10 @@ function applyEasyFilter(pool, isSwedish) {
       return isValidChart || isPopularNonChart;
     });
   }
-  // Swedish: relative ranking — top 33% most popular within the Swedish pool
-  const SE_EASY_FRACTION = 0.33;
-  const sorted = pool.slice().sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-  const cutoff = Math.max(1, Math.ceil(sorted.length * SE_EASY_FRACTION));
-  return sorted.slice(0, cutoff);
+  // Swedish: use curator-set difficultyLevel (1–2 = well-known to Swedish audiences).
+  // Raw Spotify popularity is recency-biased and doesn't reflect cultural familiarity for
+  // Swedish artists, so we rely on manually-curated difficulty ratings instead.
+  return pool.filter((s) => Number(s.difficultyLevel || 3) <= 2);
 }
 
 /**

@@ -321,6 +321,7 @@
       <button id="analyticsBtn" class="secondary">Song Analytics</button>
       <button id="usageAnalyticsBtn" class="secondary">Usage Analytics</button>
       <button id="yearAuditBtn" class="secondary">Year Audit</button>
+      <button id="feedbackBtn" class="secondary">Feedback</button>
       <button id="signOutBtn" class="secondary">Sign out</button>
     </div>
   </header>
@@ -1089,6 +1090,36 @@
       </div>
     </div>
 
+    <!-- Feedback view -->
+    <div id="feedbackView" style="display:none;">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+        <div class="actions">
+          <button id="backFromFeedbackBtn" class="secondary">&larr; Back to Admin</button>
+        </div>
+        <div><h3 style="margin:0;">User Feedback</h3></div>
+        <div>
+          <button id="refreshFeedbackBtn">Refresh</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div id="feedbackStatus" class="muted" style="font-size:13px; margin-bottom:12px;"></div>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="text-align:left; border-bottom:1px solid #223045;">
+              <th style="padding:6px 8px; color:#8b949e; font-weight:600; width:60%;">Message</th>
+              <th style="padding:6px 8px; color:#8b949e; font-weight:600; width:12%;">Context</th>
+              <th style="padding:6px 8px; color:#8b949e; font-weight:600; width:20%;">Date</th>
+              <th style="padding:6px 8px; width:8%;"></th>
+            </tr>
+          </thead>
+          <tbody id="feedbackTbody">
+            <tr><td colspan="4" class="muted" style="padding:12px 8px;">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
   <!-- Edit Song Modal -->
@@ -1232,7 +1263,8 @@
       const usage = document.getElementById('usageAnalyticsView');
       const yearAudit = document.getElementById('yearAuditView');
       const health = document.getElementById('healthView');
-      const allViews = [admin, imp, analytics, usage, yearAudit, health];
+      const feedbackView = document.getElementById('feedbackView');
+      const allViews = [admin, imp, analytics, usage, yearAudit, health, feedbackView];
       allViews.forEach(v => { if (v) v.style.display = 'none'; });
       if (view === 'import') {
         if (imp) imp.style.display = 'block';
@@ -1247,6 +1279,9 @@
       } else if (view === 'health') {
         if (health) health.style.display = 'block';
         try { loadEnrichmentStatus(); } catch (_) {}
+      } else if (view === 'feedback') {
+        if (feedbackView) feedbackView.style.display = 'block';
+        try { loadFeedback(); } catch (_) {}
       } else {
         if (admin) admin.style.display = 'block';
         try { listSongs(); } catch (_) {}
@@ -3197,6 +3232,54 @@
       }
     }
 
+    // --- Feedback ---
+    async function loadFeedback() {
+      const tbody = document.getElementById('feedbackTbody');
+      const status = document.getElementById('feedbackStatus');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:12px 8px;">Loading…</td></tr>';
+      try {
+        const data = await adminFetch('/api/admin/feedback?limit=200');
+        if (status) status.textContent = `${data.total || 0} entr${data.total === 1 ? 'y' : 'ies'}`;
+        if (!data.items || data.items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="muted" style="padding:12px 8px;">No feedback yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.items.map(item => {
+          const date = item.timestamp ? new Date(item.timestamp).toLocaleString() : '';
+          const msg = (item.message || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          return `<tr style="border-bottom:1px solid #223045;">
+            <td style="padding:8px; vertical-align:top; white-space:pre-wrap; word-break:break-word;">${msg}</td>
+            <td style="padding:8px; vertical-align:top; color:#8b949e;">${item.context || ''}</td>
+            <td style="padding:8px; vertical-align:top; color:#8b949e; font-size:12px;">${date}</td>
+            <td style="padding:8px; vertical-align:top;">
+              <button class="danger small" style="font-size:11px; padding:3px 8px;" onclick="deleteFeedbackEntry('${item.id}', this)">Delete</button>
+            </td>
+          </tr>`;
+        }).join('');
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding:12px 8px; color:#da3633;">${e.message || 'Failed to load feedback'}</td></tr>`;
+      }
+    }
+
+    async function deleteFeedbackEntry(id, btn) {
+      if (!confirm('Delete this feedback entry?')) return;
+      try {
+        btn.disabled = true;
+        await adminFetch(`/api/admin/feedback/${id}`, { method: 'DELETE' });
+        const row = btn.closest('tr');
+        if (row) row.remove();
+        const status = document.getElementById('feedbackStatus');
+        if (status) {
+          const remaining = document.getElementById('feedbackTbody')?.querySelectorAll('tr').length || 0;
+          status.textContent = `${remaining} entr${remaining === 1 ? 'y' : 'ies'}`;
+        }
+      } catch (e) {
+        btn.disabled = false;
+        alert(e.message || 'Delete failed');
+      }
+    }
+
     // Wire UI
     if (els.bulkImportBtn) {
       els.bulkImportBtn.onclick = () => switchView('import');
@@ -3277,6 +3360,12 @@
     if (backFromUsageBtn) {
       backFromUsageBtn.onclick = () => switchView('admin');
     }
+    const feedbackBtn = document.getElementById('feedbackBtn');
+    if (feedbackBtn) feedbackBtn.onclick = () => switchView('feedback');
+    const backFromFeedbackBtn = document.getElementById('backFromFeedbackBtn');
+    if (backFromFeedbackBtn) backFromFeedbackBtn.onclick = () => switchView('admin');
+    const refreshFeedbackBtn = document.getElementById('refreshFeedbackBtn');
+    if (refreshFeedbackBtn) refreshFeedbackBtn.onclick = loadFeedback;
     const refreshUsageBtn = document.getElementById('refreshUsageBtn');
     if (refreshUsageBtn) {
       refreshUsageBtn.onclick = loadUsageAnalytics;

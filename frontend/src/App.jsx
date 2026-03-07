@@ -11,6 +11,7 @@ import SongGuessNotification from "./SongGuessNotification";
 import CreditSpendNotification from "./CreditSpendNotification";
 import SessionRestore from "./SessionRestore";
 import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
+import HowToPlayView from "./HowToPlayView";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
 import debugLogger from './utils/debugLogger';
@@ -91,6 +92,7 @@ function App() {
   const socketRef = useRef(null);
   const [view, setView] = useState('landing');
   const [showSessionRestore, setShowSessionRestore] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   // Create lobby when we have token + pending name + socket ready
   useEffect(() => {
@@ -2482,7 +2484,8 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   if (view === "landing") {
     return (
       <>
-        <Landing onCreate={handleCreate} onJoin={handleJoin} />
+        <Landing onCreate={handleCreate} onJoin={handleJoin} onShowHowToPlay={() => setShowHowToPlay(true)} />
+        {showHowToPlay && <HowToPlayView onClose={() => setShowHowToPlay(false)} context="landing" />}
         {showSessionRestore && (
           <SessionRestore
             sessionData={sessionRestoreData}
@@ -2626,14 +2629,16 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     return (
       <DndProvider backend={HTML5Backend}>
         <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col h-full">
-          <PlayerHeader 
-            players={players} 
-            currentPlayerId={currentPlayerId} 
+          <PlayerHeader
+            players={players}
+            currentPlayerId={currentPlayerId}
             tokenAnimations={tokenAnimations}
             isCreator={isCreator}
             onRestart={handleRestartGame}
             onExit={handleExitToLobby}
+            onShowHowToPlay={() => setShowHowToPlay(true)}
           />
+          {showHowToPlay && <HowToPlayView onClose={() => setShowHowToPlay(false)} context="game" />}
           <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 z-10 bg-background overflow-hidden min-h-0">
             {/* Hidden Spotify Player for initialization only */}
             {isCreator && spotifyToken && (

@@ -31,7 +31,7 @@ function TokenStack({ count }) {
   );
 }
 
-function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreator, onRestart, onExit }) {
+function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreator, onRestart, onExit, onShowHowToPlay }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [showExitConfirm, setShowExitConfirm] = React.useState(false);
   const [animatingTokens, setAnimatingTokens] = useState({});
@@ -180,6 +180,13 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
                         className="w-full h-12 px-4 border border-border bg-transparent hover:bg-input font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
                       >
                         Exit to Lobby
+                      </Button>
+                      <Button
+                        onClick={() => { setMenuOpen(false); onShowHowToPlay && onShowHowToPlay(); }}
+                        variant="outline"
+                        className="w-full h-12 px-4 border border-border bg-transparent hover:bg-input font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button"
+                      >
+                        How to Play
                       </Button>
                     </div>
                     <Button
