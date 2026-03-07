@@ -1,6 +1,15 @@
 // Sound utility functions for the game
 
 /**
+ * When true, all sound effect playback is suppressed (e.g. creator with music playing)
+ */
+let suppressSoundEffects = false;
+
+export function setSuppressSoundEffects(suppress) {
+  suppressSoundEffects = suppress;
+}
+
+/**
  * Fallback HTMLAudio elements (used when Web Audio is unavailable)
  */
 let clickAudio = null;
@@ -164,6 +173,7 @@ function initializeIncorrectGuessAudio() {
  * Play a click sound when a card is dropped
  */
 export function playClickSound() {
+  if (suppressSoundEffects) return;
   try {
     // Prefer low-latency Web Audio if ready
     if (webAudioSupported && playWebAudioBuffer('click', SOUND_CONFIG.click.volume)) {
@@ -194,6 +204,7 @@ export function playClickSound() {
  * Play a correct guess sound
  */
 export function playCorrectGuessSound() {
+  if (suppressSoundEffects) return;
   try {
     // Prefer low-latency Web Audio if ready
     if (webAudioSupported && playWebAudioBuffer('correct', SOUND_CONFIG.correct.volume)) {
@@ -224,6 +235,7 @@ export function playCorrectGuessSound() {
  * Play an incorrect guess sound
  */
 export function playIncorrectGuessSound() {
+  if (suppressSoundEffects) return;
   try {
     // Prefer low-latency Web Audio if ready
     if (webAudioSupported && playWebAudioBuffer('incorrect', SOUND_CONFIG.incorrect.volume)) {

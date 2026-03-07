@@ -16,7 +16,7 @@ import sessionManager from "./utils/sessionManager";
 import debugLogger from './utils/debugLogger';
 import viewportManager from "./utils/viewportUtils";
 import deviceAwarePlayback from "./utils/deviceAwarePlayback";
-import { preloadAudio } from "./utils/soundUtils";
+import { preloadAudio, setSuppressSoundEffects } from "./utils/soundUtils";
 import './App.css';
 import WinnerView from "./WinnerView";
 import { DndProvider } from 'react-dnd';
@@ -28,7 +28,7 @@ import { usePreviewMode } from './contexts/PreviewModeContext';
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
 
 function App() {
-  const { isPreviewMode, setFullPlayMode, stopPreview } = usePreviewMode();
+  const { isPreviewMode, setFullPlayMode, stopPreview, isPlaying: previewIsPlaying } = usePreviewMode();
   
   // Expose setFullPlayMode globally for auth callback
   useEffect(() => {
@@ -220,6 +220,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Spotify player state
   const [spotifyDeviceId, setSpotifyDeviceId] = useState(null);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
+
+  // Suppress sound effects on the creator's device while music is playing (prevents AirPlay interruption)
+  useEffect(() => {
+    setSuppressSoundEffects(isCreator && (isPlayingMusic || previewIsPlaying));
+  }, [isCreator, isPlayingMusic, previewIsPlaying]);
+
   const [realSongs, setRealSongs] = useState(null); // Will replace fake songs when loaded
 
   // Debug panel state
