@@ -151,6 +151,31 @@ tailwindcss-animate            —     — Animations
 - Admin API for managing songs (requires `x-admin-secret` header)
 - Swedish chart history: `backend/data/swedish-charts.json` (~4,400 tracks, 1977–present) committed to repo
 
+**Song schema fields (selected):**
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Unique ID (`cur_<timestamp>_<random>`) |
+| `spotifyUri` | string | `spotify:track:…` |
+| `title`, `artist` | string | Track metadata |
+| `year` | number \| null | Release year |
+| `genre`, `genreSecondary` | string | Primary/secondary genre |
+| `genres` | string[] | `[genre, genreSecondary].filter(Boolean)` — max 2 |
+| `difficultyLevel` | 1–5 | Used for Easy/Advanced pool selection |
+| `popularity` | 0–100 | Spotify popularity score |
+| `isBillboardChart` | boolean | Whether the song charted on Billboard Hot 100 |
+| `chartInfo` | object | `{ rank, peakPos, weeksOnChart, chartDate }` |
+| `verified` | boolean | Manually confirmed quality |
+| `suspicionCleared` | boolean | Reviewed by admin as OK despite matching suspicious patterns (default `false`) |
+
+**Difficulty / Easy mode filter** (`curatedDb.js`):
+
+A song is included in the Easy pool if:
+```js
+(isBillboardChart === true && popularity >= 20) || (difficultyLevel <= 2 && popularity >= 70)
+```
+The `popularity >= 20` floor on chart songs prevents obscure covers, remixes, and low-quality recordings from appearing even if they carry the Billboard flag.
+
 **Genre schema per song:**
 
 | Field | Type | Description |
@@ -167,6 +192,30 @@ tailwindcss-animate            —     — Animations
 5. Fallback to Spotify artist genres if MusicBrainz returns nothing (single genre, no secondary)
 
 The `genres` array is what the game filter checks — filtering on "Rock" matches songs where `genres` includes `"rock"`, regardless of whether it's primary or secondary.
+
+### Song Curation & Quality Control
+
+The database was built from Billboard Hot 100 history + genre-based Spotify searches. Automated import can occasionally bring in false positives — covers, remixes, live versions, tribute bands, children's songs, or low-popularity recordings of legitimate chart hits.
+
+**Suspicious song detection** — implemented in both the admin UI (`frontend/public/admin.html`) and the populate script (`backend/scripts/populate-initial-database.js`). A song is flagged as suspicious if its title, artist, or genre matches patterns for:
+- Version variants: remix, cover, live, remaster, acoustic, instrumental, karaoke, medley, etc.
+- Tribute/karaoke artists: "tribute band", "as made famous by", "in the style of", etc.
+- Children's/novelty content: nursery rhyme, lullaby, white noise, baby songs, etc.
+- Low-popularity chart songs: `isBillboardChart: true` but `popularity < 20`
+
+**Admin workflow:**
+1. In `admin.html`, activate the **⚠ Suspicious** filter chip to see all unreviewed flagged songs
+2. Listen via the Spotify link or 30s preview, then either **Delete** (real bad apple) or click **OK** (false positive — sets `suspicionCleared: true`)
+3. Cleared songs gain a subtle gray **✓** indicator and are excluded from the suspicious filter going forward; click ✓ to undo
+4. After a bulk import, the populate script prints a list of suspicious songs imported so you know to run a review
+
+**Curation scripts** (`backend/scripts/`):
+
+| Script | Purpose |
+|---|---|
+| `audit-easy-mode.js` | Read-only audit: categorizes all Easy-eligible songs into suspect groups, outputs `cache/audit-easy-mode-results.json` |
+| `clean-easy-mode.js` | Applies bulk cleanup: `--delete` removes songs, `--demote` sets `difficultyLevel=3` (removes from Easy without deleting), always backs up first |
+| `bulk-clear-suspicion.js` | One-time: marks all currently-suspicious songs as `suspicionCleared=true` (use after an initial review pass) |
 
 ### Feature Flags (`config.js`)
 
