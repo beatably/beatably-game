@@ -552,20 +552,61 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
     // Force reload database to ensure we have latest migrated data
     console.log('[Admin] Force reloading curated database for analytics request');
     curatedDb.load(true); // Pass true to force reload
-    
-    // Get all curated songs
-    const first = curatedDb.list({ limit: 1, offset: 0 });
-    const total = Number(first.total || 0);
-    const all = total > 0 ? curatedDb.list({ limit: Math.max(1, total), offset: 0 }).items : [];
-    
+
+    // Filter params (all optional)
+    const q = req.query.q ? String(req.query.q).trim() : '';
+    const genre = req.query.genre ? String(req.query.genre).trim() : '';
+    const geography = req.query.geography ? String(req.query.geography).trim() : '';
+    const yearMin = req.query.yearMin ? Number(req.query.yearMin) : undefined;
+    const yearMax = req.query.yearMax ? Number(req.query.yearMax) : undefined;
+    const difficultyMode = req.query.difficultyMode ? String(req.query.difficultyMode).trim() : ''; // 'easy' | 'advanced' | ''
+    const musicMode = req.query.musicMode ? String(req.query.musicMode).trim() : ''; // 'se' | 'mix' | 'international' | ''
+
+    const hasFilters = !!(q || genre || geography || yearMin || yearMax || difficultyMode || musicMode);
+
+    // Fetch base set with structural filters
+    const baseList = curatedDb.list({
+      q: q || undefined,
+      genre: genre || undefined,
+      geography: geography || undefined,
+      yearMin: Number.isFinite(yearMin) ? yearMin : undefined,
+      yearMax: Number.isFinite(yearMax) ? yearMax : undefined,
+      limit: 999999,
+      offset: 0,
+    });
+    let all = baseList.items;
+
+    // Apply difficulty mode filter (mirrors selectForGame logic)
+    if (difficultyMode === 'easy') {
+      all = all.filter((s) => {
+        const lvl = Number(s.difficultyLevel || 2);
+        const pop = s.popularity || 0;
+        return (s.isBillboardChart === true && pop >= 20) || (lvl <= 2 && pop >= 70);
+      });
+    }
+    // 'advanced' = all songs — no additional filter
+
+    // Apply music mode filter (mirrors selectForGame market logic)
+    if (musicMode === 'se') {
+      all = all.filter((s) => (s.geography || '').toLowerCase() === 'se');
+    } else if (musicMode === 'international') {
+      all = all.filter((s) => s.isInternational === true);
+    } else if (musicMode === 'mix') {
+      all = all.filter((s) => (s.geography || '').toLowerCase() === 'se' || s.isInternational === true);
+    }
+
+    // Total for unfiltered count (shown alongside filtered)
+    const unfilteredTotal = hasFilters ? curatedDb.list({ limit: 1, offset: 0 }).total : null;
+
     console.log('[Admin] Analytics request:', {
-      totalSongs: total,
-      itemsAnalyzed: all.length
+      totalSongs: all.length,
+      itemsAnalyzed: all.length,
+      hasFilters,
     });
 
     const toDecade = (y) => {
       const n = Number(y);
-      if (!Number.isFinite(n)) return 'unknown';
+      if (!Number.isFinite(n) || n < 1900) return 'unknown';
       return `${Math.floor(n / 10) * 10}s`;
     };
     const lc = (s, def = 'unknown') => {
@@ -663,15 +704,19 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
     // Sort gap segments by lowest counts first
     gapSegments.sort((a, b) => a.count - b.count || a.decade.localeCompare(b.decade) || a.genre.localeCompare(b.genre));
 
+    const filteredTotal = all.length;
+
     const result = {
       ok: true,
       totals: {
-        curatedCount: total,
+        curatedCount: filteredTotal,
+        unfilteredTotal: unfilteredTotal !== null ? unfilteredTotal : filteredTotal,
         withAlbumArt,
         withPreview,
-        albumArtPct: total ? Math.round((withAlbumArt / total) * 100) : 0,
-        previewPct: total ? Math.round((withPreview / total) * 100) : 0,
+        albumArtPct: filteredTotal ? Math.round((withAlbumArt / filteredTotal) * 100) : 0,
+        previewPct: filteredTotal ? Math.round((withPreview / filteredTotal) * 100) : 0,
       },
+      activeFilters: hasFilters ? { q, genre, geography, yearMin, yearMax, difficultyMode, musicMode } : null,
       counts: {
         byDecade: decadesSorted,     // [ [decade, count], ... ]
         byGenre: topGenres,          // [ [genre, count], ... ]

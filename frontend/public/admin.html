@@ -660,46 +660,143 @@
           <h3 style="margin:0;">Song Analytics</h3>
         </div>
         <div class="row" style="gap:8px; align-items:center;">
-          <label class="muted nowrap">Gap threshold</label>
-          <input id="gapThreshold" type="number" min="1" max="500" value="30" style="width:90px;" />
           <button id="refreshAnalyticsBtn">Refresh</button>
         </div>
       </div>
 
-      <div class="card">
-        <div class="row">
+      <!-- Analytics filter bar -->
+      <div class="card" style="margin-bottom:0;">
+        <!-- Row 1: Search + Year -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
           <div>
-            <strong>Total curated</strong>
-            <div id="curatedCount" class="muted">0</div>
+            <label class="field-label">Search</label>
+            <input id="analyticsFilterQ" placeholder="Title or artist…" style="width:100%; box-sizing:border-box;" />
           </div>
           <div>
-            <strong>Album art coverage</strong>
-            <div id="albumArtPct" class="muted">0%</div>
+            <label class="field-label">Year Range</label>
+            <div class="chip-group" id="analyticsDecadeChips" style="margin:0;">
+              <span class="chip" data-decade="1960" onclick="analyticsToggleDecade(1960)">60s</span>
+              <span class="chip" data-decade="1970" onclick="analyticsToggleDecade(1970)">70s</span>
+              <span class="chip" data-decade="1980" onclick="analyticsToggleDecade(1980)">80s</span>
+              <span class="chip" data-decade="1990" onclick="analyticsToggleDecade(1990)">90s</span>
+              <span class="chip" data-decade="2000" onclick="analyticsToggleDecade(2000)">00s</span>
+              <span class="chip" data-decade="2010" onclick="analyticsToggleDecade(2010)">10s</span>
+              <span class="chip" data-decade="2020" onclick="analyticsToggleDecade(2020)">20s</span>
+            </div>
+          </div>
+        </div>
+        <!-- Row 2: Genre + Origin -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+          <div>
+            <label class="field-label">Genre</label>
+            <div class="chip-group" id="analyticsGenreChips">
+              <span class="chip" data-genre="pop" onclick="analyticsToggleGenre('pop')">Pop</span>
+              <span class="chip" data-genre="rock" onclick="analyticsToggleGenre('rock')">Rock</span>
+              <span class="chip" data-genre="hip-hop" onclick="analyticsToggleGenre('hip-hop')">Hip-Hop</span>
+              <span class="chip" data-genre="electronic" onclick="analyticsToggleGenre('electronic')">Electronic</span>
+              <span class="chip" data-genre="indie" onclick="analyticsToggleGenre('indie')">Indie</span>
+              <span class="chip" data-genre="chart" onclick="analyticsToggleGenre('chart')">Chart</span>
+            </div>
           </div>
           <div>
-            <strong>Preview coverage</strong>
-            <div id="previewPct" class="muted">0%</div>
+            <label class="field-label">Origin</label>
+            <div class="chip-group" id="analyticsOriginChips">
+              <span class="chip" data-origin="SE" onclick="analyticsToggleOrigin('SE')">SE</span>
+              <span class="chip" data-origin="NO" onclick="analyticsToggleOrigin('NO')">NO</span>
+              <span class="chip" data-origin="DK" onclick="analyticsToggleOrigin('DK')">DK</span>
+              <span class="chip" data-origin="FI" onclick="analyticsToggleOrigin('FI')">FI</span>
+              <span class="chip" data-origin="US" onclick="analyticsToggleOrigin('US')">US</span>
+              <span class="chip" data-origin="GB" onclick="analyticsToggleOrigin('GB')">GB</span>
+              <span class="chip" data-origin="DE" onclick="analyticsToggleOrigin('DE')">DE</span>
+              <span class="chip" data-origin="AU" onclick="analyticsToggleOrigin('AU')">AU</span>
+            </div>
+          </div>
+        </div>
+        <!-- Row 3: Game Mode + Reset -->
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="field-label" style="margin:0; white-space:nowrap;">Game Mode</span>
+            <div class="chip-group" id="analyticsModeChips" style="margin:0;">
+              <span class="chip active" data-mode="" onclick="analyticsSetMode('')">Any</span>
+              <span class="chip" data-mode="easy" onclick="analyticsSetMode('easy')" title="Chart hits + high-popularity songs (difficultyLevel 1-2)">Easy</span>
+              <span class="chip" data-mode="advanced" onclick="analyticsSetMode('advanced')" title="Full catalogue — all songs">Advanced</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="field-label" style="margin:0; white-space:nowrap;">Music Pool</span>
+            <div class="chip-group" id="analyticsMusicModeChips" style="margin:0;">
+              <span class="chip active" data-mmode="" onclick="analyticsSetMusicMode('')">Any</span>
+              <span class="chip" data-mmode="se" onclick="analyticsSetMusicMode('se')" title="Songs from Sweden only">Sweden</span>
+              <span class="chip" data-mmode="mix" onclick="analyticsSetMusicMode('mix')" title="Sweden + International songs">Mix</span>
+              <span class="chip" data-mmode="international" onclick="analyticsSetMusicMode('international')" title="International songs only">International</span>
+            </div>
+          </div>
+          <div id="analyticsFilterBadge" class="muted" style="font-size:12px; display:none;"></div>
+          <button id="analyticsResetFiltersBtn" class="secondary small" style="margin-left:auto;">Reset</button>
+        </div>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="grid" style="margin-bottom:0;">
+        <div class="card col-4">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Total Curated</div>
+          <div id="curatedCount" style="font-size:28px; font-weight:600; margin-top:2px;">0</div>
+          <div id="curatedCountContext" class="muted" style="font-size:12px; margin-top:2px;"></div>
+        </div>
+        <div class="card col-4">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Album Art Coverage</div>
+          <div style="display:flex; align-items:baseline; gap:8px; margin-top:2px;">
+            <span id="albumArtPct" style="font-size:28px; font-weight:600;">0%</span>
+            <span id="albumArtCount" class="muted" style="font-size:13px;"></span>
+          </div>
+          <div style="height:4px; background:#223045; border-radius:2px; margin-top:8px; overflow:hidden;">
+            <div id="albumArtBar" style="height:100%; background:#2ea043; border-radius:2px; width:0%; transition:width 0.4s ease;"></div>
+          </div>
+        </div>
+        <div class="card col-4">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Preview Coverage</div>
+          <div style="display:flex; align-items:baseline; gap:8px; margin-top:2px;">
+            <span id="previewPct" style="font-size:28px; font-weight:600;">0%</span>
+            <span id="previewCount" class="muted" style="font-size:13px;"></span>
+          </div>
+          <div style="height:4px; background:#223045; border-radius:2px; margin-top:8px; overflow:hidden;">
+            <div id="previewBar" style="height:100%; background:#1f6feb; border-radius:2px; width:0%; transition:width 0.4s ease;"></div>
           </div>
         </div>
       </div>
 
       <div class="grid">
         <div class="card col-6"><canvas id="decadeChart" height="200"></canvas></div>
-        <div class="card col-6"><canvas id="yearChart" height="200"></canvas></div>
         <div class="card col-6"><canvas id="genreChart" height="200"></canvas></div>
+        <div class="card col-12"><canvas id="yearChart" height="80"></canvas></div>
         <div class="card col-6"><canvas id="difficultyChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="tagsChart" height="200"></canvas></div>
         <div class="card col-6"><canvas id="marketChart" height="200"></canvas></div>
         <div class="card col-6"><canvas id="billboardChart" height="200"></canvas></div>
+      </div>
+
+      <!-- Genre × Decade heatmap -->
+      <div class="card">
+        <strong>Genre × Decade Coverage</strong>
+        <div class="muted" style="font-size:12px; margin-bottom:12px;">Songs per genre per decade — darker = more songs</div>
+        <div style="overflow:auto;">
+          <table id="genreDecadeTable" style="border:none;">
+            <thead><tr id="genreDecadeHeader"></tr></thead>
+            <tbody id="genreDecadeBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card">
         <div class="row" style="justify-content:space-between; align-items:center;">
           <div>
-            <strong>Gap analysis</strong>
+            <strong>Gap Analysis</strong>
             <div class="muted">Segments below threshold needing attention (top 50)</div>
           </div>
-          <div>
-            <ul id="gapRecommendations" class="muted" style="margin:0; padding-left:18px;"></ul>
+          <div class="row" style="gap:8px; align-items:center;">
+            <label class="muted nowrap" style="font-size:12px;">Threshold</label>
+            <input id="gapThreshold" type="number" min="1" max="500" value="30" style="width:70px;" />
+            <button id="applyGapThreshold" class="secondary small">Apply</button>
           </div>
         </div>
         <div style="overflow:auto; margin-top:8px;">
@@ -735,50 +832,71 @@
         </div>
       </div>
 
+      <!-- Date range filter -->
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span class="muted" style="font-size:12px;">Time range:</span>
+          <span class="chip preset-btn active" id="rangeAll" onclick="setUsageRange('all')">All time</span>
+          <span class="chip preset-btn" id="range90" onclick="setUsageRange('90')">Last 90 days</span>
+          <span class="chip preset-btn" id="range30" onclick="setUsageRange('30')">Last 30 days</span>
+          <span class="chip preset-btn" id="range7" onclick="setUsageRange('7')">Last 7 days</span>
+        </div>
+      </div>
+
       <!-- Overview Cards -->
       <div class="grid">
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">TOTAL GAMES</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Total Games</div>
           <div id="usageTotalGames" style="font-size:28px; font-weight:600;">0</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">UNIQUE PLAYERS</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Unique Players</div>
           <div id="usageUniquePlayers" style="font-size:28px; font-weight:600;">0</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">AVG DURATION</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Avg Duration</div>
           <div id="usageAvgDuration" style="font-size:28px; font-weight:600;">0:00</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">AVG ROUNDS</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Avg Rounds</div>
           <div id="usageAvgRounds" style="font-size:28px; font-weight:600;">0</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">TOTAL ROUNDS</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Total Rounds</div>
           <div id="usageTotalRounds" style="font-size:28px; font-weight:600;">0</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">COMPLETION RATE</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Completion Rate</div>
           <div id="usageCompletionRate" style="font-size:28px; font-weight:600;">0%</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">TOTAL ERRORS</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Total Errors</div>
           <div id="usageTotalErrors" style="font-size:28px; font-weight:600;">0</div>
         </div>
         <div class="card col-3">
-          <div class="muted" style="font-size:11px;">COMPLETED GAMES</div>
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Completed Games</div>
           <div id="usageCompletedGames" style="font-size:28px; font-weight:600;">0</div>
         </div>
       </div>
 
       <!-- Charts -->
       <div class="grid">
-        <div class="card col-12"><canvas id="gamesOverTimeChart" height="80"></canvas></div>
+        <!-- Time series with Daily/Weekly toggle -->
+        <div class="card col-12">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:600; color:#8b949e;">Games Over Time</span>
+            <div style="display:flex; gap:6px;">
+              <span class="chip active" id="timeseriesDaily" onclick="setTimeseriesGranularity('daily')" style="font-size:11px; padding:3px 8px;">Daily</span>
+              <span class="chip" id="timeseriesWeekly" onclick="setTimeseriesGranularity('weekly')" style="font-size:11px; padding:3px 8px;">Weekly</span>
+            </div>
+          </div>
+          <canvas id="gamesOverTimeChart" height="80"></canvas>
+        </div>
         <div class="card col-4"><canvas id="playerCountChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="difficultyDistChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="musicModeChart" height="200"></canvas></div>
         <div class="card col-6"><canvas id="errorTypesChart" height="200"></canvas></div>
-        <div class="card col-6"><canvas id="completionChart" height="200"></canvas></div>
+        <div class="card col-6"><canvas id="winConditionChart" height="200"></canvas></div>
       </div>
 
       <!-- Recent Sessions Table -->
@@ -802,6 +920,7 @@
                 <th class="num">Players</th>
                 <th>Player Names</th>
                 <th class="num">Rounds</th>
+                <th class="num">Win At</th>
                 <th>Winner</th>
                 <th>Difficulty</th>
                 <th>Music Mode</th>
@@ -809,9 +928,19 @@
               </tr>
             </thead>
             <tbody id="sessionsTbody">
-              <tr><td colspan="10" class="muted">No data</td></tr>
+              <tr><td colspan="11" class="muted">No data</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="pager" id="sessionsPager" style="padding-top:8px;">
+          <div class="left">
+            <button id="sessionsPrevBtn" class="secondary small">&larr; Prev</button>
+            <div id="sessionsPageInfo" class="muted nowrap">Page 1</div>
+            <button id="sessionsNextBtn" class="secondary small">Next &rarr;</button>
+          </div>
+          <div class="right">
+            <div id="sessionsRangeInfo" class="muted nowrap"></div>
+          </div>
         </div>
       </div>
 
@@ -825,9 +954,6 @@
           <div class="actions">
             <select id="errorTypeFilter" class="tight">
               <option value="">All Types</option>
-              <option value="gameplay">Gameplay</option>
-              <option value="connection">Connection</option>
-              <option value="playback">Playback</option>
             </select>
             <button id="refreshErrorsBtn" class="secondary small">Refresh</button>
           </div>
@@ -2486,7 +2612,82 @@
       __analyticsCharts[id] = new Chart(ctx, cfg);
     }
 
-    function renderGapTable(segments) {
+    // ===== Analytics filter state =====
+    const analyticsFilter = {
+      q: '',
+      genre: '',       // single genre
+      origin: '',      // single origin
+      decade: null,    // number (e.g. 1980) or null
+      mode: '',        // '' | 'easy' | 'advanced'
+      musicMode: '',   // '' | 'se' | 'mix' | 'international'
+    };
+
+    function analyticsToggleDecade(decade) {
+      analyticsFilter.decade = analyticsFilter.decade === decade ? null : decade;
+      document.querySelectorAll('#analyticsDecadeChips .chip').forEach(c => {
+        c.classList.toggle('active', Number(c.dataset.decade) === analyticsFilter.decade);
+      });
+      loadAnalytics();
+    }
+    function analyticsToggleGenre(genre) {
+      analyticsFilter.genre = analyticsFilter.genre === genre ? '' : genre;
+      document.querySelectorAll('#analyticsGenreChips .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.genre === analyticsFilter.genre);
+      });
+      loadAnalytics();
+    }
+    function analyticsToggleOrigin(origin) {
+      analyticsFilter.origin = analyticsFilter.origin === origin ? '' : origin;
+      document.querySelectorAll('#analyticsOriginChips .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.origin === analyticsFilter.origin);
+      });
+      loadAnalytics();
+    }
+    function analyticsSetMode(mode) {
+      analyticsFilter.mode = mode;
+      document.querySelectorAll('#analyticsModeChips .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.mode === mode);
+      });
+      loadAnalytics();
+    }
+    function analyticsSetMusicMode(mmode) {
+      analyticsFilter.musicMode = mmode;
+      document.querySelectorAll('#analyticsMusicModeChips .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.mmode === mmode);
+      });
+      loadAnalytics();
+    }
+    function analyticsResetFilters() {
+      analyticsFilter.q = '';
+      analyticsFilter.genre = '';
+      analyticsFilter.origin = '';
+      analyticsFilter.decade = null;
+      analyticsFilter.mode = '';
+      analyticsFilter.musicMode = '';
+      const qEl = document.getElementById('analyticsFilterQ');
+      if (qEl) qEl.value = '';
+      document.querySelectorAll('#analyticsDecadeChips .chip, #analyticsGenreChips .chip, #analyticsOriginChips .chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('#analyticsModeChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mode === ''));
+      document.querySelectorAll('#analyticsMusicModeChips .chip').forEach(c => c.classList.toggle('active', c.dataset.mmode === ''));
+      loadAnalytics();
+    }
+    function buildAnalyticsParams() {
+      const params = new URLSearchParams();
+      const thr = Math.max(1, Number(els.gapThreshold?.value) || 30);
+      params.set('gapThreshold', String(thr));
+      if (analyticsFilter.q) params.set('q', analyticsFilter.q);
+      if (analyticsFilter.genre) params.set('genre', analyticsFilter.genre);
+      if (analyticsFilter.origin) params.set('geography', analyticsFilter.origin);
+      if (analyticsFilter.decade) {
+        params.set('yearMin', String(analyticsFilter.decade));
+        params.set('yearMax', String(analyticsFilter.decade + 9));
+      }
+      if (analyticsFilter.mode) params.set('difficultyMode', analyticsFilter.mode);
+      if (analyticsFilter.musicMode) params.set('musicMode', analyticsFilter.musicMode);
+      return params.toString();
+    }
+
+    function renderGapTable(segments, threshold) {
       const tbody = els.gapTable;
       if (!tbody) return;
       tbody.innerHTML = '';
@@ -2494,34 +2695,109 @@
         tbody.innerHTML = '<tr><td colspan="4" class="muted">No gaps under current threshold</td></tr>';
         return;
       }
+      const half = Math.floor((threshold || 30) / 2);
       segments.forEach(seg => {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + seg.decade + '</td><td>' + seg.genre + '</td><td class="num">' + seg.count + '</td><td class="num">' + seg.deficit + '</td>';
+        let color, label;
+        if (seg.count === 0) { color = 'rgba(248,81,73,0.15)'; label = ''; }
+        else if (seg.count < half) { color = 'rgba(210,153,34,0.15)'; label = ''; }
+        else { color = 'rgba(210,153,34,0.08)'; label = ''; }
+        tr.style.background = color;
+        tr.innerHTML = '<td>' + seg.decade + '</td><td>' + seg.genre + '</td>'
+          + '<td class="num" style="color:' + (seg.count === 0 ? '#f85149' : seg.count < half ? '#d29922' : '#e6edf3') + '">' + seg.count + '</td>'
+          + '<td class="num">' + seg.deficit + '</td>';
         tbody.appendChild(tr);
       });
     }
 
     function renderRecommendations(segments, n = 8) {
-      const el = els.gapRecommendations;
-      if (!el) return;
-      el.innerHTML = '';
-      if (!Array.isArray(segments) || !segments.length) return;
-      const top = segments.slice(0, n);
-      top.forEach(seg => {
-        const li = document.createElement('li');
-        li.textContent = seg.decade + ' • ' + seg.genre + ' — add ~' + seg.deficit + ' songs';
-        el.appendChild(li);
-      });
+      // no-op — recommendations section removed in favour of color-coded table
+    }
+
+    function renderGenreDecadeTable(crosstab) {
+      const header = document.getElementById('genreDecadeHeader');
+      const body = document.getElementById('genreDecadeBody');
+      if (!header || !body || !crosstab) return;
+
+      const decades = Object.keys(crosstab).sort();
+      const genreSet = new Set();
+      decades.forEach(d => Object.keys(crosstab[d] || {}).forEach(g => genreSet.add(g)));
+      const genres = [...genreSet].sort();
+
+      // Find max value for color scaling
+      let maxVal = 0;
+      decades.forEach(d => genres.forEach(g => { const v = crosstab[d]?.[g] || 0; if (v > maxVal) maxVal = v; }));
+
+      // Header row: empty cell + decade columns
+      header.innerHTML = '<th style="border:none;background:transparent;"></th>'
+        + genres.map(g => '<th style="font-size:11px; padding:4px 10px; white-space:nowrap;">' + g + '</th>').join('');
+
+      // Body rows: one row per decade
+      body.innerHTML = decades.map(d => {
+        const cells = genres.map(g => {
+          const v = crosstab[d]?.[g] || 0;
+          const intensity = maxVal > 0 ? v / maxVal : 0;
+          const bg = v === 0
+            ? 'rgba(248,81,73,0.18)'
+            : 'rgba(31,111,235,' + (0.1 + intensity * 0.7).toFixed(2) + ')';
+          const textColor = intensity > 0.5 ? '#e6edf3' : '#8b949e';
+          return '<td style="text-align:center; background:' + bg + '; color:' + textColor + '; font-size:12px; padding:6px 10px;">'
+            + (v || '—') + '</td>';
+        }).join('');
+        return '<tr><td style="font-size:12px; font-weight:600; white-space:nowrap; padding:6px 10px;">' + d + '</td>' + cells + '</tr>';
+      }).join('');
     }
 
     async function loadAnalytics() {
       try {
-        const thr = Math.max(1, Number(els.gapThreshold?.value) || 30);
-        const data = await adminFetch('/api/admin/analytics?gapThreshold=' + thr);
-        // Totals
-        if (els.curatedCount) els.curatedCount.textContent = String(data.totals?.curatedCount ?? 0);
-        if (els.albumArtPct) els.albumArtPct.textContent = String(data.totals?.albumArtPct ?? 0) + '%';
-        if (els.previewPct) els.previewPct.textContent = String(data.totals?.previewPct ?? 0) + '%';
+        const data = await adminFetch('/api/admin/analytics?' + buildAnalyticsParams());
+
+        // Stat cards with absolute counts + progress bars
+        const total = data.totals?.curatedCount ?? 0;
+        const unfilteredTotal = data.totals?.unfilteredTotal ?? total;
+        const artCount = data.totals?.withAlbumArt ?? 0;
+        const previewCount = data.totals?.withPreview ?? 0;
+        const artPct = data.totals?.albumArtPct ?? 0;
+        const prevPct = data.totals?.previewPct ?? 0;
+        const isFiltered = data.activeFilters !== null;
+
+        if (els.curatedCount) els.curatedCount.textContent = total.toLocaleString();
+
+        // Show filter context under the total
+        const contextEl = document.getElementById('curatedCountContext');
+        if (contextEl) {
+          contextEl.textContent = isFiltered ? `of ${unfilteredTotal.toLocaleString()} total` : '';
+        }
+
+        // Update filter badge
+        const badge = document.getElementById('analyticsFilterBadge');
+        if (badge) {
+          if (isFiltered) {
+            const parts = [];
+            if (data.activeFilters.q) parts.push(`"${data.activeFilters.q}"`);
+            if (data.activeFilters.genre) parts.push(data.activeFilters.genre);
+            if (data.activeFilters.geography) parts.push(data.activeFilters.geography);
+            if (data.activeFilters.yearMin) parts.push(`${data.activeFilters.yearMin}–${data.activeFilters.yearMax}`);
+            if (data.activeFilters.difficultyMode) parts.push(data.activeFilters.difficultyMode + ' mode');
+            if (data.activeFilters.musicMode) parts.push({ se: 'Sweden only', mix: 'SE + International', international: 'International only' }[data.activeFilters.musicMode] || data.activeFilters.musicMode);
+            badge.textContent = 'Filtered: ' + parts.join(', ');
+            badge.style.display = 'block';
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+
+        if (els.albumArtPct) els.albumArtPct.textContent = artPct + '%';
+        if (els.previewPct) els.previewPct.textContent = prevPct + '%';
+
+        const albumArtCountEl = document.getElementById('albumArtCount');
+        const previewCountEl = document.getElementById('previewCount');
+        const albumArtBar = document.getElementById('albumArtBar');
+        const previewBar = document.getElementById('previewBar');
+        if (albumArtCountEl) albumArtCountEl.textContent = artCount.toLocaleString() + ' songs';
+        if (previewCountEl) previewCountEl.textContent = previewCount.toLocaleString() + ' songs';
+        if (albumArtBar) albumArtBar.style.width = artPct + '%';
+        if (previewBar) previewBar.style.width = prevPct + '%';
 
         // Charts data
         const decades = (data.counts?.byDecade || []).map(([k]) => k);
@@ -2533,7 +2809,7 @@
         const genres = (data.counts?.byGenre || []).map(([k]) => k);
         const genreVals = (data.counts?.byGenre || []).map(([, v]) => v);
 
-        const diffs = (data.counts?.byDifficulty || []).map(([k]) => k);
+        const diffs = (data.counts?.byDifficulty || []).map(([k]) => k).map(d => 'Level ' + d);
         const diffVals = (data.counts?.byDifficulty || []).map(([, v]) => v);
 
         const geographies = (data.counts?.byGeography || []).map(([k]) => k);
@@ -2541,46 +2817,56 @@
 
         const billVals = [data.counts?.billboard?.billboard || 0, data.counts?.billboard?.nonBillboard || 0];
 
+        const tags = (data.counts?.tags || []).slice(0, 15).map(([k]) => k);
+        const tagVals = (data.counts?.tags || []).slice(0, 15).map(([, v]) => v);
+
         const palette = ['#1f6feb', '#2ea043', '#d29922', '#f85149', '#a371f7', '#58a6ff', '#3fb950', '#f2cc60', '#ffa198', '#d2a8ff'];
 
         upsertChart('decadeChart', {
           type: 'bar',
           data: { labels: decades, datasets: [{ label: 'Songs by decade', data: decadeVals, backgroundColor: palette[0] }] },
-          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          options: { plugins: { legend: { display: false }, title: { display: true, text: 'Songs by Decade', color: '#8b949e' } }, scales: { y: { beginAtZero: true } } }
         });
 
         upsertChart('yearChart', {
           type: 'line',
-          data: { labels: years, datasets: [{ label: 'Songs per year', data: yearVals, borderColor: palette[1], backgroundColor: 'rgba(46,160,67,0.3)', fill: true, tension: 0.2 }] },
-          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          data: { labels: years, datasets: [{ label: 'Songs per year', data: yearVals, borderColor: palette[1], backgroundColor: 'rgba(46,160,67,0.15)', fill: true, tension: 0.2, pointRadius: 0 }] },
+          options: { plugins: { legend: { display: false }, title: { display: true, text: 'Songs per Year', color: '#8b949e' } }, scales: { y: { beginAtZero: true } } }
         });
 
         upsertChart('genreChart', {
           type: 'bar',
-          data: { labels: genres, datasets: [{ label: 'Top genres', data: genreVals, backgroundColor: palette.slice(0, Math.max(1, genres.length)) }] },
-          options: { plugins: { legend: { display: false } }, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+          data: { labels: genres, datasets: [{ label: 'Songs', data: genreVals, backgroundColor: palette.slice(0, Math.max(1, genres.length)) }] },
+          options: { plugins: { legend: { display: false }, title: { display: true, text: 'Top Genres', color: '#8b949e' } }, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
         });
 
         upsertChart('difficultyChart', {
           type: 'doughnut',
           data: { labels: diffs, datasets: [{ data: diffVals, backgroundColor: palette.slice(0, Math.max(1, diffs.length)) }] },
-          options: { plugins: { legend: { position: 'bottom' } } }
+          options: { plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Difficulty Distribution', color: '#8b949e' } } }
+        });
+
+        upsertChart('tagsChart', {
+          type: 'bar',
+          data: { labels: tags, datasets: [{ label: 'Songs', data: tagVals, backgroundColor: palette[4] }] },
+          options: { plugins: { legend: { display: false }, title: { display: true, text: 'Top Tags', color: '#8b949e' } }, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
         });
 
         upsertChart('marketChart', {
           type: 'bar',
-          data: { labels: geographies, datasets: [{ label: 'Top origins', data: geographyVals, backgroundColor: palette.slice(2, 2 + Math.max(1, geographies.length)) }] },
-          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          data: { labels: geographies, datasets: [{ label: 'Songs', data: geographyVals, backgroundColor: palette.slice(2, 2 + Math.max(1, geographies.length)) }] },
+          options: { plugins: { legend: { display: false }, title: { display: true, text: 'Top Origins', color: '#8b949e' } }, scales: { y: { beginAtZero: true } } }
         });
 
         upsertChart('billboardChart', {
           type: 'pie',
           data: { labels: ['Billboard', 'Non-Billboard'], datasets: [{ data: billVals, backgroundColor: ['#f2cc60', '#58a6ff'] }] },
-          options: { plugins: { legend: { position: 'bottom' } } }
+          options: { plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Billboard vs Non-Billboard', color: '#8b949e' } } }
         });
 
-        renderGapTable(data.gapAnalysis?.segmentsNeedingAttention || []);
+        renderGapTable(data.gapAnalysis?.segmentsNeedingAttention || [], data.gapAnalysis?.threshold || 30);
         renderRecommendations(data.gapAnalysis?.segmentsNeedingAttention || []);
+        renderGenreDecadeTable(data.crosstabs?.genreByDecade);
 
       } catch (e) {
         showStatus(e.message || 'Failed to load analytics', 'error');
@@ -2588,59 +2874,127 @@
     }
 
     // ===== Usage Analytics Implementation =====
+
+    // State for usage analytics
+    const usageState = {
+      rangeDays: null,         // null = all time
+      timeseriesGranularity: 'daily',
+      sessionsPage: 0,
+      sessionsPerPage: 50,
+      sessionsTotal: 0,
+      rawGamesOverTime: [],    // cache for granularity toggle
+    };
+
+    function setUsageRange(range) {
+      usageState.rangeDays = range === 'all' ? null : Number(range);
+      usageState.sessionsPage = 0;
+      // Update active chip
+      ['rangeAll', 'range90', 'range30', 'range7'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', id === 'range' + (range === 'all' ? 'All' : range));
+      });
+      loadUsageAnalytics();
+    }
+
+    function setTimeseriesGranularity(g) {
+      usageState.timeseriesGranularity = g;
+      document.getElementById('timeseriesDaily')?.classList.toggle('active', g === 'daily');
+      document.getElementById('timeseriesWeekly')?.classList.toggle('active', g === 'weekly');
+      renderGamesOverTimeChart(usageState.rawGamesOverTime);
+    }
+
+    function buildUsageDateParams() {
+      if (!usageState.rangeDays) return '';
+      const from = new Date(Date.now() - usageState.rangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      return `?dateFrom=${from}`;
+    }
+
+    function formatDuration(secs) {
+      if (!secs) return '-';
+      const mins = Math.floor(secs / 60);
+      const s = secs % 60;
+      return `${mins}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function renderGamesOverTimeChart(rawData) {
+      const palette = ['#1f6feb', '#2ea043', '#d29922', '#f85149', '#a371f7', '#58a6ff'];
+      usageState.rawGamesOverTime = rawData;
+
+      let labels, values;
+      if (usageState.timeseriesGranularity === 'weekly') {
+        // Bucket by ISO week (YYYY-Www)
+        const weekMap = {};
+        rawData.forEach(([date, count]) => {
+          const d = new Date(date);
+          // ISO week: get Monday of that week
+          const day = d.getDay() || 7;
+          const monday = new Date(d);
+          monday.setDate(d.getDate() - day + 1);
+          const week = monday.toISOString().split('T')[0];
+          weekMap[week] = (weekMap[week] || 0) + count;
+        });
+        const sorted = Object.entries(weekMap).sort(([a], [b]) => a.localeCompare(b));
+        labels = sorted.map(([w]) => 'Wk ' + w.slice(5));
+        values = sorted.map(([, v]) => v);
+      } else {
+        labels = rawData.map(([date]) => date);
+        values = rawData.map(([, count]) => count);
+      }
+
+      upsertChart('gamesOverTimeChart', {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: usageState.timeseriesGranularity === 'weekly' ? 'Games per week' : 'Games per day',
+            data: values,
+            borderColor: palette[0],
+            backgroundColor: 'rgba(31, 111, 235, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: values.length > 60 ? 0 : 3,
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
     async function loadUsageAnalytics() {
       try {
-        const data = await adminFetch('/api/admin/usage-stats');
-        
+        const params = buildUsageDateParams();
+        const data = await adminFetch('/api/admin/usage-stats' + params);
+
         // Update overview cards
-        const formatDuration = (secs) => {
-          if (!secs) return '0:00';
-          const mins = Math.floor(secs / 60);
-          const s = secs % 60;
-          return `${mins}:${s.toString().padStart(2, '0')}`;
-        };
-        
-        document.getElementById('usageTotalGames').textContent = data.overview?.totalGames || 0;
-        document.getElementById('usageUniquePlayers').textContent = data.overview?.uniquePlayers || 0;
+        document.getElementById('usageTotalGames').textContent = (data.overview?.totalGames || 0).toLocaleString();
+        document.getElementById('usageUniquePlayers').textContent = (data.overview?.uniquePlayers || 0).toLocaleString();
         document.getElementById('usageAvgDuration').textContent = formatDuration(data.overview?.avgDuration || 0);
         document.getElementById('usageAvgRounds').textContent = data.overview?.avgRounds || 0;
-        document.getElementById('usageTotalRounds').textContent = data.overview?.totalRounds || 0;
+        document.getElementById('usageTotalRounds').textContent = (data.overview?.totalRounds || 0).toLocaleString();
         document.getElementById('usageCompletionRate').textContent = (data.overview?.completionRate || 0) + '%';
-        document.getElementById('usageTotalErrors').textContent = data.overview?.totalErrors || 0;
-        document.getElementById('usageCompletedGames').textContent = data.overview?.completedGames || 0;
-        
+        document.getElementById('usageTotalErrors').textContent = (data.overview?.totalErrors || 0).toLocaleString();
+        document.getElementById('usageCompletedGames').textContent = (data.overview?.completedGames || 0).toLocaleString();
+
         // Render charts
         const palette = ['#1f6feb', '#2ea043', '#d29922', '#f85149', '#a371f7', '#58a6ff'];
-        
-        // Games over time chart
-        const gamesData = data.timeSeries?.gamesOverTime || [];
-        upsertChart('gamesOverTimeChart', {
-          type: 'line',
-          data: {
-            labels: gamesData.map(([date]) => date),
-            datasets: [{ 
-              label: 'Games per day', 
-              data: gamesData.map(([, count]) => count),
-              borderColor: palette[0],
-              backgroundColor: 'rgba(31, 111, 235, 0.1)',
-              fill: true,
-              tension: 0.3
-            }]
-          },
-          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-        });
-        
-        // Player count distribution
+
+        // Games over time
+        renderGamesOverTimeChart(data.timeSeries?.gamesOverTime || []);
+
+        // Player count distribution — bar chart (easier to compare 2/3/4 players)
         const playerCounts = data.distributions?.playerCount || {};
+        const sortedPlayerKeys = Object.keys(playerCounts).sort((a, b) => Number(a) - Number(b));
         upsertChart('playerCountChart', {
-          type: 'pie',
+          type: 'bar',
           data: {
-            labels: Object.keys(playerCounts).map(k => k + ' players'),
-            datasets: [{ data: Object.values(playerCounts), backgroundColor: palette }]
+            labels: sortedPlayerKeys.map(k => k + ' players'),
+            datasets: [{ label: 'Games', data: sortedPlayerKeys.map(k => playerCounts[k]), backgroundColor: palette[0] }]
           },
-          options: { plugins: { legend: { position: 'bottom' } } }
+          options: {
+            plugins: { legend: { display: false }, title: { display: true, text: 'Player Count', color: '#8b949e' } },
+            scales: { y: { beginAtZero: true } }
+          }
         });
-        
+
         // Difficulty distribution
         const difficulties = data.distributions?.difficulty || {};
         upsertChart('difficultyDistChart', {
@@ -2649,20 +3003,22 @@
             labels: Object.keys(difficulties),
             datasets: [{ data: Object.values(difficulties), backgroundColor: palette }]
           },
-          options: { plugins: { legend: { position: 'bottom' } } }
+          options: { plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Difficulty', color: '#8b949e' } } }
         });
-        
-        // Music mode distribution
+
+        // Music mode distribution — filter out 'unknown' if others exist
         const musicModes = data.distributions?.musicMode || {};
+        const knownModes = Object.entries(musicModes).filter(([k]) => k !== 'unknown');
+        const modeEntries = knownModes.length > 0 ? knownModes : Object.entries(musicModes);
         upsertChart('musicModeChart', {
           type: 'pie',
           data: {
-            labels: Object.keys(musicModes),
-            datasets: [{ data: Object.values(musicModes), backgroundColor: palette }]
+            labels: modeEntries.map(([k]) => k),
+            datasets: [{ data: modeEntries.map(([, v]) => v), backgroundColor: palette }]
           },
-          options: { plugins: { legend: { position: 'bottom' } } }
+          options: { plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Music Mode', color: '#8b949e' } } }
         });
-        
+
         // Error types
         const errorTypes = data.distributions?.errorTypes || {};
         upsertChart('errorTypesChart', {
@@ -2671,63 +3027,75 @@
             labels: Object.keys(errorTypes),
             datasets: [{ label: 'Errors', data: Object.values(errorTypes), backgroundColor: palette[3] }]
           },
-          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+          options: {
+            plugins: { legend: { display: false }, title: { display: true, text: 'Error Types', color: '#8b949e' } },
+            scales: { y: { beginAtZero: true } }
+          }
         });
-        
-        // Completion chart
-        const completed = data.overview?.completedGames || 0;
-        const total = data.overview?.totalGames || 1;
-        const incomplete = total - completed;
-        upsertChart('completionChart', {
-          type: 'doughnut',
+
+        // Win condition distribution (replaces completion doughnut)
+        const winConds = data.distributions?.winCondition || {};
+        const wcKeys = Object.keys(winConds).sort((a, b) => Number(a) - Number(b));
+        upsertChart('winConditionChart', {
+          type: 'bar',
           data: {
-            labels: ['Completed', 'Incomplete'],
-            datasets: [{ data: [completed, incomplete], backgroundColor: [palette[1], palette[3]] }]
+            labels: wcKeys.map(k => k + ' cards'),
+            datasets: [{ label: 'Games', data: wcKeys.map(k => winConds[k]), backgroundColor: palette[1] }]
           },
-          options: { plugins: { legend: { position: 'bottom' } } }
+          options: {
+            plugins: { legend: { display: false }, title: { display: true, text: 'Win Condition (Target Cards)', color: '#8b949e' } },
+            scales: { y: { beginAtZero: true } }
+          }
         });
-        
+
         // Load sessions and errors
+        usageState.sessionsPage = 0;
         await Promise.all([loadGameSessions(), loadErrorLogs()]);
-        
+
       } catch (e) {
         showStatus(e.message || 'Failed to load usage analytics', 'error');
       }
     }
-    
+
     async function loadGameSessions() {
       try {
-        const data = await adminFetch('/api/admin/game-sessions?limit=50');
+        const offset = usageState.sessionsPage * usageState.sessionsPerPage;
+        const data = await adminFetch(`/api/admin/game-sessions?limit=${usageState.sessionsPerPage}&offset=${offset}`);
+        usageState.sessionsTotal = data.total || 0;
+
         const tbody = document.getElementById('sessionsTbody');
         const countEl = document.getElementById('sessionsCount');
-        
-        if (countEl) countEl.textContent = `Showing ${data.items?.length || 0} of ${data.total || 0} sessions`;
-        
+        const pageInfo = document.getElementById('sessionsPageInfo');
+        const rangeInfo = document.getElementById('sessionsRangeInfo');
+        const prevBtn = document.getElementById('sessionsPrevBtn');
+        const nextBtn = document.getElementById('sessionsNextBtn');
+
+        const currentPage = usageState.sessionsPage + 1;
+        const totalPages = Math.max(1, Math.ceil(usageState.sessionsTotal / usageState.sessionsPerPage));
+        if (countEl) countEl.textContent = `${usageState.sessionsTotal.toLocaleString()} sessions total`;
+        if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        if (rangeInfo) rangeInfo.textContent = `Showing ${offset + 1}–${Math.min(offset + (data.items?.length || 0), usageState.sessionsTotal)}`;
+        if (prevBtn) prevBtn.disabled = usageState.sessionsPage === 0;
+        if (nextBtn) nextBtn.disabled = offset + usageState.sessionsPerPage >= usageState.sessionsTotal;
+
         if (!tbody) return;
         tbody.innerHTML = '';
-        
+
         if (!data.items || !data.items.length) {
-          tbody.innerHTML = '<tr><td colspan="10" class="muted">No sessions yet</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="11" class="muted">No sessions yet</td></tr>';
           return;
         }
-        
+
         data.items.forEach(session => {
           const tr = document.createElement('tr');
-          
-          const formatDuration = (secs) => {
-            if (!secs) return '-';
-            const mins = Math.floor(secs / 60);
-            const s = secs % 60;
-            return `${mins}:${s.toString().padStart(2, '0')}`;
-          };
-          
           tr.innerHTML = `
-            <td>${session.roomCode || '-'}</td>
+            <td class="mono" style="font-size:12px;">${session.roomCode || '-'}</td>
             <td class="nowrap">${new Date(session.startTime).toLocaleString()}</td>
             <td>${formatDuration(session.duration)}</td>
             <td class="num">${session.playerCount || 0}</td>
             <td>${(session.playerNames || []).join(', ')}</td>
             <td class="num">${session.totalRounds || 0}</td>
+            <td class="num">${session.winCondition || '-'}</td>
             <td>${session.winnerName || '-'}</td>
             <td><span class="pill">${session.difficulty || 'normal'}</span></td>
             <td><span class="pill">${session.musicMode || 'unknown'}</span></td>
@@ -2739,27 +3107,35 @@
         console.error('Failed to load sessions:', e);
       }
     }
-    
+
     async function loadErrorLogs() {
       try {
         const filter = document.getElementById('errorTypeFilter');
         const errorType = filter ? filter.value : '';
-        const params = errorType ? `?errorType=${errorType}&limit=50` : '?limit=50';
-        
+        const params = errorType ? `?errorType=${errorType}&limit=100` : '?limit=100';
+
         const data = await adminFetch('/api/admin/error-logs' + params);
         const tbody = document.getElementById('errorsTbody');
         const countEl = document.getElementById('errorsCount');
-        
+
         if (countEl) countEl.textContent = `Showing ${data.items?.length || 0} of ${data.total || 0} errors`;
-        
+
+        // Dynamically populate error type filter from actual data
+        if (filter && data.items?.length) {
+          const currentVal = filter.value;
+          const types = [...new Set(data.items.map(e => e.errorType).filter(Boolean))].sort();
+          filter.innerHTML = '<option value="">All Types</option>'
+            + types.map(t => `<option value="${t}"${t === currentVal ? ' selected' : ''}>${t}</option>`).join('');
+        }
+
         if (!tbody) return;
         tbody.innerHTML = '';
-        
+
         if (!data.items || !data.items.length) {
           tbody.innerHTML = '<tr><td colspan="5" class="muted">No errors logged</td></tr>';
           return;
         }
-        
+
         data.items.forEach(error => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
@@ -2775,14 +3151,13 @@
         console.error('Failed to load errors:', e);
       }
     }
-    
+
     async function exportSessions() {
       try {
         const data = await adminFetch('/api/admin/game-sessions?limit=500');
         const sessions = data.items || [];
-        
-        // Convert to CSV
-        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Rounds', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
+
+        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Rounds', 'Win Condition', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
         const rows = sessions.map(s => [
           s.roomCode || '',
           s.startTime || '',
@@ -2790,12 +3165,13 @@
           s.playerCount || '',
           (s.playerNames || []).join(';'),
           s.totalRounds || '',
+          s.winCondition || '',
           s.winnerName || '',
           s.difficulty || '',
           s.musicMode || '',
           s.completedNormally ? 'Completed' : 'Incomplete'
         ]);
-        
+
         const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
@@ -2809,7 +3185,7 @@
         showStatus(e.message || 'Export failed', 'error');
       }
     }
-    
+
     async function clearOldData() {
       if (!confirm('Clear analytics data older than 90 days? This cannot be undone.')) return;
       try {
@@ -2917,6 +3293,17 @@
     if (refreshErrorsBtn) {
       refreshErrorsBtn.onclick = loadErrorLogs;
     }
+    const sessionsPrevBtn = document.getElementById('sessionsPrevBtn');
+    if (sessionsPrevBtn) sessionsPrevBtn.onclick = () => {
+      if (usageState.sessionsPage > 0) { usageState.sessionsPage--; loadGameSessions(); }
+    };
+    const sessionsNextBtn = document.getElementById('sessionsNextBtn');
+    if (sessionsNextBtn) sessionsNextBtn.onclick = () => {
+      if ((usageState.sessionsPage + 1) * usageState.sessionsPerPage < usageState.sessionsTotal) {
+        usageState.sessionsPage++;
+        loadGameSessions();
+      }
+    };
     if (els.signOutBtn) {
       els.signOutBtn.onclick = () => {
         setSecret('');
@@ -2994,7 +3381,22 @@
     els.refreshBtn.onclick = listSongs;
     els.exportBtn.onclick = exportJson;
     if (els.refreshAnalyticsBtn) els.refreshAnalyticsBtn.onclick = loadAnalytics;
-    if (els.gapThreshold) els.gapThreshold.addEventListener('change', () => loadAnalytics());
+    const applyGapBtn = document.getElementById('applyGapThreshold');
+    if (applyGapBtn) applyGapBtn.onclick = loadAnalytics;
+    if (els.gapThreshold) els.gapThreshold.addEventListener('keydown', e => { if (e.key === 'Enter') loadAnalytics(); });
+
+    // Analytics filter wiring
+    const analyticsFilterQEl = document.getElementById('analyticsFilterQ');
+    if (analyticsFilterQEl) {
+      let analyticsSearchTimer = null;
+      analyticsFilterQEl.addEventListener('input', () => {
+        analyticsFilter.q = analyticsFilterQEl.value.trim();
+        clearTimeout(analyticsSearchTimer);
+        analyticsSearchTimer = setTimeout(loadAnalytics, 400);
+      });
+    }
+    const analyticsResetBtn = document.getElementById('analyticsResetFiltersBtn');
+    if (analyticsResetBtn) analyticsResetBtn.onclick = analyticsResetFilters;
 
     // Bulk import wiring
     if (els.previewImportBtn) els.previewImportBtn.onclick = previewImport;

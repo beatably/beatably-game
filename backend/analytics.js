@@ -280,7 +280,14 @@ function getStats({ dateFrom, dateTo } = {}) {
   
   // Completion rate
   const completionRate = totalGames > 0 ? Math.round((completedGames / totalGames) * 100) : 0;
-  
+
+  // Win condition distribution
+  const winConditionDist = {};
+  sessions.forEach(s => {
+    const wc = s.winCondition || 10;
+    winConditionDist[wc] = (winConditionDist[wc] || 0) + 1;
+  });
+
   // Games over time (by day)
   const gamesOverTime = {};
   sessions.forEach(s => {
@@ -312,6 +319,7 @@ function getStats({ dateFrom, dateTo } = {}) {
       difficulty: difficultyDist,
       musicMode: musicModeDist,
       errorTypes: errorTypesDist,
+      winCondition: winConditionDist,
     },
     timeSeries: {
       gamesOverTime: Object.entries(gamesOverTime).sort(),
