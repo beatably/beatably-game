@@ -504,6 +504,29 @@ function diversifyByArtist(tracks, maxPerArtist = 1) {
 }
 
 /**
+ * Apply easy-mode filter to a pool of songs.
+ * International songs: must be Billboard chart hits (pop >= 20) OR well-known (difficultyLevel <= 2 AND pop >= 70).
+ * Swedish songs: top 33% by Spotify popularity (relative ranking — Swedish songs score lower globally
+ * but are well-known to Swedish audiences, so absolute thresholds don't apply).
+ */
+function applyEasyFilter(pool, isSwedish) {
+  if (!isSwedish) {
+    return pool.filter((s) => {
+      const lvl = Number(s.difficultyLevel || 2);
+      const pop = s.popularity || 0;
+      const isValidChart = s.isBillboardChart === true && pop >= 20;
+      const isPopularNonChart = lvl <= 2 && pop >= 70;
+      return isValidChart || isPopularNonChart;
+    });
+  }
+  // Swedish: relative ranking — top 33% most popular within the Swedish pool
+  const SE_EASY_FRACTION = 0.33;
+  const sorted = pool.slice().sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  const cutoff = Math.max(1, Math.ceil(sorted.length * SE_EASY_FRACTION));
+  return sorted.slice(0, cutoff);
+}
+
+/**
  * Select songs for a game based on criteria
  * criteria = {
  *   yearRange: { min, max },
@@ -552,48 +575,65 @@ function selectForGame(criteria = {}) {
     });
   }
 
-  // Filter by music mode (geography/international)
-  if (Array.isArray(markets) && markets.length) {
-    const mset = new Set(markets.map((m) => String(m || '').toLowerCase()));
-    pool = pool.filter((s) => {
-      const geo = (s.geography || '').toLowerCase();
-      const isIntl = s.isInternational === true;
-      if (mset.has('se')) {
-        if (mset.size === 1) return geo === 'se';
-        if (mset.has('international') || mset.has('intl')) return geo === 'se' || isIntl;
-      }
-      if (mset.has('international') || mset.has('intl')) {
-        if (mset.size === 1 || !mset.has('se')) return isIntl;
-      }
-      return true;
-    });
-  }
-
-  // Filter by difficulty:
-  // easy     → well-known chart hits: (isBillboardChart AND popularity >= 20) OR (popularity >= 70 AND difficultyLevel <= 2)
-  //            The popularity floor on chart songs prevents obscure/low-quality recordings (covers, remixes,
-  //            old novelty tracks) from appearing even if they carry the Billboard flag.
-  // advanced → all songs (no restriction)
-  if (difficulty === 'easy') {
-    pool = pool.filter((s) => {
-      const lvl = Number(s.difficultyLevel || 2);
-      const pop = s.popularity || 0;
-      const isValidChart = s.isBillboardChart === true && pop >= 20;
-      const isPopularNonChart = lvl <= 2 && pop >= 70;
-      return isValidChart || isPopularNonChart;
-    });
-  }
-  // legacy support: treat 'normal' as advanced, 'hard' as advanced
-  // (no filter needed for advanced/normal/hard)
-
-  // Shuffle
-  pool = pool.sort(() => 0.5 - Math.random());
-
-  // Diversify by artist
-  pool = diversifyByArtist(pool, 1);
+  // Determine mode from markets
+  const mset = new Set((Array.isArray(markets) ? markets : []).map((m) => String(m || '').toLowerCase()));
+  const wantSE = mset.has('se');
+  const wantIntl = mset.has('international') || mset.has('intl');
+  const isMixMode = wantSE && wantIntl;
 
   const minSongsNeeded = Math.max(60, (Number(playerCount) || 2) * 20);
   const maxSongs = 120;
+
+  // Mix mode (intl-se): sample separately from International and Swedish pools at a 70/30 ratio
+  // so the blend is intentional rather than dependent on database composition.
+  if (isMixMode) {
+    const INTL_RATIO = 0.70;
+
+    let intlPool = pool.filter((s) => s.isInternational === true);
+    let sePool = pool.filter((s) => (s.geography || '').toLowerCase() === 'se');
+
+    if (difficulty === 'easy') {
+      intlPool = applyEasyFilter(intlPool, false);
+      sePool = applyEasyFilter(sePool, true);
+    }
+
+    // Shuffle and diversify each pool independently
+    intlPool = diversifyByArtist(intlPool.sort(() => 0.5 - Math.random()), 1);
+    sePool = diversifyByArtist(sePool.sort(() => 0.5 - Math.random()), 1);
+
+    const targetIntl = Math.round(maxSongs * INTL_RATIO);
+    const targetSE = maxSongs - targetIntl;
+
+    pool = [
+      ...intlPool.slice(0, targetIntl),
+      ...sePool.slice(0, targetSE),
+    ].sort(() => 0.5 - Math.random());
+
+    console.log(`[CuratedDB] Mix mode: ${Math.min(intlPool.length, targetIntl)} intl + ${Math.min(sePool.length, targetSE)} SE songs`);
+  } else {
+    // Single-region: filter pool then apply difficulty
+    if (mset.size > 0) {
+      pool = pool.filter((s) => {
+        const geo = (s.geography || '').toLowerCase();
+        if (wantSE && !wantIntl) return geo === 'se';
+        if (wantIntl && !wantSE) return s.isInternational === true;
+        return true;
+      });
+    }
+
+    // Filter by difficulty:
+    // easy     → international: Billboard chart hits OR difficultyLevel <= 2 + pop >= 70
+    //            swedish: top 33% most popular in pool (relative ranking)
+    // advanced → all songs (no restriction)
+    if (difficulty === 'easy') {
+      pool = applyEasyFilter(pool, wantSE && !wantIntl);
+    }
+    // legacy support: treat 'normal' as advanced, 'hard' as advanced
+    // (no filter needed for advanced/normal/hard)
+
+    // Shuffle and diversify
+    pool = diversifyByArtist(pool.sort(() => 0.5 - Math.random()), 1);
+  }
 
   // Choose up to maxSongs but at least minSongsNeeded when available
   const selected = pool.slice(0, Math.min(maxSongs, pool.length));
