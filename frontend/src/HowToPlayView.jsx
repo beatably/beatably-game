@@ -36,7 +36,7 @@ function HowToPlayView({ onClose, context = "landing" }) {
   return (
     <div className="fixed inset-0 bg-background flex flex-col" style={{ zIndex: 10000 }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
+      <div className="flex items-center justify-between px-6 pt-24 pb-4 border-b border-border flex-shrink-0">
         <h2 className="text-lg font-bold text-foreground">What is Beatably?</h2>
         <button
           onClick={onClose}
@@ -48,7 +48,7 @@ function HowToPlayView({ onClose, context = "landing" }) {
       </div>
 
       {/* Scrollable body */}
-      <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5 text-sm text-foreground max-w-lg w-full mx-auto">
+      <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5 text-left text-sm text-foreground max-w-lg w-full mx-auto">
             <section>
               <p className="text-muted-foreground leading-relaxed">
                 Beatably is a multiplayer music game where players take turns placing songs on a
@@ -111,11 +111,11 @@ function HowToPlayView({ onClose, context = "landing" }) {
               <h3 className="font-semibold text-foreground mb-2">Difficulty</h3>
               <div className="space-y-2 text-muted-foreground">
                 <p>
-                  <span className="text-foreground font-medium">Easy</span> — Chart hits and popular
+                  <span className="text-foreground font-medium">Easy:</span> Chart hits and popular
                   songs. Great for mixed groups and casual play.
                 </p>
                 <p>
-                  <span className="text-foreground font-medium">Advanced</span> — Full catalogue
+                  <span className="text-foreground font-medium">Advanced:</span> Full catalogue
                   including deeper cuts across all genres. Best for music obsessives.
                 </p>
               </div>
@@ -123,26 +123,26 @@ function HowToPlayView({ onClose, context = "landing" }) {
 
             <section>
               <h3 className="font-semibold text-foreground mb-2">Settings</h3>
-              <ul className="space-y-1 text-muted-foreground list-none">
-                <li>• <span className="text-foreground">Song selection</span> — International chart hits, Swedish artists only, or a mix of both.</li>
-                <li>• <span className="text-foreground">Decades</span> — Narrow the era from the 60s all the way to today.</li>
-                <li>• <span className="text-foreground">Genres</span> — Filter by Pop, Rock, Indie, Electronic, or Hip-Hop (Advanced mode).</li>
-                <li>• <span className="text-foreground">Win condition</span> — Set the target to 8, 10, or 12 correctly placed songs.</li>
+              <ul className="ml-3 space-y-1 text-muted-foreground list-disc">
+                <li><span className="text-foreground">Song selection</span> — International chart hits, Swedish artists only, or a mix of both.</li>
+                <li><span className="text-foreground">Decades</span> — Narrow the era from the 60s all the way to today.</li>
+                <li><span className="text-foreground">Genres</span> — Filter by Pop, Rock, Indie, Electronic, or Hip-Hop (Advanced mode).</li>
+                <li><span className="text-foreground">Win condition</span> — Set the target to 8, 10, or 12 correctly placed songs.</li>
               </ul>
             </section>
 
             <section>
               <h3 className="font-semibold text-foreground mb-2">Tips</h3>
-              <ul className="space-y-1 text-muted-foreground list-none">
-                <li>• Use the songs already on your timeline as anchors — place relative to what you know.</li>
-                <li>• When in doubt, place between two songs you're unsure about to minimize the risk.</li>
-                <li>• Watch other players' timelines for clues about songs you've both heard.</li>
-                <li>• Save credits for songs you truly can't place — a skip can save your timeline.</li>
+              <ul className="ml-3 space-y-1 text-muted-foreground list-disc">
+                <li>Use the songs already on your timeline as anchors — place relative to what you know.</li>
+                <li>When in doubt, place between two songs you're unsure about to minimize the risk.</li>
+                <li>Watch other players' timelines for clues about songs you've both heard.</li>
+                <li>Save credits for songs you truly can't place — a skip can save your timeline.</li>
               </ul>
             </section>
 
             {/* Feedback section */}
-            <div className="pt-2 border-t border-border">
+            <div className="pt-8 pb-16 border-t border-border">
               {!showFeedback ? (
                 <button
                   onClick={() => setShowFeedback(true)}
