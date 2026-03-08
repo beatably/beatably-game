@@ -393,10 +393,10 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
         )}
 
         {/* How to play link */}
-        <div className="mt-8 text-center">
+        <div className="mt-8 pt-4 text-center">
           <button
             onClick={onShowHowToPlay}
-            className="text-sm text-muted-foreground underline underline-offset-2 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button"
+            className="text-sm text-foreground/30 underline underline-offset-2 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button"
           >
             What is Beatably and how to play?
           </button>
