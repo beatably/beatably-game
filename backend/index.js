@@ -577,16 +577,6 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
     });
     let all = baseList.items;
 
-    // Apply difficulty mode filter (mirrors selectForGame logic)
-    if (difficultyMode === 'easy') {
-      all = all.filter((s) => {
-        const lvl = Number(s.difficultyLevel || 2);
-        const pop = s.popularity || 0;
-        return (s.isBillboardChart === true && pop >= 20) || (lvl <= 2 && pop >= 70);
-      });
-    }
-    // 'advanced' = all songs — no additional filter
-
     // Apply music mode filter (mirrors selectForGame market logic)
     if (musicMode === 'se') {
       all = all.filter((s) => (s.geography || '').toLowerCase() === 'se');
@@ -595,6 +585,23 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
     } else if (musicMode === 'mix') {
       all = all.filter((s) => (s.geography || '').toLowerCase() === 'se' || s.isInternational === true);
     }
+
+    // Apply difficulty mode filter (mirrors applyEasyFilter in curatedDb.js)
+    // Swedish songs use difficultyLevel (curator-set, context-aware — Spotify popularity is
+    // recency-biased and doesn't reflect familiarity for Swedish audiences).
+    // International songs use Billboard chart status + popularity thresholds.
+    if (difficultyMode === 'easy') {
+      all = all.filter((s) => {
+        const isSE = (s.geography || '').toLowerCase() === 'se';
+        if (isSE) {
+          return Number(s.difficultyLevel || 3) <= 2;
+        }
+        const lvl = Number(s.difficultyLevel || 2);
+        const pop = s.popularity || 0;
+        return (s.isBillboardChart === true && pop >= 20) || (lvl <= 2 && pop >= 70);
+      });
+    }
+    // 'advanced' = all songs — no additional filter
 
     // Total for unfiltered count (shown alongside filtered)
     const unfilteredTotal = hasFilters ? curatedDb.list({ limit: 1, offset: 0 }).total : null;
