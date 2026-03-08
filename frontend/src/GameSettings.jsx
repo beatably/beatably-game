@@ -304,7 +304,7 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
         <p className="text-xs text-muted-foreground text-center pt-1">
           {localSettings.difficulty === 'easy'
             ? <><strong>Easy mode</strong> pulls from popular chart hits — great for casual play and mixed groups where everyone can join in.</>
-            : <><strong>Advanced</strong> unlocks the full song catalogue across all genres, including deeper cuts. Best for music obsessives who want a real challenge.</>}
+            : <><strong>Advanced</strong> unlocks the full song catalogue across all genres, including deeper cuts.</>}
         </p>
       </div>
 
@@ -317,14 +317,14 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
           return 'international';
         })();
         const musicDescriptions = {
-          international: <><strong>Internationally</strong> charting hits — songs that made Billboard Hot 100, UK charts, and other global charts. Expect widely recognised hits from around the world.</>,
-          'intl-se': <>A <strong>blend</strong> of international chart hits and Swedish chart favourites. Songs that topped both global and Swedish charts are included.</>,
+          international: <><strong>Internationally</strong> charting hits — songs that made Billboard Hot 100, UK charts, and other global charts.</>,
+          'intl-se': <>A <strong>blend</strong> of international chart hits and Swedish chart favourites.</>,
           se: <><strong>Swedish artists only</strong> — songs by acts originating from Sweden, from pop exports to homegrown classics.</>,
         };
         return (
           <div className="space-y-3">
             <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="px-8 grid grid-cols-3 gap-4">
               {[
                 { code: 'international', name: 'International', img: '/img/intl.svg' },
                 { code: 'intl-se', name: 'Mix', img: '/img/mix.svg' },
@@ -344,11 +344,11 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
                       handleMusicPreferenceChange('markets', newMarkets);
                     }}
                   >
-                    <img src={mode.img} alt={mode.name} className={`absolute inset-0 w-full h-full object-cover transition-opacity ${isActive ? 'opacity-100' : 'opacity-30'}`} />
+                    <img src={mode.img} alt={mode.name} className={`absolute inset-0 w-full h-full object-cover transition-opacity ${isActive ? 'opacity-100' : 'opacity-20'}`} />
                     {isActive && (
                       <span className="absolute inset-0 rounded-md pointer-events-none" style={{
                         background: 'linear-gradient(90deg, #08AF9A, #7D3BED)',
-                        padding: '2px',
+                        padding: '3px',
                         WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                         WebkitMaskComposite: 'xor',
                         maskComposite: 'exclude'
