@@ -922,9 +922,9 @@ const CurvedTimeline = ({
       
       {/* Timeline Title */}
       {currentPlayerName && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
-          <h2 
-            className="text-lg font-semibold text-foreground text-center cursor-pointer select-none"
+        <div className="absolute top-4 left-4 right-4 z-10">
+          <h2
+            className="text-lg font-semibold text-foreground text-center cursor-pointer select-none truncate"
             onClick={handleSecretTap}
           >
             {currentPlayerName}'s timeline
