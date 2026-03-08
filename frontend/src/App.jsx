@@ -12,6 +12,7 @@ import CreditSpendNotification from "./CreditSpendNotification";
 import SessionRestore from "./SessionRestore";
 import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import HowToPlayView from "./HowToPlayView";
+import GameStartModal from "./GameStartModal";
 import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
 import debugLogger from './utils/debugLogger';
@@ -93,6 +94,7 @@ function App() {
   const [view, setView] = useState('landing');
   const [showSessionRestore, setShowSessionRestore] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showGameStartModal, setShowGameStartModal] = useState(false);
 
   // Create lobby when we have token + pending name + socket ready
   useEffect(() => {
@@ -810,6 +812,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
         setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
         // Reset game round to 1 when a new game starts
         setGameRound(1);
+        setShowGameStartModal(true);
       });
 
   // Listen for game updates (real-time sync, per player)
@@ -2646,6 +2649,13 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             onShowHowToPlay={() => setShowHowToPlay(true)}
           />
           {showHowToPlay && <HowToPlayView onClose={() => setShowHowToPlay(false)} context="game" />}
+          {showGameStartModal && (
+            <GameStartModal
+              settings={gameSettings}
+              players={players}
+              onDismiss={() => setShowGameStartModal(false)}
+            />
+          )}
           <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 z-10 bg-background overflow-hidden min-h-0">
             {/* Hidden Spotify Player for initialization only */}
             {isCreator && spotifyToken && (

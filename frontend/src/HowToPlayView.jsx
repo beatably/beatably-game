@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "./config";
 
@@ -34,35 +33,22 @@ function HowToPlayView({ onClose, context = "landing" }) {
     }
   }
 
-  return createPortal(
-    <>
-      {/* Background overlay */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-70"
-        style={{ zIndex: 9999 }}
-        onClick={onClose}
-      />
+  return (
+    <div className="fixed inset-0 bg-background flex flex-col" style={{ zIndex: 10000 }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
+        <h2 className="text-lg font-bold text-foreground">What is Beatably?</h2>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none no-focus-outline"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
 
-      {/* Modal content */}
-      <div
-        className="fixed inset-0 flex items-center justify-center p-4"
-        style={{ zIndex: 10000 }}
-      >
-        <div className="bg-card border border-border rounded-xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border flex-shrink-0">
-            <h2 className="text-lg font-bold text-foreground">What is Beatably?</h2>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none no-focus-outline"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Scrollable body */}
-          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5 text-sm text-foreground">
+      {/* Scrollable body */}
+      <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5 text-sm text-foreground max-w-lg w-full mx-auto">
             <section>
               <p className="text-muted-foreground leading-relaxed">
                 Beatably is a multiplayer music game where players take turns placing songs on a
@@ -200,11 +186,8 @@ function HowToPlayView({ onClose, context = "landing" }) {
                 </div>
               )}
             </div>
-          </div>
-        </div>
       </div>
-    </>,
-    document.body
+    </div>
   );
 }
 
