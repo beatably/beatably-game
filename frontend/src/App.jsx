@@ -109,7 +109,7 @@ function App() {
         difficulty: "normal",
         winCondition: 10,
         musicPreferences: {
-          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
           yearRange: { min: 1960, max: 2025 },
           markets: ['US']
         }
@@ -210,7 +210,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
     difficulty: "easy",
     winCondition: 10,
     musicPreferences: {
-      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'r&b'],
+      genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
       yearRange: { min: 1960, max: 2025 },
       markets: ['international']
     }

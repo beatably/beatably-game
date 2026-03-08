@@ -640,7 +640,7 @@ app.get('/api/admin/analytics', requireAdmin, (req, res) => {
     const genreByDecade = {}; // { decade: { genre: count } }
 
     // Allowed genres for game settings (used for gap analysis)
-    const allowedGenres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie', 'chart'];
+    const allowedGenres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie'];
 
     for (const s of all) {
       const genreList = (Array.isArray(s.genres) && s.genres.length ? s.genres : [s.genre]).map((g) => lc(g));
