@@ -474,7 +474,7 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
             onUpdate(defaultSettings);
           }}
           aria-label="Reset settings to defaults"
-          className="text-foreground underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none"
+          className="text-foreground bg-transparent underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none"
         >
           <svg
             className="w-4 h-4 text-muted-foreground mr-2 inline"
