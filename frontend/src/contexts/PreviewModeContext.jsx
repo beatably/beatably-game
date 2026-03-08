@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { onAirPlayTargetChange } from '../utils/castUtils';
 
 const PreviewModeContext = createContext();
 
@@ -23,6 +24,7 @@ export function PreviewModeProvider({ children }) {
   const fadeTimerRef = useRef(null);
   const fadeAnimationRef = useRef(null);
   const isIOSRef = useRef(false);
+  const isAirPlayActiveRef = useRef(false);
   
   // Default to preview mode (full play mode is opt-in via settings)
   const [isFullPlayMode, setIsFullPlayMode] = useState(false);
@@ -60,7 +62,13 @@ export function PreviewModeProvider({ children }) {
       audioRef.current.preload = 'auto';
       // Append to DOM so Safari can track it for AirPlay
       document.body.appendChild(audioRef.current);
-      
+
+      // Track AirPlay routing state so we can skip fades (volume control doesn't work via AirPlay)
+      onAirPlayTargetChange(audioRef.current, (isRemote) => {
+        isAirPlayActiveRef.current = isRemote;
+        console.log('[PreviewMode] AirPlay active:', isRemote);
+      });
+
       // Track if we're currently fading out
       const fadeOutTimerRef = { current: null };
       
@@ -68,8 +76,8 @@ export function PreviewModeProvider({ children }) {
       audioRef.current.addEventListener('timeupdate', () => {
         setCurrentTime(audioRef.current.currentTime);
         
-        // Desktop fade-out using RAF
-        if (!isIOSRef.current) {
+        // Desktop fade-out using RAF (skip if AirPlay active — volume control doesn't affect AirPlay)
+        if (!isIOSRef.current && !isAirPlayActiveRef.current) {
           const timeRemaining = audioRef.current.duration - audioRef.current.currentTime;
           if (timeRemaining <= 6 && timeRemaining > 0 && !fadeOutTimerRef.current && !fadeAnimationRef.current) {
             console.log('[PreviewMode] Starting fade-out (desktop)');
@@ -106,7 +114,8 @@ export function PreviewModeProvider({ children }) {
         setDuration(audioRef.current.duration);
         
         // iOS: Schedule fade-out based on duration (audio-thread scheduling)
-        if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
+        // Skip if AirPlay active — volume control doesn't affect AirPlay output
+        if (isIOSRef.current && gainNodeRef.current && audioContextRef.current && !isAirPlayActiveRef.current) {
           const ctx = audioContextRef.current;
           const gain = gainNodeRef.current;
           const fadeOutDuration = 6; // 6 seconds - smooth and gradual
@@ -237,42 +246,45 @@ export function PreviewModeProvider({ children }) {
       
       // iOS: Use epsilon (0.0001) and schedule fade on audio thread
       // Desktop: Start at 0 and fade with RAF
-      if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
-        const ctx = audioContextRef.current;
-        const gain = gainNodeRef.current;
-        const now = ctx.currentTime;
-        
-        // Cancel any previous scheduled values
-        gain.gain.cancelScheduledValues(0);
-        
-        // CRITICAL: Start from epsilon (0.0001), not 0 - prevents iOS "stuck at zero" bug
-        gain.gain.setValueAtTime(0.0001, now);
-        // Use linear ramp to match desktop behavior (smooth, consistent fade)
-        gain.gain.linearRampToValueAtTime(1, now + 1.5);
-        
-        console.log('[PreviewMode] iOS - Scheduled linear fade-in from 0.0001 to 1 over 1.5s');
-      } else {
-        audioRef.current.volume = 0;
+      // AirPlay: skip fades — volume control doesn't affect AirPlay output
+      if (!isAirPlayActiveRef.current) {
+        if (isIOSRef.current && gainNodeRef.current && audioContextRef.current) {
+          const ctx = audioContextRef.current;
+          const gain = gainNodeRef.current;
+          const now = ctx.currentTime;
+
+          // Cancel any previous scheduled values
+          gain.gain.cancelScheduledValues(0);
+
+          // CRITICAL: Start from epsilon (0.0001), not 0 - prevents iOS "stuck at zero" bug
+          gain.gain.setValueAtTime(0.0001, now);
+          // Use linear ramp to match desktop behavior (smooth, consistent fade)
+          gain.gain.linearRampToValueAtTime(1, now + 1.5);
+
+          console.log('[PreviewMode] iOS - Scheduled linear fade-in from 0.0001 to 1 over 1.5s');
+        } else {
+          audioRef.current.volume = 0;
+        }
       }
-      
+
       // Play
       await audioRef.current.play();
       setCurrentPreviewUrl(previewUrl);
       setIsPlaying(true);
       isUnlockedRef.current = true;
-      
-      // Desktop: fade with RAF using gentle easing curve
-      if (!isIOSRef.current) {
+
+      // Desktop: fade with RAF using gentle easing curve (skip if AirPlay active)
+      if (!isIOSRef.current && !isAirPlayActiveRef.current) {
         const startTime = performance.now();
         const fadeInDuration = 1500; // 1.5 seconds
-        
+
         const fadeIn = (currentTime) => {
           const elapsed = currentTime - startTime;
           const progress = Math.min(elapsed / fadeInDuration, 1);
           // Ease-out curve: sqrt for gentler, smoother rise
           const easedProgress = Math.sqrt(progress);
           audioRef.current.volume = easedProgress;
-          
+
           if (progress < 1) {
             fadeAnimationRef.current = requestAnimationFrame(fadeIn);
           } else {
@@ -281,7 +293,7 @@ export function PreviewModeProvider({ children }) {
             console.log('[PreviewMode] Desktop fade-in complete');
           }
         };
-        
+
         fadeAnimationRef.current = requestAnimationFrame(fadeIn);
         console.log('[PreviewMode] Desktop - fade-in started');
       }
