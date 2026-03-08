@@ -636,6 +636,7 @@
                 <th>Pop</th>
                 <th>Lvl</th>
                 <th>Prev</th>
+                <th>⚠</th>
                 <th>URI</th>
               </tr>
             </thead>
@@ -1527,7 +1528,7 @@
       els.importPreviewTbody.innerHTML = '';
       const tr = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = 13;
+      td.colSpan = 14;
       td.className = 'muted';
       td.textContent = message || 'Fetching preview…';
       tr.appendChild(td);
@@ -1600,7 +1601,7 @@
       const arr = window.__importPreviewItems;
       els.importPreviewTbody.innerHTML = '';
       if (!arr.length) {
-        els.importPreviewTbody.innerHTML = '<tr><td colspan="13" class="muted">No results</td></tr>';
+        els.importPreviewTbody.innerHTML = '<tr><td colspan="14" class="muted">No results</td></tr>';
         updateImportCommitState();
         return;
       }
@@ -1679,6 +1680,19 @@
         tdPrev.textContent = it.previewUrl ? '✓' : '–';
         if (it.previewUrl) tdPrev.style.color = '#4caf50';
         tr.appendChild(tdPrev);
+
+        const tdSusp = document.createElement('td');
+        const suspReason = getSuspiciousReason(it);
+        if (suspReason) {
+          const badge = document.createElement('span');
+          badge.textContent = '⚠';
+          badge.title = 'Suspicious: ' + suspReason;
+          badge.style.cssText = 'color:#f59e0b; font-size:12px; cursor:default;';
+          tdSusp.appendChild(badge);
+          cb.checked = false;
+          tr.style.opacity = '0.65';
+        }
+        tr.appendChild(tdSusp);
 
         const tdUri = document.createElement('td');
         tdUri.className = 'mono';
@@ -1780,6 +1794,8 @@
         const diagParts = [];
         if (total) diagParts.push({ value: total, label: 'songs found' });
         if (resp.duplicatesFiltered) diagParts.push({ value: resp.duplicatesFiltered, label: 'duplicates filtered' });
+        const suspiciousCount = (resp.items || []).filter(it => getSuspiciousReason(it)).length;
+        if (suspiciousCount > 0) diagParts.push({ value: suspiciousCount, label: 'suspicious (auto-unchecked)' });
         if (diagnostics.mbYearAdjusted > 0) diagParts.push({ value: `${diagnostics.mbYearAdjusted}/${diagnostics.mbYearChecks || total}`, label: 'years corrected (MB)' });
         if (diagnostics.modeCanonical) diagParts.push({ value: diagnostics.modeCanonical, label: 'mode' });
         if (diagnostics.queriesRun > 0) diagParts.push({ value: diagnostics.queriesRun, label: 'queries run' });
