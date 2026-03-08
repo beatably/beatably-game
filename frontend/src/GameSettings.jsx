@@ -457,7 +457,7 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
       </div>
 
       {/* Reset to Defaults (inline text action) */}
-      <div className="flex justify-center pt-2">
+      <div className="flex justify-center pt-6">
         <button
           onClick={(e) => {
             e.preventDefault();
