@@ -138,13 +138,13 @@ function GameFooter({
       const pulseInterval = setInterval(() => {
         if (increasing) {
           intensity += 0.01;
-          if (intensity >= 0.65) increasing = false;
+          if (intensity >= 1.0) increasing = false;
         } else {
           intensity -= 0.01;
           if (intensity <= 0.3) increasing = true;
         }
         setGlowIntensity(intensity);
-      }, 50); // Update every 50ms for smooth animation
+      }, 25); // Update every 25ms for smooth animation
       
       return () => clearInterval(pulseInterval);
     }
@@ -1045,6 +1045,7 @@ function GameFooter({
                     boxShadow: actualIsPlaying
                       ? 'inset 0 0 20px rgba(255, 255, 255, 0.3), inset 0 0 40px rgba(0, 214, 192, 0.5)'
                       : `inset 0 0 ${10 + (glowIntensity - 0.3) * 20}px rgba(255, 255, 255, ${glowIntensity * 0.4}), inset 0 0 ${30 + (glowIntensity - 0.3) * 30}px rgba(0, 214, 192, ${glowIntensity * 0.6})`,
+                    transform: actualIsPlaying ? 'scale(1)' : `scale(${0.95 + ((glowIntensity - 0.3) / 0.7) * 0.10})`,
                     transition: 'none'
                   }}
                 >
