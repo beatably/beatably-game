@@ -3350,17 +3350,31 @@ const lobby = lobbies[code];
     console.log('[Backend] Current player index:', game.currentPlayerIdx);
     
     // PERSISTENT ID FIX: Use persistent IDs for comparison
-    const persistentId = getPersistentId(socket.id);
+    let persistentId = getPersistentId(socket.id);
+
+    // RECONNECT RACE CONDITION FIX: If socketToPlayerMap hasn't been updated yet
+    // (player reconnected and sent place_card before reconnect_session round-trip completed),
+    // fall back to looking up the persistent ID directly from game.players by socket ID.
+    if (!persistentId) {
+      const playerInGame = game.players.find(p => p.id === socket.id);
+      if (playerInGame?.persistentId) {
+        persistentId = playerInGame.persistentId;
+        socketToPlayerMap[socket.id] = persistentId;
+        console.log('[Backend] place_card: recovered persistentId via game.players fallback:', persistentId);
+      }
+    }
+
     const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
-    console.log('[Backend] Player validation:', { 
-      socketId: socket.id, 
-      persistentId, 
-      currentPersistentId, 
-      match: persistentId === currentPersistentId 
+    console.log('[Backend] Player validation:', {
+      socketId: socket.id,
+      persistentId,
+      currentPersistentId,
+      match: persistentId === currentPersistentId
     });
-    
+
     if (persistentId !== currentPersistentId) {
       console.log('[Backend] Not current player:', { persistentId, currentPersistentId });
+      socket.emit('place_card_error', { reason: 'not_your_turn' });
       return;
     }
     console.log('[Backend] All validations passed, processing card placement...');
@@ -4080,12 +4094,32 @@ const lobby = lobbies[code];
     }
     
     const playerId = socket.id;
-    if (playerId !== game.challenge.challengerId) {
-      console.log('[CHALLENGE] Wrong challenger for challenge_place_card:', {
-        playerId,
-        expectedChallenger: game.challenge.challengerId
-      });
-      return;
+    // RECONNECT RACE CONDITION FIX: After reconnect, game.challenge.challengerId may still
+    // hold the old socket ID. Fall back to comparing by persistent ID.
+    const isDirectMatch = playerId === game.challenge.challengerId;
+    if (!isDirectMatch) {
+      const playerPersistentId = getPersistentId(socket.id) ||
+        game.players.find(p => p.id === socket.id)?.persistentId;
+      const challengerPersistentId = getPersistentId(game.challenge.challengerId) ||
+        game.players.find(p => p.id === game.challenge.challengerId)?.persistentId;
+      const isPersistentMatch = playerPersistentId && playerPersistentId === challengerPersistentId;
+      if (!isPersistentMatch) {
+        console.log('[CHALLENGE] Wrong challenger for challenge_place_card:', {
+          playerId,
+          expectedChallenger: game.challenge.challengerId,
+          playerPersistentId,
+          challengerPersistentId
+        });
+        socket.emit('place_card_error', { reason: 'not_your_turn' });
+        return;
+      }
+      // Update challengerId to current socket ID to prevent future mismatches
+      console.log('[CHALLENGE] Persistent ID match — updating challengerId from', game.challenge.challengerId, 'to', socket.id);
+      game.challenge.challengerId = socket.id;
+      // Also update socketToPlayerMap if needed
+      if (playerPersistentId && !getPersistentId(socket.id)) {
+        socketToPlayerMap[socket.id] = playerPersistentId;
+      }
     }
     console.log('[CHALLENGE] Processing challenge_place_card...');
     

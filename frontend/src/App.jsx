@@ -247,6 +247,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
 
   // Pending drop confirmation state
   const [pendingDropIndex, setPendingDropIndex] = useState(null);
+  const [placeCardError, setPlaceCardError] = useState(null);
   const [previewTimeline, setPreviewTimeline] = useState(null);
 
   // Session management state
@@ -1170,6 +1171,12 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       });
       socketRef.current.on("connect_error", (err) => {
         console.error("[Socket] Connection error:", err);
+      });
+
+      socketRef.current.on("place_card_error", ({ reason }) => {
+        console.error("[Socket] place_card_error — reconnect race condition, retrying is safe. Reason:", reason);
+        setPlaceCardError("Connection was interrupted. Please tap Confirm again.");
+        setTimeout(() => setPlaceCardError(null), 4000);
       });
     }
     // Cleanup on unmount
@@ -2708,6 +2715,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
             pendingDropIndex={pendingDropIndex}
             onConfirmDrop={handleConfirmDrop}
             onCancelDrop={handleCancelDrop}
+            placeCardError={placeCardError}
             lastSongGuess={lastSongGuess}
           />
           {/* Device switch propagation from GameFooter / DeviceSwitchModal */}

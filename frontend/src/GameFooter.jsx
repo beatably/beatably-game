@@ -37,7 +37,8 @@ function GameFooter({
   isDragging,
   pendingDropIndex,
   onConfirmDrop,
-  onCancelDrop
+  onCancelDrop,
+  placeCardError
 }) {
   // Preview Mode context
   const { 
@@ -1528,8 +1529,11 @@ function GameFooter({
           <div className="text-white mb-8">
             You have now selected a place on the timeline.
           </div>
+          {placeCardError && (
+            <div className="text-yellow-400 text-sm mb-3">{placeCardError}</div>
+          )}
           <div className="flex gap-2 justify-center">
-            <button 
+            <button
               ref={dropCancelButtonRef}
               onClick={() => {
                 onCancelDrop();
