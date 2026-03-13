@@ -3,6 +3,7 @@ import beatablyLogo from "./assets/beatably_logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import IOSInstallPrompt from "./IOSInstallPrompt";
 
 function Landing({ onCreate, onJoin, onShowHowToPlay }) {
   const [name, setName] = useState("");
@@ -402,6 +403,8 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
           </button>
         </div>
       </div>
+
+      <IOSInstallPrompt />
     </div>
   );
 }
