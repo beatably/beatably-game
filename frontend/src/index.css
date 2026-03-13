@@ -159,30 +159,28 @@ html, body, #root {
   }
 }
 
-/* PWA STANDALONE/FULLSCREEN MODE - No global padding, components handle their own safe areas */
-@media (display-mode: standalone), (display-mode: fullscreen) {
+/* PWA STANDALONE MODE - No global padding, components handle their own safe areas */
+@media (display-mode: standalone) {
   html, body, #root {
     /* Remove global safe area padding in PWA mode */
     padding: 0;
     /* Fix iOS grab handle area background to black */
     background-color: #000000 !important;
   }
-
-  /* Ensure the grab handle / bottom edge is covered */
+  
+  /* Ensure the grab handle area at bottom is black for landing page */
   body::after {
     content: '';
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    /* Use safe-area-inset-bottom when available (iOS), but always at least 3px to cover
-       Android fullscreen rendering artifacts */
-    height: max(env(safe-area-inset-bottom, 0px), 3px);
+    height: env(safe-area-inset-bottom, 0px);
     background-color: #000000;
     z-index: 9999;
     pointer-events: none;
   }
-
+  
   /* Waiting room specific safe area background using body class */
   body.waiting-room-active::after {
     content: '';
@@ -190,12 +188,12 @@ html, body, #root {
     bottom: 0;
     left: 0;
     right: 0;
-    height: max(env(safe-area-inset-bottom, 0px), 3px);
+    height: env(safe-area-inset-bottom, 0px);
     background-color: hsl(var(--background)) !important;
     z-index: 10000;
     pointer-events: none;
   }
-
+  
 }
 
 /* Ensure smooth native scrolling on iOS (kept for older engines) */

@@ -32,7 +32,7 @@
     }
   ],
   "start_url": "/",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#121212",
   "theme_color": "#121212",
