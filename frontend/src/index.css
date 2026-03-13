@@ -168,14 +168,16 @@ html, body, #root {
     background-color: #000000 !important;
   }
 
-  /* Ensure the grab handle area at bottom is black for landing page */
+  /* Ensure the grab handle / bottom edge is covered */
   body::after {
     content: '';
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: env(safe-area-inset-bottom, 0px);
+    /* Use safe-area-inset-bottom when available (iOS), but always at least 3px to cover
+       Android fullscreen rendering artifacts */
+    height: max(env(safe-area-inset-bottom, 0px), 3px);
     background-color: #000000;
     z-index: 9999;
     pointer-events: none;
@@ -188,7 +190,7 @@ html, body, #root {
     bottom: 0;
     left: 0;
     right: 0;
-    height: env(safe-area-inset-bottom, 0px);
+    height: max(env(safe-area-inset-bottom, 0px), 3px);
     background-color: hsl(var(--background)) !important;
     z-index: 10000;
     pointer-events: none;
