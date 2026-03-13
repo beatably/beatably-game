@@ -77,6 +77,7 @@
   font-family: "Encode Sans", sans-serif;
   line-height: 1.5;
   background-color: #121212;
+  color-scheme: dark;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -127,16 +128,6 @@ button:hover {
 }
 
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-
-}
 
 /* Prevent white overscroll flash on iOS when rubber-banding (match root background to app background) */
 html, body, #root {
