@@ -85,6 +85,14 @@ const { resolveOriginalYear, isRemasterMarker, normalizeTitle } = require('./mus
 const { getChartEntries, getSwedishChartEntries, getSvenskToppenEntries } = require('./chartProvider');
 
 const app = express();
+// In production we run behind Render's proxy, which sets X-Forwarded-For.
+// Trust exactly one hop so req.ip is the real client IP (used for rate
+// limiting) rather than the proxy's — and so express-rate-limit doesn't
+// warn about an untrusted X-Forwarded-For. Trusting only 1 hop (not `true`)
+// prevents clients from spoofing the header to dodge limits.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 const discovery = require('./discovery');
 
 // --- Persistent state (lobbies/games) across backend restarts ---
