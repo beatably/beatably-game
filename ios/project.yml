@@ -1,0 +1,46 @@
+name: Beatably
+options:
+  bundleIdPrefix: app.beatably
+
+packages:
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: "16.1.1"
+
+targets:
+  Beatably:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Beatably
+    info:
+      path: Beatably/Info.plist
+      properties:
+        UIBackgroundModes:
+          - audio
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.beatably.ios
+        SWIFT_VERSION: 5.9
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    dependencies:
+      - package: SocketIO
+        product: SocketIO
+
+  BeatableTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: BeatableTests
+    dependencies:
+      - target: Beatably
+    settings:
+      base:
+        SWIFT_VERSION: 5.9
+        GENERATE_INFOPLIST_FILE: YES
