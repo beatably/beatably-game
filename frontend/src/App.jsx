@@ -264,6 +264,17 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
   // Player left game notification state
   const [playerLeftNotification, setPlayerLeftNotification] = useState(null);
 
+  // Long-lived socket handlers are registered once (in a useEffect with []),
+  // so any state they read directly is captured at mount and goes stale.
+  // Mirror the values those handlers need into a ref that we refresh after
+  // every render, and have the handlers read latestRef.current instead.
+  const latestRef = useRef({});
+  useEffect(() => {
+    latestRef.current = {
+      showWinnerView, winner, currentPlayerId, isCreator, spotifyDeviceId, roomCode,
+    };
+  });
+
   // Initialize viewport manager for mobile Safari optimizations
   useEffect(() => {
     console.log('[App] Initializing viewport manager for mobile Safari optimizations');
@@ -848,8 +859,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       return;
     }
 
-    // If already showing winner, ignore further updates to avoid UI flicker
-    if (showWinnerView && winner) {
+    // If already showing winner, ignore further updates to avoid UI flicker.
+    // Read from latestRef (not closure) so the guard sees current state.
+    if (latestRef.current.showWinnerView && latestRef.current.winner) {
       return;
     }
 
@@ -859,7 +871,7 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       setWinner(game.winner);
       setShowWinnerView(true);
       // Stop any Spotify playback if creator
-      if (isCreator && spotifyDeviceId) {
+      if (latestRef.current.isCreator && latestRef.current.spotifyDeviceId) {
         pauseSpotifyPlayback();
       }
       return;
@@ -871,9 +883,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
       if (game.phase !== 'game-over') {
         console.error("[App] ERROR: Empty deck but game not over!");
         // Attempt to request fresh state from backend
-        if (socketRef.current && roomCode) {
+        if (socketRef.current && latestRef.current.roomCode) {
           console.log("[App] Requesting game state refresh...");
-          socketRef.current.emit("request_game_state", { code: roomCode });
+          socketRef.current.emit("request_game_state", { code: latestRef.current.roomCode });
         }
       }
     }
@@ -980,8 +992,9 @@ const [challengeResponseGiven, setChallengeResponseGiven] = useState(false);
           setLastSongGuess(null);
         }
         
-        // Increment game round when the current player changes
-        if (game.currentPlayerId !== currentPlayerId) {
+        // Increment game round when the current player changes.
+        // Read from latestRef so the comparison uses the current value.
+        if (game.currentPlayerId !== latestRef.current.currentPlayerId) {
           setGameRound(prevRound => prevRound + 1);
         }
       });
