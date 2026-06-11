@@ -170,7 +170,11 @@ function persistState() {
     };
     const serializable = sanitizeForSave(payload);
     if (!serializable) return;
-    fs.writeFileSync(STATE_FILE, JSON.stringify(serializable));
+    // Atomic write: write to a temp file then rename, so a crash mid-write
+    // can never leave a truncated/corrupt state.json behind.
+    const tmp = STATE_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(serializable));
+    fs.renameSync(tmp, STATE_FILE);
     console.log('[State] Saved to', STATE_FILE);
   } catch (e) {
     console.warn('[State] Save failed:', e && e.message);

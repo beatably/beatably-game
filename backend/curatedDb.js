@@ -323,7 +323,11 @@ function load(forceReload = false) {
 function save() {
   ensureCacheDir();
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(_songs, null, 2), 'utf8');
+    // Atomic write: write to a temp file then rename, so a crash mid-write
+    // can never corrupt the song database (which has no other source of truth).
+    const tmp = DB_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(_songs, null, 2), 'utf8');
+    fs.renameSync(tmp, DB_FILE);
     return true;
   } catch (e) {
     console.warn('[CuratedDB] Save failed:', e && e.message);
