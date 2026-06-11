@@ -9,6 +9,10 @@ const path = require('path');
 
 // Use persistent disk in production if available, otherwise fall back to deployed cache
 function getCacheDir() {
+  // Explicit override (used by tests to isolate the DB from the dev cache).
+  if (process.env.BEATABLY_CACHE_DIR) {
+    return process.env.BEATABLY_CACHE_DIR;
+  }
   console.log('[CuratedDB] getCacheDir() called - starting path detection');
   console.log('[CuratedDB] Environment check:', {
     NODE_ENV: process.env.NODE_ENV,

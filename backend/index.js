@@ -8,6 +8,8 @@ if (process.env.NODE_ENV !== 'production') {
 }
 const axios = require('axios');
 const querystring = require('querystring');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const curatedDb = require('./curatedDb');
 const analytics = require('./analytics');
 const feedback = require('./feedback');
@@ -91,6 +93,10 @@ const path = require('path');
 
 // Use persistent disk in production if available, otherwise fall back to deployed cache
 function getStateDir() {
+  // Explicit override (used by tests to isolate state from the dev cache).
+  if (process.env.BEATABLY_CACHE_DIR) {
+    return process.env.BEATABLY_CACHE_DIR;
+  }
   if (process.env.NODE_ENV === 'production') {
     const persistentPath = '/var/data/cache';
     const deployedPath = path.join(__dirname, 'cache');
@@ -292,6 +298,36 @@ async function getClientToken() {
   }
 }
 
+// Allowed frontend origins — the only hosts we will redirect a Spotify token
+// back to, and the CORS allowlist. Shared so both stay in sync.
+const ALLOWED_FRONTEND_ORIGINS = (
+  process.env.NODE_ENV === 'production'
+    ? [
+        process.env.FRONTEND_URI,
+        'https://beatably-frontend.netlify.app',
+        'https://beatably.app',
+        'https://www.beatably.app'
+      ]
+    : ['http://127.0.0.1:5173', 'http://localhost:5173']
+).filter(Boolean);
+
+// Validate a caller-supplied redirect target against the allowlist.
+// Returns a safe absolute URL string, falling back to FRONTEND_URI.
+function safeRedirectBase(requested) {
+  const fallback = process.env.FRONTEND_URI || ALLOWED_FRONTEND_ORIGINS[0] || '';
+  if (!requested) return fallback;
+  try {
+    const u = new URL(requested);
+    if (ALLOWED_FRONTEND_ORIGINS.includes(u.origin)) {
+      return requested;
+    }
+    console.warn('[Spotify] Rejected non-allowlisted redirect target:', requested);
+  } catch (e) {
+    console.warn('[Spotify] Rejected malformed redirect target:', requested);
+  }
+  return fallback;
+}
+
 // Spotify OAuth login endpoint
 app.get('/login', (req, res) => {
   console.log('[Spotify] Login endpoint called');
@@ -324,7 +360,9 @@ app.get('/login', (req, res) => {
   // Spotify OAuth callback endpoint
   app.get('/callback', async (req, res) => {
     const code = req.query.code || null;
-    const redirectUrl = req.query.redirect || process.env.FRONTEND_URI;
+    // Validate the redirect target against an allowlist to prevent an open
+    // redirect that would leak the Spotify access token to an attacker domain.
+    const redirectUrl = safeRedirectBase(req.query.redirect);
     try {
       const tokenResponse = await axios.post('https://accounts.spotify.com/api/token',
         querystring.stringify({
@@ -347,31 +385,67 @@ app.get('/login', (req, res) => {
 
 // CORS configuration for production
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        process.env.FRONTEND_URI, 
-        'https://beatably-frontend.netlify.app',
-        'https://beatably.app',
-        'https://www.beatably.app'
-      ].filter(Boolean) // Remove any undefined values
-    : ['http://127.0.0.1:5173', 'http://localhost:5173'],
+  origin: ALLOWED_FRONTEND_ORIGINS,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret']
+  // x-admin-secret intentionally omitted: admin endpoints are called
+  // server-to-server / via tooling, never cross-origin from the browser.
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' })); // Add JSON body parser
 
+// --- Rate limiting ---
+// Admin routes: tight cap to slow brute-forcing of ADMIN_PASSWORD.
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many requests' }
+});
+// Public/expensive routes (song fetch fans out to many Spotify calls; feedback
+// can be spammed). Generous enough for real play, low enough to blunt abuse.
+const publicLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many requests, please try again shortly' }
+});
+// Disable limiting in the test environment so integration tests aren't throttled.
+const limiterEnabled = process.env.NODE_ENV !== 'test';
+const adminRateLimit = limiterEnabled ? adminLimiter : (req, res, next) => next();
+const publicRateLimit = limiterEnabled ? publicLimiter : (req, res, next) => next();
+app.use('/api/admin', adminRateLimit);
+
+// Constant-time string comparison that tolerates differing lengths without
+// leaking length via early return.
+function secretsMatch(provided, expected) {
+  if (typeof provided !== 'string' || typeof expected !== 'string') return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) {
+    // Still run a comparison to keep timing roughly constant.
+    crypto.timingSafeEqual(a, a);
+    return false;
+  }
+  return crypto.timingSafeEqual(a, b);
+}
+
 // --- Admin password middleware for curated DB ---
 function requireAdmin(req, res, next) {
   try {
-    const secret =
-      req.headers['x-admin-secret'] || req.query.admin_secret || (req.body && req.body.admin_secret);
+    // Accept the secret via the x-admin-secret header or an Authorization
+    // Bearer token only. The query-string variant was removed: query strings
+    // get logged by proxies, browsers, and access logs, leaking the secret.
+    const bearer = (req.headers['authorization'] || '').match(/^Bearer\s+(.+)$/i);
+    const secret = req.headers['x-admin-secret'] || (bearer && bearer[1]);
     if (!process.env.ADMIN_PASSWORD) {
       return res.status(500).json({ ok: false, error: 'ADMIN_PASSWORD not set on server' });
     }
-    if (secret !== process.env.ADMIN_PASSWORD) {
+    if (!secretsMatch(secret, process.env.ADMIN_PASSWORD)) {
       return res.status(401).json({ ok: false, error: 'Unauthorized' });
     }
     next();
@@ -379,6 +453,37 @@ function requireAdmin(req, res, next) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
 }
+
+// Keep only the most recent N curated-songs backups so the persistent disk
+// doesn't fill up over time. Matches the same set the restore-backup endpoint
+// manages (curated-songs.backup-*.json). Safe to call on startup and after
+// each new backup is written.
+function pruneCuratedBackups(keep = 5) {
+  try {
+    const dir = curatedDb.CACHE_DIR;
+    if (!dir || !fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir)
+      .filter(f => f.startsWith('curated-songs.backup-') && f.endsWith('.json'))
+      .map(f => {
+        try { return { f, t: fs.statSync(path.join(dir, f)).mtimeMs }; }
+        catch (e) { return { f, t: 0 }; }
+      })
+      .sort((a, b) => b.t - a.t);
+    for (const { f } of entries.slice(keep)) {
+      try {
+        fs.unlinkSync(path.join(dir, f));
+        console.log('[Backups] Pruned old backup:', f);
+      } catch (e) {
+        console.warn('[Backups] Failed to prune', f, '-', e.message);
+      }
+    }
+  } catch (e) {
+    console.warn('[Backups] Prune failed:', e && e.message);
+  }
+}
+
+// Prune leftover backups from previous runs on startup.
+pruneCuratedBackups();
 
 // --- Curated DB Admin Endpoints ---
 app.get('/api/admin/curated-songs', requireAdmin, (req, res) => {
@@ -839,6 +944,7 @@ app.post('/api/admin/enrich-batch', requireAdmin, async (req, res) => {
       backupFile = path.join(curatedDb.CACHE_DIR, `curated-songs.backup-${timestamp}.json`);
       await fsPromises.copyFile(curatedDb.DB_FILE, backupFile);
       console.log(`[AdminEnrich][batch] Backup saved: ${backupFile}`);
+      pruneCuratedBackups();
     } catch (backupErr) {
       console.warn(`[AdminEnrich][batch] Backup failed (continuing anyway):`, backupErr.message);
     }
@@ -903,7 +1009,16 @@ app.get('/api/admin/backups', requireAdmin, async (req, res) => {
 app.post('/api/admin/restore-backup', requireAdmin, async (req, res) => {
   const fsPromises = require('fs').promises;
   const filename = req.body?.filename;
-  if (!filename || !filename.startsWith('curated-songs.backup-') || !filename.endsWith('.json')) {
+  // Reject anything that isn't a bare filename in CACHE_DIR — path.basename
+  // strips any directory components, so a traversal payload like
+  // "curated-songs.backup-../../etc/passwd.json" can never escape the dir.
+  if (
+    !filename ||
+    typeof filename !== 'string' ||
+    path.basename(filename) !== filename ||
+    !filename.startsWith('curated-songs.backup-') ||
+    !filename.endsWith('.json')
+  ) {
     return res.status(400).json({ ok: false, error: 'Invalid backup filename' });
   }
   try {
@@ -2053,8 +2168,15 @@ function applyNonChartDifficulty(tracks, difficulty) {
 }
 
 // Enhanced fetch songs from Spotify with filtering support and MB enrichment (Phase 1-2)
-app.post('/api/fetch-songs', async (req, res) => {
-  const { musicPreferences = {}, difficulty = (config.difficulty || 'normal'), playerCount = 2, useChartMode } = req.body || {};
+app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
+  const body = req.body || {};
+  if (typeof body !== 'object' || (body.musicPreferences != null && typeof body.musicPreferences !== 'object')) {
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
+  const { musicPreferences = {}, difficulty = (config.difficulty || 'normal'), useChartMode } = body;
+  // Clamp playerCount to a sane range — it drives minSongsNeeded (playerCount * 20)
+  // and an unbounded value would let a caller request an enormous fetch.
+  const playerCount = Math.max(1, Math.min(8, Number.parseInt(body.playerCount, 10) || 2));
   const chartMode = typeof useChartMode === 'boolean' ? useChartMode : config.featureFlags.enableChartMode;
   console.log('[FetchSongs] Incoming request:', {
     requestedChartMode: useChartMode,
@@ -2071,9 +2193,24 @@ app.post('/api/fetch-songs', async (req, res) => {
   } = musicPreferences || {};
 
   // Defensive normalization: lowercase + dedupe genres; uppercase + dedupe markets
-  genres = Array.from(new Set((genres || []).map(g => String(g || '').toLowerCase()).filter(Boolean)));
-  markets = Array.from(new Set((markets || []).map(m => String(m || '').toUpperCase()).filter(Boolean)));
-  
+  genres = Array.isArray(genres) ? genres : [];
+  markets = Array.isArray(markets) ? markets : [];
+  genres = Array.from(new Set(genres.map(g => String(g || '').toLowerCase()).filter(Boolean)));
+  markets = Array.from(new Set(markets.map(m => String(m || '').toUpperCase()).filter(Boolean)));
+
+  // Sanitize yearRange: coerce to integers, clamp to plausible bounds, ensure min<=max.
+  {
+    const nowYear = new Date().getFullYear() + 1;
+    let min = Number.parseInt(yearRange && yearRange.min, 10);
+    let max = Number.parseInt(yearRange && yearRange.max, 10);
+    if (!Number.isFinite(min)) min = 1980;
+    if (!Number.isFinite(max)) max = 2024;
+    min = Math.max(1900, Math.min(nowYear, min));
+    max = Math.max(1900, Math.min(nowYear, max));
+    if (min > max) { const t = min; min = max; max = t; }
+    yearRange = { min, max };
+  }
+
   // Calculate minimum songs needed: playerCount * 20
   const minSongsNeeded = playerCount * 20;
 
@@ -5220,6 +5357,11 @@ const lobby = lobbies[code];
         // Note: Host disconnections are handled above in the lobby section
       }
     }
+
+    // Prevent unbounded growth of socketToPlayerMap: each connection adds an
+    // entry keyed by socket.id, so drop it once the socket is gone. Reconnects
+    // re-establish the mapping under the new socket id via reconnect_session.
+    delete socketToPlayerMap[socket.id];
   });
 });
 
@@ -5580,7 +5722,7 @@ app.delete('/api/admin/analytics-data', requireAdmin, (req, res) => {
 // --- Feedback Endpoints ---
 
 // Public: submit feedback
-app.post('/api/feedback', (req, res) => {
+app.post('/api/feedback', publicRateLimit, (req, res) => {
   try {
     const { message, context } = req.body || {};
     if (!message || !String(message).trim()) {
