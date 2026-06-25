@@ -276,7 +276,7 @@ const [, setChallengeResponseGiven] = useState(false);
     // socket + key state so the e2e harness can drive game progression
     // deterministically and read room state. See e2e/.
     if (import.meta.env.DEV && typeof window !== 'undefined') {
-      window.__beatably = { ...latestRef.current, view, phase, timeline, socket: socketRef.current };
+      window.__beatably = { ...latestRef.current, view, phase, timeline, players, challenge, socket: socketRef.current };
     }
   });
 
