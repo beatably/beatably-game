@@ -198,3 +198,49 @@ test('currentPlayerId is the persistent id and survives a reconnect mid-turn', a
   assert.equal(u.lastPlaced.correct, true);
   assert.equal(u.currentPlayerId, guestPid, 'turn identity preserved by persistent id');
 });
+
+// Reproduces the live bug: reconnecting DURING song-guess (after placing, while
+// deciding guess-vs-skip) must leave the player able to act and see their
+// placement. Asserts the invariants the frontend's isMyTurn + skip UI rely on.
+test('reconnect during song-guess: state lets the active player still skip', async (t) => {
+  const { code, guest, guestPid, guestStarted } = await startedGame(t);
+  const card = guestStarted.deck[0];
+  const idx = card.year < guestStarted.timeline[0].year ? 0 : 1;
+
+  // Place the card -> phase becomes song-guess.
+  const placed = waitFor(guest, 'game_update');
+  guest.emit('place_card', { code, index: idx });
+  const placedState = await placed;
+  assert.equal(placedState.phase, 'song-guess');
+
+  // Kill the socket mid-song-guess and reconnect a fresh one as the same player.
+  guest.close();
+  await delay(300);
+  const guest2 = connect();
+  t.after(() => guest2.close());
+  const reAck = await emitAck(guest2, 'reconnect_session', {
+    sessionId: 'sess-songguess', roomCode: code, playerName: 'Guest',
+  });
+  const gs = reAck.gameState || {};
+
+  // Invariants the frontend needs for isMyTurn + the song-guess skip UI:
+  assert.equal(reAck.success, true, 'reconnect succeeded');
+  assert.equal(gs.phase, 'song-guess', 'phase preserved across reconnect');
+  assert.equal(gs.currentPlayerId, guestPid, 'currentPlayerId is the persistent id');
+  const me = (gs.players || []).find((p) => p.persistentId === guestPid);
+  assert.ok(me, 'reconnecting player present in players');
+  assert.equal(me.id, guest2.id, 'player.id rebound to the new socket (isMyTurn lookup)');
+  assert.ok(gs.lastPlaced, 'lastPlaced preserved so the placement can be shown');
+  // The reconnect timeline must include the tentative (preview) placed card so
+  // the highlight is visible — it is not committed to the timeline yet.
+  const previewCard = (gs.timeline || []).find((c) => c && c.preview);
+  assert.ok(previewCard, 'tentative placed card is present in the reconnect timeline');
+  assert.equal(gs.timeline[gs.lastPlaced.index] && gs.timeline[gs.lastPlaced.index].preview, true,
+    'preview card sits at lastPlaced.index');
+
+  // And the backend must still accept the skip from the reconnected socket.
+  const afterSkip = waitFor(guest2, 'game_update');
+  guest2.emit('skip_song_guess', { code });
+  const skipped = await afterSkip;
+  assert.equal(skipped.phase, 'challenge-window', 'skip advanced the phase');
+});

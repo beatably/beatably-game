@@ -2954,8 +2954,24 @@ io.on('connection', (socket) => {
         }
       }
 
-      // Send the current player's timeline (the one whose turn it is)
-      const currentPlayerTimeline = game.timelines[currentPlayerId] || [];
+      // Send the current player's timeline (the one whose turn it is).
+      // During song-guess / challenge-window the active player has a tentative,
+      // not-yet-committed card on the board — it lives only in lastPlaced, not in
+      // the committed timeline. Reconstruct that visual placement so a
+      // reconnecting player still sees (and can act on) their pending placement.
+      const committedTimeline = game.timelines[currentPlayerId] || [];
+      let currentPlayerTimeline = committedTimeline;
+      if (
+        currentCard &&
+        game.lastPlaced && game.lastPlaced.index !== undefined &&
+        (game.phase === 'song-guess' || game.phase === 'challenge-window')
+      ) {
+        currentPlayerTimeline = [...committedTimeline];
+        const previewCard = game.phase === 'challenge-window'
+          ? { ...currentCard, preview: true, challengeCard: true }
+          : { ...currentCard, preview: true };
+        currentPlayerTimeline.splice(game.lastPlaced.index, 0, previewCard);
+      }
 
       callback({
         success: true,
@@ -2976,10 +2992,9 @@ io.on('connection', (socket) => {
 
       // Broadcast updated state to all players
       setTimeout(() => {
-        const broadcastCurrentPlayerId = game.playerOrder[game.currentPlayerIdx];
         game.players.forEach((p) => {
           io.to(p.id).emit('game_update', {
-            timeline: game.timelines[broadcastCurrentPlayerId] || [],
+            timeline: currentPlayerTimeline,
             deck: [currentCard],
             players: game.players,
             phase: game.phase,
@@ -2987,7 +3002,7 @@ io.on('connection', (socket) => {
             lastPlaced: game.lastPlaced,
             removingId: game.removingId,
             currentPlayerIdx: game.currentPlayerIdx,
-            currentPlayerId: broadcastCurrentPlayerId,
+            currentPlayerId: currentPlayerId,
             challenge: game.challenge
           });
         });
