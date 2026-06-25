@@ -93,7 +93,7 @@ class DebugLogger {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(logEntry)
-      }).catch(err => {
+      }).catch(() => {
         // Silently fail - don't spam console with log delivery errors
       });
     } catch (error) {

@@ -23,11 +23,24 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        // Conventional throwaways: a leading-underscore argument and an unused
+        // catch binding are intentional, not bugs.
+        argsIgnorePattern: '^_',
+        caughtErrors: 'none',
+      }],
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
+    },
+  },
+  {
+    // Build/tooling config files run in Node, not the browser.
+    files: ['*.config.js', 'vite.config.js', 'tailwind.config.js', 'postcss.config.js'],
+    languageOptions: {
+      globals: globals.node,
     },
   },
 ]

@@ -102,7 +102,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
           if (window.spotifyPlayerInstance?.pause) {
             await window.spotifyPlayerInstance.pause();
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
     };
     return () => {
@@ -225,7 +225,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
                 deviceAwarePlayback.setCurrentDevice(existing);
               }
             }
-          } catch (_) {}
+          } catch (_) { /* ignore */ }
 
           if (onPlayerReady) {
             onPlayerReady(device_id);
@@ -365,7 +365,7 @@ const SpotifyPlayer = ({ token, currentTrack, isPlaying, onPlayerReady, onPlayer
         }
         // If resume exists, try to resume
         if (player.resume) {
-          try { await player.resume(); } catch (_) {}
+          try { await player.resume(); } catch (_) { /* ignore */ }
         }
         // If we still aren't unlocked, bail; App will flip the CTA when needed
         if (!playbackUnlocked) {

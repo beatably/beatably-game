@@ -233,7 +233,7 @@ class DeviceDiscoveryService {
         };
         this._sse.onerror = (err) => {
           console.warn('[DeviceDiscovery] SSE error, falling back to polling:', err);
-          try { this._sse.close(); } catch (_) {}
+          try { this._sse.close(); } catch (_) { /* ignore */ }
           this._sse = null;
           // start polling
           this.scanInterval = setInterval(() => { this.discoverDevices().catch(()=>{}); }, pollMs);
@@ -261,7 +261,7 @@ class DeviceDiscoveryService {
       this.scanInterval = null;
     }
     if (this._sse) {
-      try { this._sse.close(); } catch (_) {}
+      try { this._sse.close(); } catch (_) { /* ignore */ }
       this._sse = null;
     }
   }

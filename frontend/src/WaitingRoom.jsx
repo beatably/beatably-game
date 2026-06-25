@@ -59,12 +59,12 @@ function WaitingRoom({
 
       // Drive stages visually while waiting for transition to game
       // Stage 2 after short delay
-      const t1 = setTimeout(() => {
+      setTimeout(() => {
         setLoadingStage((prev) => (prev < 2 ? 2 : prev));
       }, 900);
 
       // Stage 3 after another short delay
-      const t2 = setTimeout(() => {
+      setTimeout(() => {
         setLoadingStage((prev) => (prev < 3 ? 3 : prev));
       }, 1800);
 

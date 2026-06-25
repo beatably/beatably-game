@@ -14,9 +14,8 @@ function GameFooter({
   currentCard, 
   showFeedback, 
   feedback, 
-  onContinue, 
-  onRestart, 
-  players, 
+  onContinue,
+  players,
   currentPlayerId, 
   myPlayerId, 
   isMyTurn, 
@@ -98,14 +97,14 @@ function GameFooter({
   const [localIsPlaying, setLocalIsPlaying] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [duration, setDuration] = React.useState(30); // Default 30 seconds
-  const [spotifyPosition, setSpotifyPosition] = React.useState(0);
+  const [, setSpotifyPosition] = React.useState(0);
   
   // Track when a new song has been loaded but not yet played
   const [showNewSongMessage, setShowNewSongMessage] = React.useState(false);
   const lastCardIdRef = React.useRef(null);
   
   // Track if play has been pressed at least once for current song
-  const [hasPlayedOnce, setHasPlayedOnce] = React.useState(false);
+  const [, setHasPlayedOnce] = React.useState(false);
 
   // Use real Spotify playing state if available, otherwise use local state
   const [isSpotifyPlaying, setIsSpotifyPlaying] = React.useState(false);
@@ -400,7 +399,7 @@ function GameFooter({
         let state = null;
         try {
           state = await spotifyAuth.getPlaybackState(target);
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
         const positionMs = state?.progress_ms ?? 0;
         const ok = await spotifyAuth.verifiedStartPlayback(
           target,
@@ -415,22 +414,6 @@ function GameFooter({
     } catch (error) {
       console.error('[GameFooter] Error resuming Spotify playback:', error);
       if (error.message?.includes?.('Token expired')) {
-        handleTokenExpiration();
-      }
-      return false;
-    }
-  };
-
-  // Function to stop Spotify playback when moving to next player
-  const stopSpotifyPlayback = async () => {
-    if (!isCreator || !spotifyDeviceId) return false;
-
-    try {
-      console.log('[GameFooter] Stopping Spotify playback for next player turn');
-      return await spotifyAuth.pausePlayback(spotifyDeviceId);
-    } catch (error) {
-      console.error('[GameFooter] Error stopping Spotify playback:', error);
-      if (error.message.includes('Token expired')) {
         handleTokenExpiration();
       }
       return false;
@@ -600,42 +583,6 @@ function GameFooter({
     } else {
       // Non-creator: no-op (creator controls playback)
       return;
-
-      if (!localIsPlaying) {
-        setLocalIsPlaying(true);
-        if (currentCard?.preview_url) {
-          try {
-            const audio = new Audio(currentCard.preview_url);
-            audio.volume = 0.3;
-            audio.setAttribute('playsinline', 'true');
-            audio.setAttribute('webkit-playsinline', 'true');
-            audio.muted = false;
-            window.currentGameAudio = audio;
-            const playPromise = audio.play();
-            if (playPromise && playPromise.catch) {
-              playPromise.catch((err) => {
-                if (err?.name === 'NotAllowedError') {
-                  alert('Tap the play button again to enable audio');
-                } else {
-                  console.log('[GameFooter] Audio playback failed:', err);
-                }
-              });
-            }
-          } catch (e) {
-            console.log('[GameFooter] Audio creation failed:', e);
-          }
-        }
-      } else {
-        setLocalIsPlaying(false);
-        if (window.currentGameAudio) {
-          try {
-            window.currentGameAudio.pause();
-            window.currentGameAudio = null;
-          } catch (e) {
-            console.log('[GameFooter] Error pausing audio:', e);
-          }
-        }
-      }
     }
   };
 
@@ -658,7 +605,7 @@ function GameFooter({
 
 // Song guessing state - now handled by modal
   const [showSongGuessModal, setShowSongGuessModal] = useState(false);
-  const [newSongRequest, setNewSongRequest] = useState(null); // For creator notifications
+  const [, setNewSongRequest] = useState(null); // For creator notifications
   // Removed tokenExpiredNotification UI: re-auth is mandatory; no local fallback
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   // Prevent spamming skip_song while backend reconnects or processes the request
@@ -669,10 +616,6 @@ function GameFooter({
   const restartButtonRef = React.useRef(null);
   const mainPlayButtonRef = React.useRef(null);
   const deviceSwitchButtonRef = React.useRef(null);
-  const challengeRejectButtonRef = React.useRef(null);
-  const challengeAcceptButtonRef = React.useRef(null);
-  const songGuessSkipButtonRef = React.useRef(null);
-  const songGuessSubmitButtonRef = React.useRef(null);
   const songGuessModalGuessButtonRef = React.useRef(null);
   const songGuessModalSkipButtonRef = React.useRef(null);
   const challengeWindowChallengeButtonRef = React.useRef(null);
@@ -1281,7 +1224,7 @@ function GameFooter({
         let waitingForOthers = false;
         let waitingText = "";
         if (challenge && challenge.challengeWindow) {
-          const { respondedCount, totalEligible, waitingFor } = challenge.challengeWindow;
+          const { waitingFor } = challenge.challengeWindow;
           hasResponded = waitingFor && !waitingFor.includes(myPlayerId);
           waitingForOthers = hasResponded && waitingFor.length > 0;
           if (waitingForOthers) {

@@ -3,7 +3,7 @@ import { useDrag } from "react-dnd";
 
 const CARD_TYPE = "SONG_CARD";
 
-function DraggableCard({ card, type = CARD_TYPE, outline, setIsDragging, isNewCard }) {
+function DraggableCard({ card, type = CARD_TYPE, outline, setIsDragging }) {
   const [{ isDragging }, drag] = useDrag({
     type,
     item: { id: card.id },

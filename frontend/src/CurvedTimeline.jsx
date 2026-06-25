@@ -4,16 +4,12 @@ import SongDebugPanel from './SongDebugPanel';
 import { playCorrectGuessSound, playIncorrectGuessSound } from './utils/soundUtils';
 
 const CurvedTimeline = ({ 
-  timeline, 
-  currentCard, 
-  onNodeSelect, 
-  selectedNodeIndex, 
-  phase, 
-  isMyTurn, 
+  timeline,
+  onNodeSelect,
+  phase,
+  isMyTurn,
   lastPlaced,
   challenge,
-  feedback,
-  showFeedback,
   pendingDropIndex,
   currentPlayerName,
   roomCode,
@@ -242,8 +238,7 @@ const CurvedTimeline = ({
     const normalSpacing = 100; // Normal spacing between years
     const curveSpacing = 100; // No extended spacing - curves start directly from years
     const rowHeight = 80; // Height between timeline rows
-    const curveRadius = 50; // Radius for curve transitions
-    
+
     // Dynamic positioning based on container dimensions
     const centerX = containerDimensions.width / 2;
     const centerY = containerDimensions.height / 2;
@@ -270,8 +265,7 @@ const CurvedTimeline = ({
 
     // PHASE 1: Calculate timeline positions using temporary coordinates
     let tempYearPositions = [];
-    let tempSections = [];
-    
+
     // Calculate positions relative to origin (0,0) first
     for (let yearIndex = 0; yearIndex < totalYears; yearIndex++) {
       const sectionIndex = Math.floor(yearIndex / 3);
@@ -330,7 +324,7 @@ const CurvedTimeline = ({
     }));
     
     // Add years to layout with final positions
-    yearPositions.forEach((pos, index) => {
+    yearPositions.forEach((pos) => {
       layout.push({
         type: 'year',
         index: pos.yearIndex,
@@ -367,9 +361,8 @@ const CurvedTimeline = ({
       
       // Check if this is the final straight segment of a complete 3-year section
       if (section.type === 'straight') {
-        const startYear = section.startYear;
         const endYear = section.endYear;
-        
+
         // Check if the end year is the 3rd year of its section (posInSection === 2)
         // and there's a curve transition after it
         if (endYear.posInSection === 2 && i < sections.length - 1) {
@@ -409,7 +402,7 @@ const CurvedTimeline = ({
     }
     
     // Add nodes between years (on sections)
-    sections.forEach((section, sectionIdx) => {
+    sections.forEach((section) => {
       if (section.type === 'straight') {
         // Node at midpoint of straight section
         const nodeX = (section.startX + section.endX) / 2;
@@ -568,8 +561,7 @@ const CurvedTimeline = ({
     }
     
     let mainPath = '';
-    let continuationPaths = [];
-    
+
     // Start from the first node (before first year)
     if (nodes.length > 0) {
       mainPath = `M ${nodes[0].x} ${nodes[0].y}`;
@@ -590,9 +582,6 @@ const CurvedTimeline = ({
       
       if (isVerticalTransition) {
         // This is a curve transition - use SVG arcs for smooth curves
-        const goingUp = nextYear.y < currentYear.y;
-        const goingLeft = nextYear.x < currentYear.x;
-        
         // Use SVG arcs with alternating sweep direction for smooth curves
         const currentSectionIndex = Math.floor(i / 3); // Which section transition this is
         const shouldCurveLeft = currentSectionIndex % 2 === 0; // Alternate curve directions
@@ -691,7 +680,7 @@ const CurvedTimeline = ({
   };
 
   // Helper to get vibrant color for year nodes (using neon purple for all years)
-  const getYearColor = (index) => {
+  const getYearColor = () => {
     // Always return neon purple
     return { bg: 'hsl(262 83% 58%)', border: 'hsl(262 83% 68%)', glow: 'rgba(153, 69, 255, 0.6)' };
   };
@@ -773,12 +762,6 @@ const CurvedTimeline = ({
   const shouldShowNodeLabels = () => {
     const confirmedYears = timelineLayout.filter(item => item.type === 'year');
     return confirmedYears.length === 1 && (phase === 'player-turn' || phase === 'challenge');
-  };
-
-  // Get the single year value for labels
-  const getSingleYearValue = () => {
-    const confirmedYears = timelineLayout.filter(item => item.type === 'year');
-    return confirmedYears.length === 1 ? confirmedYears[0].card.year : null;
   };
 
   const getTimelineOwnerLabel = () => {
@@ -1009,7 +992,7 @@ const CurvedTimeline = ({
       
       {/* Timeline Items */}
       <div className="relative w-full h-full" style={{ zIndex: 3 }}>
-        {timelineLayout.map((item, index) => {
+        {timelineLayout.map((item) => {
           if (item.type === 'node') {
             // Hide all nodes during reveal and challenge-resolved phases
             if (phase === 'reveal' || phase === 'challenge-resolved') {

@@ -116,7 +116,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
         players.length === 3 ? 'gap-4' : 
         'gap-6'
       } text-[10px] md:text-xs`}>
-        {players.map((p, index) => (
+        {players.map((p) => (
           <div
             key={p.id}
             className={`flex flex-col rounded-xl items-center px-1.5 py-1 md:px-2 md:py-1 ${

@@ -77,7 +77,7 @@ function RowLabel({ children }) {
   );
 }
 
-function GameStartModal({ settings, players, onDismiss }) {
+function GameStartModal({ settings, onDismiss }) {
   const prefs = settings?.musicPreferences || {};
   const markets = prefs.markets || [];
   const yearRange = prefs.yearRange || { min: 1960, max: 2025 };

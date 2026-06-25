@@ -8,12 +8,11 @@ import { playClickSound } from "./utils/soundUtils";
 
 const CARD_TYPE = "SONG_CARD";
 
-function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedback, cardOutline, lastPlaced, removingId, isMyTurn, gameRound, phase, challenge, onChallengePlaceCard, isPlayingMusic, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName, roomCode, myPersistentId, timelineOwnerPersistentId }) {
+function TimelineBoard({ timeline, currentCard, feedback, showFeedback, lastPlaced, removingId, isMyTurn, phase, challenge, onDragStateChange, pendingDropIndex, onPendingDrop, currentPlayerName, roomCode, myPersistentId, timelineOwnerPersistentId }) {
   const [hoverIndex, setHoverIndex] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isLoadingNewSong, setIsLoadingNewSong] = useState(false);
-  const [challengePendingIndex, setChallengePendingIndex] = useState(null);
-  const [selectedNodeIndex, setSelectedNodeIndex] = useState(null);
+  const [isDragging] = useState(false);
+  const [, setIsLoadingNewSong] = useState(false);
+  const [, setSelectedNodeIndex] = useState(null);
 
   // Notify parent component when drag state changes
   useEffect(() => {
@@ -170,20 +169,6 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     );
   }
 
-  // Determine layout based on screen size - always use side-by-side on mobile
-  const isMobile = window.innerWidth < 768; // md breakpoint
-  const containerClasses = isMobile 
-    ? "bg-background flex flex-row w-full max-w-3xl items-start justify-center gap-2"
-    : "bg-background flex flex-col md:flex-row w-full max-w-3xl items-center md:items-start justify-center gap-2 md:gap-4";
-  
-  const timelineClasses = isMobile
-    ? "flex flex-col items-center p-2 rounded-lg min-h-[700px] w-48 relative order-1"
-    : "flex flex-col items-center p-2 rounded-lg min-h-[700px] w-full md:w-56 relative order-2 md:order-1";
-    
-  const cardContainerClasses = isMobile
-    ? "flex flex-col items-center justify-start w-24 order-2 mt-8"
-    : "flex flex-col items-center justify-center w-full md:flex-1 order-1 md:order-2 m-6 md:mb-0";
-
   // Handle node selection
   const handleNodeSelect = (nodeIndex) => {
     // PERSISTENT ID FIX: During challenge phase, validate that this player is actually the challenger
@@ -214,9 +199,6 @@ function TimelineBoard({ timeline, currentCard, onPlaceCard, feedback, showFeedb
     }
   }, [isMyTurn]);
 
-  // Determine if we should show the draggable card
-  const showDraggableCard = isMyTurn && currentCard && !showFeedback && (phase === 'player-turn' || phase === 'challenge') && pendingDropIndex === null;
-  
   return (
     <div className="w-full h-full flex flex-col">
       {/* New Curved Timeline */}
@@ -259,8 +241,8 @@ function TimelineCard({ card, outline, animateRemove, hideYear }) {
   );
 }
 
-function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback, visible, disabled, isDragging }) {
-  const [{ isOver, canDrop: monitorCanDrop }, drop] = useDrop({
+function DropTarget({ index, isActive, onDrop, setHoverIndex, canDrop, feedback, disabled, isDragging }) {
+  const [{ isOver }, drop] = useDrop({
     accept: CARD_TYPE,
     canDrop: () => canDrop,
     hover: (item, monitor) => {
