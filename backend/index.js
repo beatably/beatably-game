@@ -2887,6 +2887,14 @@ io.on('connection', (socket) => {
       // Update player's socket ID without affecting other players
       game.players[existingPlayerIndex].id = socket.id;
 
+      // Restore the socket->persistent-id mapping. Without this, socket-id-based
+      // lookups (skip_song_guess, use_token, challenges) silently reject the
+      // reconnected player: sessions created via create_session carry no
+      // persistentPlayerId, so the reconnect_session branch can't set it.
+      if (game.players[existingPlayerIndex].persistentId) {
+        socketToPlayerMap[socket.id] = game.players[existingPlayerIndex].persistentId;
+      }
+
       // RESTART FIX: Also update lobby.players to keep IDs in sync.
       // Without this, lobby.players gets stale socket IDs after game reconnections,
       // which breaks restart_game (start_game) since it iterates over lobby.players.

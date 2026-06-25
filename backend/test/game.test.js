@@ -244,3 +244,33 @@ test('reconnect during song-guess: state lets the active player still skip', asy
   const skipped = await afterSkip;
   assert.equal(skipped.phase, 'challenge-window', 'skip advanced the phase');
 });
+
+// Real-app path: the client registers a session via create_session (which stores
+// no persistentPlayerId), then reconnects through the valid-session branch. This
+// must still restore the socket->persistent mapping so socket-id-based actions
+// (skip_song_guess, use_token, challenges) work — previously they silently failed.
+test('reconnect via a create_session sessionId restores turn actions', async (t) => {
+  const { code, guest, guestStarted } = await startedGame(t);
+  const ack = await emitAck(guest, 'create_session', {
+    roomCode: code, playerName: 'Guest', isCreator: false,
+  });
+  assert.ok(ack.sessionId, 'create_session returned a sessionId');
+
+  const idx = guestStarted.deck[0].year < guestStarted.timeline[0].year ? 0 : 1;
+  const placed = waitFor(guest, 'game_update');
+  guest.emit('place_card', { code, index: idx });
+  assert.equal((await placed).phase, 'song-guess');
+
+  guest.close();
+  await delay(300);
+  const guest2 = connect();
+  t.after(() => guest2.close());
+  await emitAck(guest2, 'reconnect_session', {
+    sessionId: ack.sessionId, roomCode: code, playerName: 'Guest',
+  });
+
+  const afterSkip = waitFor(guest2, 'game_update');
+  guest2.emit('skip_song_guess', { code });
+  assert.equal((await afterSkip).phase, 'challenge-window',
+    'skip accepted after valid-session reconnect (socket->persistent map restored)');
+});
