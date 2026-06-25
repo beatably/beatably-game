@@ -4036,24 +4036,28 @@ const lobby = lobbies[code];
     if (!game || game.phase !== 'challenge-window') return;
     
     const playerId = socket.id;
-    
+
     // Initialize challenge responses tracking if not exists
     if (!game.challengeResponses) {
       game.challengeResponses = new Set();
     }
-    
-    // Track that this player has responded (using socket ID is fine here)
-    game.challengeResponses.add(playerId);
-    
+
+    // Track responses by PERSISTENT id, not socket id: a challenger who passes
+    // and then reconnects gets a new socket id, which would otherwise strand the
+    // all-responded check and freeze the game in challenge-window forever.
+    const responderPersistentId = getPersistentId(playerId)
+      || (game.players.find(p => p.id === playerId)?.persistentId);
+    if (responderPersistentId) game.challengeResponses.add(responderPersistentId);
+
     // PERSISTENT ID FIX: Get current persistent ID from playerOrder
     const currentPersistentId = game.playerOrder[game.currentPlayerIdx];
-    // Find eligible challengers by comparing persistent IDs
-    const eligibleChallengers = game.players.filter(p => 
+    // Eligible challengers tracked by persistent id (stable across reconnects).
+    const eligibleChallengers = game.players.filter(p =>
       p.persistentId !== currentPersistentId && p.tokens > 0
-    ).map(p => p.id); // Return socket IDs for response tracking
-    
+    ).map(p => p.persistentId);
+
     // Check if all eligible challengers have responded
-    const allResponded = eligibleChallengers.every(id => game.challengeResponses.has(id));
+    const allResponded = eligibleChallengers.every(pid => game.challengeResponses.has(pid));
     
     if (allResponded || eligibleChallengers.length === 0) {
       // All eligible players have responded, move to reveal phase
@@ -4140,7 +4144,12 @@ const lobby = lobbies[code];
             challengeWindow: {
               respondedCount,
               totalEligible,
-              waitingFor: eligibleChallengers.filter(id => !game.challengeResponses.has(id))
+              // Map the not-yet-responded persistent ids back to current socket
+              // ids — the client compares this against its own socket id.
+              waitingFor: eligibleChallengers
+                .filter(pid => !game.challengeResponses.has(pid))
+                .map(pid => game.players.find(p => p.persistentId === pid)?.id)
+                .filter(Boolean)
             }
           });
         });

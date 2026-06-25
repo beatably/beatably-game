@@ -274,3 +274,48 @@ test('reconnect via a create_session sessionId restores turn actions', async (t)
   assert.equal((await afterSkip).phase, 'challenge-window',
     'skip accepted after valid-session reconnect (socket->persistent map restored)');
 });
+
+// 3-player: a challenger who passes and then reconnects must not strand the game
+// in challenge-window. Challenge responses are keyed by persistent id, so the
+// earlier pass survives the new socket id. (Regression test for the e2e finding.)
+test('challenge-window survives a passer reconnecting (3 players)', async (t) => {
+  const code = newCode();
+  const host = connect();
+  const bob = connect();
+  const cara = connect();
+  t.after(() => { host.close(); bob.close(); cara.close(); });
+
+  await emitAck(host, 'create_lobby', { name: 'Alice', code, settings: { winCondition: 10 } });
+  await emitAck(bob, 'join_lobby', { name: 'Bob', code });
+  await emitAck(cara, 'join_lobby', { name: 'Cara', code });
+
+  // Bob (first joiner) is active first; Alice (host) + Cara are the challengers.
+  const started = waitFor(bob, 'game_started');
+  host.emit('start_game', { code, realSongs: makeDeck() });
+  const gs = await started;
+  const idx = gs.deck[0].year < gs.timeline[0].year ? 0 : 1;
+
+  const placed = waitFor(bob, 'game_update');
+  bob.emit('place_card', { code, index: idx });
+  assert.equal((await placed).phase, 'song-guess');
+
+  const cw = waitFor(bob, 'game_update');
+  bob.emit('skip_song_guess', { code });
+  assert.equal((await cw).phase, 'challenge-window');
+
+  // Cara passes, then reconnects (new socket id -> old socket-keyed response
+  // would be stranded). Cara has no session, so rejoin-by-name is used.
+  cara.emit('skip_challenge', { code });
+  await delay(200);
+  cara.close();
+  await delay(300);
+  const cara2 = connect();
+  t.after(() => cara2.close());
+  await emitAck(cara2, 'reconnect_session', { sessionId: 'sess-cara', roomCode: code, playerName: 'Cara' });
+
+  // Alice passes last. With persistent-id keying, Cara's earlier pass still
+  // counts, so the game advances to reveal instead of freezing.
+  const reveal = waitFor(host, 'game_update');
+  host.emit('skip_challenge', { code });
+  assert.equal((await reveal).phase, 'reveal', 'reached reveal despite a passer reconnecting');
+});
