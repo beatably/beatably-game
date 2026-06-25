@@ -1,0 +1,13 @@
+{
+  "name": "beatably-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end harness: drives two browser players against a local backend+frontend to exercise multiplayer flows (reconnection, challenges).",
+  "scripts": {
+    "test:reconnect": "node reconnect-songguess.mjs",
+    "setup": "npm install && npx playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

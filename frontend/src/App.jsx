@@ -272,6 +272,12 @@ const [, setChallengeResponseGiven] = useState(false);
     latestRef.current = {
       showWinnerView, winner, currentPlayerId, isCreator, spotifyDeviceId, roomCode,
     };
+    // Dev-only testing hook (stripped from production builds): exposes the live
+    // socket + key state so the e2e harness can drive game progression
+    // deterministically and read room state. See e2e/.
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      window.__beatably = { ...latestRef.current, view, phase, timeline, socket: socketRef.current };
+    }
   });
 
   // Initialize viewport manager for mobile Safari optimizations
