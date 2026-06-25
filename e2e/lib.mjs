@@ -140,3 +140,39 @@ export async function freshGame(id) {
   await startGame(host, guest);
   return { host, guest, code };
 }
+
+const GUEST_NAMES = ['Bob', 'Cara', 'Dan'];
+
+// Fresh N-player game (n = 2..4). host = creator (plays last); guests join in
+// order, so guests[0] is the active player first. Returns { host, guests, all, code }.
+export async function freshGameN(id, n) {
+  const host = await newPlayer(`h-${id}`, `host-${id}`);
+  const code = await createGame(host, 'Alice');
+  const guests = [];
+  for (let i = 0; i < n - 1; i++) {
+    const gp = await newPlayer(`g${i}-${id}`, `guest${i}-${id}`);
+    await joinGame(gp, GUEST_NAMES[i], code);
+    guests.push(gp);
+  }
+  // Wait until the host sees the whole lobby, then start.
+  await host.page.waitForFunction((want) => (window.__beatably?.players?.length || 0) >= want, n, { timeout: 20000 });
+  await host.page.getByRole('button', { name: 'Start Game' }).click();
+  const all = [host, ...guests];
+  for (const p of all) await waitState(p, "s.view==='game' && s.phase==='player-turn' && true", 30000);
+  return { host, guests, all, code };
+}
+
+// Find the player whose turn it currently is (isMyTurn === true).
+export async function findActive(players) {
+  for (const p of players) {
+    const s = await getState(p);
+    if (s.isMyTurn) return p;
+  }
+  return null;
+}
+
+export async function closeAll(game) {
+  for (const p of (game?.all || [])) {
+    try { await p.ctx.close(); } catch { /* ignore */ }
+  }
+}
