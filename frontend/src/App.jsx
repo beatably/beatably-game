@@ -722,15 +722,12 @@ const [, setChallengeResponseGiven] = useState(false);
                 
                 setChallenge(restoredChallenge);
                 
-                // CRITICAL FIX: If this player was the current player before refresh,
-                // update currentPlayerId to their new socket ID so buttons remain clickable
-                const wasCurrentPlayer = saved && saved.playerId === saved.currentPlayerId;
-                if (wasCurrentPlayer && socketRef.current) {
-                  console.log('[Socket] Auto-rejoin: Was current player, updating currentPlayerId to new socket ID');
-                  setCurrentPlayerId(socketRef.current.id);
-                } else {
-                  setCurrentPlayerId(gameState.currentPlayerId);
-                }
+                // currentPlayerId is the backend's persistent player id. Our own
+                // identity is resolved at render time from the players list keyed
+                // by the current socket id, so reconnection needs no socket-id
+                // override here (that override was a holdover from when
+                // currentPlayerId held a socket id).
+                setCurrentPlayerId(gameState.currentPlayerId);
                 
                 setView('game');
               }
@@ -968,20 +965,10 @@ const [, setChallengeResponseGiven] = useState(false);
           return enrichedChallenge;
         });
         
-        // CRITICAL FIX: Preserve currentPlayerId if this player was the current player before game_update
-        // (This handles the case where game_update arrives after reconnection with stale socket IDs)
-        // Check against saved session data since prevCurrentPlayerId might already be stale
-        const savedSession = sessionManager.hasValidSession && sessionManager.hasValidSession() 
-          ? sessionManager.getSession() 
-          : null;
-        const wasCurrentPlayer = savedSession && savedSession.playerId === savedSession.currentPlayerId;
-        
-        if (wasCurrentPlayer && socketRef.current) {
-          console.log('[App] game_update: Preserving currentPlayerId after reconnection (from session data)');
-          setCurrentPlayerId(socketRef.current.id);
-        } else {
-          setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
-        }
+        // currentPlayerId is always the backend's persistent player id. Our own
+        // identity is derived at render time from the players list keyed by the
+        // current socket id, so reconnection needs no socket-id override here.
+        setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
         
         // Track lastSongGuess from game_update (sent during reveal phase)
         if (game.lastSongGuess) {
@@ -1504,15 +1491,10 @@ const [, setChallengeResponseGiven] = useState(false);
               
               setChallenge(restoredChallenge);
               
-              // CRITICAL FIX: If this player was the current player before refresh,
-              // update currentPlayerId to their new socket ID so buttons remain clickable
-              const wasCurrentPlayer = sessionRestoreData && sessionRestoreData.playerId === sessionRestoreData.currentPlayerId;
-              if (wasCurrentPlayer && socketRef.current) {
-                console.log('[SessionManager] Manual restore: Was current player, updating currentPlayerId to new socket ID');
-                setCurrentPlayerId(socketRef.current.id);
-              } else {
-                setCurrentPlayerId(gameState.currentPlayerId);
-              }
+              // currentPlayerId is the backend's persistent player id; identity is
+              // resolved at render time from the (reconnected) players list, so no
+              // socket-id override is needed on manual session restore.
+              setCurrentPlayerId(gameState.currentPlayerId);
               
               // CRITICAL FIX: Restore game round from session data
               if (sessionRestoreData.gameRound) {
@@ -1821,60 +1803,6 @@ const [, setChallengeResponseGiven] = useState(false);
   const handleCancelDrop = () => {
     console.log("[App] handleCancelDrop called");
     setPendingDropIndex(null);
-  };
-
-  // Handler for placing a card in the timeline (only if it's your turn)
-  const handlePlaceCard = (index) => {
-    console.log("[App] handlePlaceCard called:", {
-      index,
-      phase,
-      playerId: socketRef.current?.id,
-      currentPlayerId,
-      isMyTurn: socketRef.current?.id === currentPlayerId,
-      roomCode,
-      socketConnected: !!socketRef.current?.connected
-    });
-    
-    console.log("[App] Starting validation checks...");
-    
-    if (phase !== 'player-turn') {
-      console.log("[App] FAILED: Not player turn, phase:", phase);
-      return;
-    }
-    console.log("[App] PASSED: Phase check");
-    
-    if (socketRef.current?.id !== currentPlayerId) {
-      console.log("[App] FAILED: Not my turn, my ID:", socketRef.current?.id, "current player:", currentPlayerId);
-      return;
-    }
-    console.log("[App] PASSED: Player turn check");
-    
-    if (!roomCode) {
-      console.error("[App] FAILED: No room code available!");
-      return;
-    }
-    console.log("[App] PASSED: Room code check");
-    
-    if (!socketRef.current?.connected) {
-      console.error("[App] FAILED: Socket not connected!");
-      return;
-    }
-    console.log("[App] PASSED: Socket connection check");
-    
-    console.log("[App] All validations passed! Emitting place_card with data:", { code: roomCode, index });
-    console.log("[App] Current roomCode state:", roomCode);
-    console.log("[App] Socket ID:", socketRef.current?.id);
-    
-    // Test if ANY events reach the backend
-    console.log("[App] Testing event connectivity...");
-    socketRef.current.emit("test_event", { message: "test from player2", code: roomCode });
-    
-    try {
-      socketRef.current.emit("place_card", { code: roomCode, index });
-      console.log("[App] place_card emitted successfully to room:", roomCode);
-    } catch (error) {
-      console.error("[App] Error emitting place_card:", error);
-    }
   };
 
   // Handler to continue after feedback (any player can trigger)
@@ -2530,7 +2458,6 @@ const [, setChallengeResponseGiven] = useState(false);
             <TimelineBoard
               timeline={timeline || []}
               currentCard={currentCard}
-              onPlaceCard={handlePlaceCard}
               feedback={feedback}
               showFeedback={showFeedback}
               lastPlaced={lastPlaced}

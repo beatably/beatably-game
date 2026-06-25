@@ -167,3 +167,34 @@ test('use_token skip_song deducts exactly one credit', async (t) => {
   assert.equal(ev.cost, 1);
   assert.equal(ev.remainingTokens, 2, 'players start with 3 tokens, so one spend leaves 2');
 });
+
+// Identity contract the frontend relies on (D3): currentPlayerId is always the
+// persistent id, and a player keeps their turn across a reconnection because
+// identity is keyed on persistent id, not socket id.
+test('currentPlayerId is the persistent id and survives a reconnect mid-turn', async (t) => {
+  const { code, guest, guestPid, guestStarted } = await startedGame(t);
+  // The backend reports the active player by persistent id.
+  assert.equal(guestStarted.currentPlayerId, guestPid);
+
+  const card = guestStarted.deck[0];
+  const idx = card.year < guestStarted.timeline[0].year ? 0 : 1;
+
+  // Drop the active player's socket and reconnect a fresh one as the same
+  // person (the backend allows rejoin-by-name when there's an active game).
+  guest.close();
+  await delay(300);
+  const guest2 = connect();
+  t.after(() => guest2.close());
+  await emitAck(guest2, 'reconnect_session', {
+    sessionId: 'sess-guest-reconnect', roomCode: code, playerName: 'Guest',
+  });
+
+  // The reconnected player should still own the turn: placing the card is
+  // accepted (not rejected as not_your_turn), and the active id is unchanged.
+  const update = waitFor(guest2, 'game_update');
+  guest2.emit('place_card', { code, index: idx });
+  const u = await update;
+  assert.equal(u.phase, 'song-guess', 'placement was accepted after reconnect');
+  assert.equal(u.lastPlaced.correct, true);
+  assert.equal(u.currentPlayerId, guestPid, 'turn identity preserved by persistent id');
+});
