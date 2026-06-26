@@ -80,18 +80,30 @@ final class TimelineFilterTests: XCTestCase {
     }
 
     func test_songGuess_placedCardHidden() {
+        // song-guess: active player's own pending placement is hidden (they're deciding
+        // whether to guess the song, not viewing a placement to challenge).
         let cards = [song(id: "a"), song(id: "b"), song(id: "c")]
         let result = TimelineView.filterDisplayCards(cards, lastPlacedId: "b", gamePhase: "song-guess")
         XCTAssertEqual(result.map(\.id), ["a", "c"])
     }
 
-    func test_challengeWindow_placedCardHidden() {
+    func test_challengeWindow_placedCardShown() {
+        // challenge-window: the placed card MUST stay visible. The challenger is deciding
+        // whether to challenge and needs to see WHERE the active player placed it. The
+        // backend inserts the card into the broadcast timeline at lastPlaced.index
+        // flagged { preview: true, challengeCard: true }; TimelineView renders it as a
+        // mystery (year hidden) outlined marker. Filtering it out (the old behavior) was
+        // the bug: challengers couldn't see the placement.
         let cards = [song(id: "a"), song(id: "b"), song(id: "c")]
         let result = TimelineView.filterDisplayCards(cards, lastPlacedId: "b", gamePhase: "challenge-window")
-        XCTAssertEqual(result.map(\.id), ["a", "c"])
+        XCTAssertEqual(result.map(\.id), ["a", "b", "c"],
+                       "Placed card must remain visible during challenge-window")
     }
 
     func test_challenge_placedCardHidden() {
+        // challenge: the challenger RE-PLACES on this timeline, so the placed slot must
+        // be an open gap. Hiding the placed card keeps gap indices aligned with the
+        // backend's originalIndex. (Must NOT regress — see gap-alignment tests below.)
         let cards = [song(id: "a"), song(id: "b"), song(id: "c")]
         let result = TimelineView.filterDisplayCards(cards, lastPlacedId: "b", gamePhase: "challenge")
         XCTAssertEqual(result.map(\.id), ["a", "c"])

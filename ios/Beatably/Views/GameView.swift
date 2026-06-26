@@ -304,12 +304,6 @@ private struct TimelineSection: View {
         return vm.gamePlayers.first { $0.persistentId == originalId }?.name
     }
 
-    // During challenge-window, show all gaps (non-interactive) so the disabled placement
-    // marker is visible — this is how challengers see where the original player placed.
-    var showGapsForContext: Bool {
-        vm.gamePhase == "challenge-window" && disabledIndex != nil
-    }
-
     // Labels by card ID: used during reveal and challenge-resolved
     var cardLabels: [String: String] {
         var labels: [String: String] = [:]
@@ -343,7 +337,6 @@ private struct TimelineSection: View {
             TimelineView(
                 cards: vm.timeline,
                 isInteractive: isInteractive,
-                showGapsForContext: showGapsForContext,
                 pendingIndex: vm.pendingPlacementIndex,
                 lastPlacedId: vm.placementResult?.id,
                 gamePhase: vm.gamePhase,
