@@ -396,9 +396,10 @@ const corsOptions = {
   origin: ALLOWED_FRONTEND_ORIGINS,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  // x-admin-secret intentionally omitted: admin endpoints are called
-  // server-to-server / via tooling, never cross-origin from the browser.
-  allowedHeaders: ['Content-Type', 'Authorization']
+  // x-admin-secret is required: the admin page (frontend/public/admin.html,
+  // served from an allowed origin) calls the backend cross-origin with this
+  // header, so it must be allowed in the CORS preflight.
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret']
 };
 
 app.use(cors(corsOptions));
