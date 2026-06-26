@@ -119,4 +119,4 @@ xcuserdata/
 .swiftpm/
 *.xcscmblueprint
 # Verification artifact produced by ios/scripts/sim-run.sh
-ios/screenshot.png
+ios/screenshot*.png

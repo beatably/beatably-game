@@ -188,6 +188,10 @@ struct LobbyView: View {
         .onChange(of: vm.view) { _, newView in
             if newView == .game { isStarting = false }
         }
+        .overlay(alignment: .top) {
+            if !vm.isConnected { ReconnectingBanner() }
+        }
+        .animation(.easeInOut(duration: 0.2), value: vm.isConnected)
     }
 
     private var marketMode: String {

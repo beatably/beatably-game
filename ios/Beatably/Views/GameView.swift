@@ -83,6 +83,10 @@ struct GameView: View {
                 )
             }
         }
+        .overlay(alignment: .top) {
+            if !vm.isConnected { ReconnectingBanner() }
+        }
+        .animation(.easeInOut(duration: 0.2), value: vm.isConnected)
         .confirmationDialog("Menu", isPresented: $showMenu, titleVisibility: .hidden) {
             if vm.isCreator {
                 Button("Restart Game", role: .destructive) { showRestartConfirm = true }

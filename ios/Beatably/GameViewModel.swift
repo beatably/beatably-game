@@ -1,7 +1,7 @@
 import Foundation
 import SocketIO
 
-enum AppView { case landing, lobby, game }
+enum AppView { case landing, reconnecting, lobby, game }
 
 struct Player: Identifiable {
     let id: String
@@ -152,12 +152,58 @@ class GameViewModel {
         return new
     }
 
+    // UserDefaults keys for the active-session info needed to auto-rejoin after
+    // the app is killed and relaunched (sessionId persists separately above).
+    private static let kPlayerName = "beatably_player_name"
+    private static let kRoomCode = "beatably_room_code"
+    private static let kIsCreator = "beatably_is_creator"
+
+    private func persistSession() {
+        let d = UserDefaults.standard
+        d.set(playerName, forKey: Self.kPlayerName)
+        d.set(roomCode, forKey: Self.kRoomCode)
+        d.set(isCreator, forKey: Self.kIsCreator)
+        // Flush now: a user may force-quit right after creating/joining, and we
+        // need the session on disk to resume on the next launch.
+        d.synchronize()
+    }
+
+    private func clearPersistedSession() {
+        let d = UserDefaults.standard
+        d.removeObject(forKey: Self.kPlayerName)
+        d.removeObject(forKey: Self.kRoomCode)
+        d.removeObject(forKey: Self.kIsCreator)
+        d.synchronize()
+    }
+
     init() {
         manager = SocketManager(
             socketURL: URL(string: Config.backendURL)!,
-            config: [.log(false), .compress]
+            config: [
+                // Deterministic auto-reconnect: keep retrying with a bounded backoff
+                // so a dropped/ backgrounded socket comes back on its own.
+                .log(Config.socketLogging),
+                .compress,
+                .reconnects(true),
+                .reconnectAttempts(-1),
+                .reconnectWait(1),
+                .reconnectWaitMax(5),
+            ]
         )
         socket = manager.defaultSocket
+
+        // Restore an interrupted session (app was killed mid-game). If we have one,
+        // show the reconnecting screen until reconnect_session resolves.
+        let d = UserDefaults.standard
+        let savedName = d.string(forKey: Self.kPlayerName) ?? ""
+        let savedCode = d.string(forKey: Self.kRoomCode) ?? ""
+        if !savedName.isEmpty && !savedCode.isEmpty {
+            playerName = savedName
+            roomCode = savedCode
+            isCreator = d.bool(forKey: Self.kIsCreator)
+            view = .reconnecting
+        }
+
         setupEventHandlers()
         socket.connect()
     }
@@ -311,6 +357,7 @@ class GameViewModel {
                     self.myPersistentId = pId
                 }
                 if let lobby = response["lobby"] as? [String: Any] { self.applyLobby(lobby) }
+                self.persistSession()
                 self.view = .lobby
             }
         }
@@ -336,6 +383,7 @@ class GameViewModel {
                     self.myPersistentId = pId
                 }
                 if let lobby = response["lobby"] as? [String: Any] { self.applyLobby(lobby) }
+                self.persistSession()
                 self.view = .lobby
             }
         }
@@ -575,6 +623,32 @@ class GameViewModel {
         }
     }
 
+    // Called when the app returns to the foreground. iOS suspends the socket in
+    // the background; make sure we're connected (which triggers reconnect_session
+    // via the .connect handler), or resync if we already are.
+    func handleForeground() {
+        guard !roomCode.isEmpty, !playerName.isEmpty else { return }
+        if isConnected {
+            attemptReconnection()
+        } else {
+            socket.connect()
+        }
+    }
+
+    // Manual "Retry" from the reconnecting UI.
+    func forceReconnect() {
+        if isConnected {
+            attemptReconnection()
+        } else {
+            socket.connect()
+        }
+    }
+
+    // User gives up on resuming an interrupted session.
+    func cancelReconnect() {
+        resetToLanding()
+    }
+
     private func attemptReconnection() {
         let payload: [String: Any] = [
             "sessionId": sessionId,
@@ -720,6 +794,7 @@ class GameViewModel {
         stopCancelAutoProceed()
         stopProgressSync()
         AudioPlayer.shared.stop()
+        clearPersistedSession()
         currentlyPlayingCardId = nil
         playerName = ""; roomCode = ""; isCreator = false; players = []
         gamePhase = "player-turn"; currentPlayerId = ""; timeline = []
