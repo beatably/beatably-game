@@ -21,7 +21,12 @@ targets:
           - audio
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        CFBundleURLTypes:
+          - CFBundleURLName: app.beatably.ios
+            CFBundleURLSchemes:
+              - beatably
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.beatably.ios

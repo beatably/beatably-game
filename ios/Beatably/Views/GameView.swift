@@ -82,6 +82,14 @@ struct GameView: View {
                     subtitle: "Result will be revealed at end of round"
                 )
             }
+
+            if let err = vm.placeErrorMessage {
+                EventNotificationCard(
+                    icon: "exclamationmark.triangle.fill",
+                    title: err,
+                    subtitle: "Try again"
+                )
+            }
         }
         .overlay(alignment: .top) {
             if !vm.isConnected { ReconnectingBanner() }

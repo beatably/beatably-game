@@ -43,6 +43,24 @@ final class PlacementResultParsingTests: XCTestCase {
     }
 }
 
+// MARK: - Deep link parsing tests
+
+final class DeepLinkParsingTests: XCTestCase {
+    func test_queryParam() {
+        XCTAssertEqual(GameViewModel.parseJoinCode(from: URL(string: "beatably://join?code=1234")!), "1234")
+    }
+    func test_queryParam_lowercased_isUppercased() {
+        XCTAssertEqual(GameViewModel.parseJoinCode(from: URL(string: "beatably://join?code=ab12")!), "AB12")
+    }
+    func test_hostAsCode() {
+        XCTAssertEqual(GameViewModel.parseJoinCode(from: URL(string: "beatably://5678")!), "5678")
+    }
+    func test_noCode_returnsNil() {
+        XCTAssertNil(GameViewModel.parseJoinCode(from: URL(string: "beatably://join")!))
+        XCTAssertNil(GameViewModel.parseJoinCode(from: URL(string: "beatably://join?code=")!))
+    }
+}
+
 // MARK: - Timeline filter tests
 
 final class TimelineFilterTests: XCTestCase {

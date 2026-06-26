@@ -64,11 +64,13 @@ struct LandingView: View {
             Spacer()
         }
         .sheet(isPresented: $showJoin) {
-            JoinSheet(name: name, code: $joinCode, onJoin: { code in
-                vm.joinLobby(name: name.trimmingCharacters(in: .whitespaces), code: code)
+            JoinSheet(name: $name, code: $joinCode, onJoin: { joinName, code in
+                vm.joinLobby(name: joinName, code: code)
             })
             .presentationDetents([.medium])
         }
+        .onAppear { consumePendingJoinCode() }
+        .onChange(of: vm.pendingJoinCode) { _, _ in consumePendingJoinCode() }
         .alert("Error", isPresented: Binding(
             get: { vm.errorMessage != nil },
             set: { if !$0 { vm.errorMessage = nil } }
@@ -78,19 +80,39 @@ struct LandingView: View {
             Text(vm.errorMessage ?? "")
         }
     }
+
+    // A deep link (beatably://join?code=XXXX) stashes a code on the view model;
+    // prefill the join field and open the sheet.
+    private func consumePendingJoinCode() {
+        if let c = vm.pendingJoinCode {
+            joinCode = c
+            showJoin = true
+            vm.pendingJoinCode = nil
+        }
+    }
 }
 
 private struct JoinSheet: View {
-    let name: String
+    @Binding var name: String
     @Binding var code: String
-    let onJoin: (String) -> Void
+    let onJoin: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
+
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+    private var trimmedCode: String { code.trimmingCharacters(in: .whitespaces).uppercased() }
 
     var body: some View {
         VStack(spacing: 24) {
             Text("Join a Game")
                 .font(.title2.bold())
                 .padding(.top)
+
+            TextField("Your name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .textInputAutocapitalization(.words)
+                .disableAutocorrection(true)
+                .font(.title3)
+                .padding(.horizontal)
 
             TextField("Room code", text: $code)
                 .textFieldStyle(.roundedBorder)
@@ -101,9 +123,8 @@ private struct JoinSheet: View {
                 .padding(.horizontal)
 
             Button {
-                let trimmed = code.trimmingCharacters(in: .whitespaces).uppercased()
-                guard !trimmed.isEmpty else { return }
-                onJoin(trimmed)
+                guard !trimmedName.isEmpty, !trimmedCode.isEmpty else { return }
+                onJoin(trimmedName, trimmedCode)
                 dismiss()
             } label: {
                 Text("Join")
@@ -113,7 +134,7 @@ private struct JoinSheet: View {
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(trimmedName.isEmpty || trimmedCode.isEmpty)
             .padding(.horizontal)
 
             Spacer()

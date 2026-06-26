@@ -14,6 +14,8 @@ final class AudioPlayer {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var endObserver: Any?
     @ObservationIgnored private var statusObserver: NSKeyValueObservation?
+    // Fade the preview out over its final seconds (mirrors the web client).
+    @ObservationIgnored private let fadeOutSeconds: Double = 5
 
     private init() {
         do {
@@ -46,8 +48,12 @@ final class AudioPlayer {
             forInterval: CMTime(seconds: 0.25, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
+            guard let self else { return }
             let t = time.seconds
-            if t.isFinite { self?.currentTime = t }
+            if t.isFinite {
+                self.currentTime = t
+                self.applyFade(at: t)
+            }
         }
 
         endObserver = NotificationCenter.default.addObserver(
@@ -85,8 +91,12 @@ final class AudioPlayer {
             forInterval: CMTime(seconds: 0.25, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
+            guard let self else { return }
             let t = time.seconds
-            if t.isFinite { self?.currentTime = t }
+            if t.isFinite {
+                self.currentTime = t
+                self.applyFade(at: t)
+            }
         }
 
         endObserver = NotificationCenter.default.addObserver(
@@ -128,6 +138,14 @@ final class AudioPlayer {
         currentTime = 0
         duration = 0
         pendingURL = nil
+    }
+
+    // Ramp volume down over the last `fadeOutSeconds` so the clip doesn't cut
+    // off abruptly. Full volume otherwise.
+    private func applyFade(at t: Double) {
+        guard let p = player, duration > 0 else { return }
+        let remaining = duration - t
+        p.volume = remaining < fadeOutSeconds ? Float(max(0, remaining / fadeOutSeconds)) : 1.0
     }
 
     private func teardown() {

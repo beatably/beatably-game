@@ -28,6 +28,9 @@ struct BeatableApp: App {
                     viewModel.handleForeground()
                 }
             }
+            .onOpenURL { url in
+                viewModel.handleDeepLink(url)
+            }
         }
     }
 }

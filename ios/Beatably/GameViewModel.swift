@@ -111,6 +111,11 @@ class GameViewModel {
     // Transient notifications
     var playerLeftMessage: String? = nil
     var creditSpendMessage: String? = nil
+    var placeErrorMessage: String? = nil
+
+    // A join code carried in from a deep link (beatably://join?code=XXXX),
+    // consumed by LandingView to prefill the join field.
+    var pendingJoinCode: String? = nil
 
     var isMyTurn: Bool {
         !myPersistentId.isEmpty && currentPlayerId == myPersistentId
@@ -280,9 +285,22 @@ class GameViewModel {
         }
 
         socket.on("place_card_error") { [weak self] data, _ in
+            guard let self else { return }
             let dict = data.first as? [String: Any]
             let reason = dict?["reason"] as? String ?? "unknown"
             print("[Socket] place_card_error: \(reason) — safe to retry")
+            let message: String
+            switch reason {
+            case "not_your_turn": message = "It's not your turn right now."
+            case "not_ready": message = "Reconnecting… please try again."
+            default: message = "Couldn't place that card. Try again."
+            }
+            DispatchQueue.main.async {
+                self.placeErrorMessage = message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    if self.placeErrorMessage == message { self.placeErrorMessage = nil }
+                }
+            }
         }
 
         socket.on("song_guess_result") { [weak self] data, _ in
@@ -647,6 +665,33 @@ class GameViewModel {
     // User gives up on resuming an interrupted session.
     func cancelReconnect() {
         resetToLanding()
+    }
+
+    // Pure parser (testable): extract a room code from a join deep link.
+    // Accepts beatably://join?code=1234 and beatably://1234.
+    static func parseJoinCode(from url: URL) -> String? {
+        if let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let c = comps.queryItems?.first(where: { $0.name == "code" })?.value,
+           !c.trimmingCharacters(in: .whitespaces).isEmpty {
+            return c.trimmingCharacters(in: .whitespaces).uppercased()
+        }
+        let host = url.host ?? ""
+        if !host.isEmpty && host != "join" { return host.uppercased() }
+        let last = url.lastPathComponent
+        if !last.isEmpty && last != "/" && last != "join" { return last.uppercased() }
+        return nil
+    }
+
+    // Handle a join deep link: stash the code for LandingView to prefill.
+    // Ignored while already in a lobby/game so it can't yank the player out.
+    func handleDeepLink(_ url: URL) {
+        guard let c = Self.parseJoinCode(from: url) else { return }
+        DispatchQueue.main.async {
+            if self.view != .lobby && self.view != .game {
+                self.pendingJoinCode = c
+                self.view = .landing
+            }
+        }
     }
 
     private func attemptReconnection() {
