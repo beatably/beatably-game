@@ -3501,6 +3501,34 @@ const lobby = lobbies[code];
   });
 
   // Handle card placement (turn-based, only current player can act)
+  // Live placement preview — the acting player (turn-holder or challenger) broadcasts the
+  // gap they've tentatively tapped so everyone else can watch in real time before it's
+  // confirmed. Purely transient: nothing is persisted, and a null/negative index clears it.
+  // Validation mirrors place_card / challenge_place_card so only the acting player drives it.
+  socket.on('preview_placement', ({ code, index }) => {
+    const game = games[code];
+    if (!game) return;
+
+    const persistentId = getPersistentId(socket.id) ||
+      game.players.find(p => p.id === socket.id)?.persistentId;
+    if (!persistentId) return;
+
+    // In the challenger's placement phase only the challenger may drive the preview;
+    // otherwise it's the current turn-holder.
+    if (game.challenge && game.challenge.phase === 'challenger-turn') {
+      const challengerPersistentId = getPersistentId(game.challenge.challengerId) ||
+        game.players.find(p => p.id === game.challenge.challengerId)?.persistentId;
+      if (persistentId !== challengerPersistentId) return;
+    } else {
+      if (persistentId !== game.playerOrder[game.currentPlayerIdx]) return;
+    }
+
+    const cleared = index === null || index === undefined || index < 0;
+    // socket.to() reaches everyone in the room except the sender — the acting player
+    // already renders their own pending marker locally.
+    socket.to(code).emit('placement_preview', { index: cleared ? null : index });
+  });
+
   socket.on('place_card', ({ code, index }) => {
     console.log('[Backend] Received place_card:', { code, index, socketId: socket.id });
     console.log('[Backend] Socket rooms:', Array.from(socket.rooms));
