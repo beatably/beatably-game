@@ -48,6 +48,7 @@ struct LastSongGuess {
 struct GameWinner {
     let name: String
     let score: Int
+    let persistentId: String
 }
 
 struct ChallengeState {
@@ -75,6 +76,8 @@ struct GameSettings {
 
 @Observable
 class GameViewModel {
+    private static let uiTestResetStateArg = "UITEST_RESET_STATE"
+
     var view: AppView = .landing
     var isConnected = false
     var players: [Player] = []
@@ -99,9 +102,14 @@ class GameViewModel {
     var showSongGuess = false
     var songGuessNotification: String? = nil
     var lastSongGuess: LastSongGuess? = nil
+    var creditSpendAction: String = ""   // "challenge" or "skip_song"
 
     // Two-step placement confirmation (mirrors web's pendingDropIndex)
     var pendingPlacementIndex: Int? = nil
+
+    // The acting player's tentative gap, relayed from the server so observers can watch
+    // the placement happen in real time before it's confirmed. Only used by non-placers.
+    var remotePendingIndex: Int? = nil
 
     // Music progress for non-creator devices (synced from creator via progress_sync)
     var syncedProgress: Double = 0
@@ -162,6 +170,185 @@ class GameViewModel {
     private static let kPlayerName = "beatably_player_name"
     private static let kRoomCode = "beatably_room_code"
     private static let kIsCreator = "beatably_is_creator"
+
+    static func prepareForUITestsIfNeeded() {
+        guard ProcessInfo.processInfo.arguments.contains(uiTestResetStateArg) else { return }
+        let d = UserDefaults.standard
+        d.removeObject(forKey: "beatably_session_id")
+        d.removeObject(forKey: kPlayerName)
+        d.removeObject(forKey: kRoomCode)
+        d.removeObject(forKey: kIsCreator)
+        d.synchronize()
+    }
+
+    // Test-only: seed a game state for visual verification, so a screenshot test can
+    // render the timeline without orchestrating a live game. Pass the scenario name as
+    // the argument immediately after UITEST_SEED_STATE, e.g.:
+    //   xcrun simctl launch <udid> app.beatably.ios \
+    //     UITEST_RESET_STATE UITEST_SEED_STATE challenge-resolved-won
+    // (UITEST_RESET_STATE is required too, so a persisted session doesn't override the seed.)
+    //
+    // Scenarios cover the states where timeline rendering bugs hide (doubled cards,
+    // correct/incorrect colouring, per-card labels). Add cases as coverage grows.
+    private static let uiTestSeedArg = "UITEST_SEED_STATE"
+
+    func seedStateForUITestsIfNeeded() {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: Self.uiTestSeedArg), i + 1 < args.count else { return }
+        let scenario = args[i + 1]
+
+        let originalId = "p-original"
+        let challengerId = "p-challenger"
+        isCreator = false
+        gamePlayers = [
+            GamePlayer(id: originalId, persistentId: originalId, name: "Alice", score: 2, credits: 2),
+            GamePlayer(id: challengerId, persistentId: challengerId, name: "You", score: 4, credits: 1),
+        ]
+
+        func song(_ id: String, _ title: String, _ year: Int,
+                  original: Bool = false, challenger: Bool = false) -> Song {
+            Song(id: id, title: title, artist: "Artist", year: year, previewURL: nil,
+                 albumArt: nil, isPreview: false,
+                 challengerCard: challenger, originalCard: original, isYourGuess: challenger)
+        }
+
+        // The challenged card (2005) appears twice: once for each player's placement.
+        // Timeline order shows original-before-1984 vs challenger-after-1984 so the two
+        // copies sit on opposite sides of a confirmed card.
+        func challengeResolved(challengerCorrect: Bool, originalCorrect: Bool) {
+            myPersistentId = challengerId       // local player is the challenger
+            currentPlayerId = originalId        // backend sends original's id in this phase
+            // Correct side goes after 1984; wrong side goes before it.
+            let originalAfter = originalCorrect
+            let orig = song("song-2005", "Test Track", 2005, original: true)
+            let chal = song("song-2005", "Test Track", 2005, challenger: true)
+            let mid  = song("song-1984", "Confirmed A", 1984)
+            timeline = originalAfter
+                ? [chal, mid, orig]   // challenger wrong (before), original correct (after)
+                : [orig, mid, chal]   // original wrong (before), challenger correct (after)
+            currentCard = song("song-2005", "Test Track", 2005)
+            challengeState = ChallengeState(
+                challengerPersistentId: challengerId, originalPlayerId: originalId,
+                originalCardIndex: nil,
+                result: ChallengeResult(challengerCorrect: challengerCorrect,
+                                        originalCorrect: originalCorrect,
+                                        challengeWon: challengerCorrect && !originalCorrect))
+            placementResult = PlacementResult(id: "song-2005", correct: originalCorrect, year: 2005)
+            gamePhase = "challenge-resolved"
+        }
+
+        // A normal turn reveal: local player placed 2005 and the result is shown.
+        func reveal(correct: Bool) {
+            myPersistentId = originalId
+            currentPlayerId = originalId
+            timeline = [song("song-1984", "Confirmed A", 1984),
+                        song("song-2005", "Test Track", 2005)]
+            currentCard = song("song-2005", "Test Track", 2005)
+            placementResult = PlacementResult(id: "song-2005", correct: correct, year: 2005)
+            challengeState = nil
+            gamePhase = "reveal"
+        }
+
+        // Song-guess: local player just placed a card (hidden "?") and is now guessing the
+        // song. The placed card must remain visible on the timeline as a "?" marker.
+        func songGuess() {
+            myPersistentId = originalId
+            currentPlayerId = originalId
+            let placed = song("song-placed", "New Track", 1990)
+            timeline = [placed, song("song-2002", "Confirmed A", 2002)]
+            currentCard = placed
+            placementResult = PlacementResult(id: "song-placed", correct: true, year: 1990)
+            challengeState = nil
+            gamePhase = "song-guess"
+        }
+
+        // Challenge-window: local player just placed a card (hidden "?") and others may
+        // challenge. The placed card must stay a pink "?" marker (year hidden, not coloured).
+        func challengeWindow() {
+            myPersistentId = originalId
+            currentPlayerId = originalId
+            let placed = song("song-placed", "New Track", 1990)
+            timeline = [placed, song("song-2002", "Confirmed A", 2002)]
+            currentCard = placed
+            placementResult = PlacementResult(id: "song-placed", correct: true, year: 1990)
+            challengeState = nil
+            gamePhase = "challenge-window"
+        }
+
+        // Challenge: local player is the challenger placing on the original's timeline. The
+        // backend sends the timeline WITH the challenged card; the challenger's view filters
+        // it out and shows a marker at originalCardIndex. Optionally auto-place to reproduce
+        // the "tap makes nodes disappear" bug.
+        func challenge(autoPlaceAt index: Int? = nil) {
+            myPersistentId = challengerId
+            currentPlayerId = originalId
+            let challenged = song("song-2002", "Test Track", 2002)
+            timeline = [song("song-1968", "Confirmed A", 1968), challenged]  // A placed 2002 after 1968
+            currentCard = challenged
+            placementResult = PlacementResult(id: "song-2002", correct: true, year: 2002)
+            challengeState = ChallengeState(
+                challengerPersistentId: challengerId, originalPlayerId: originalId,
+                originalCardIndex: 1, result: nil)
+            gamePhase = "challenge"
+            if let index {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { [weak self] in
+                    self?.selectPlacement(index: index)
+                }
+            }
+        }
+
+        // Interactive local turn with a single confirmed card (1987). Optionally auto-fire
+        // a placement after a delay so the placement animation can be captured via
+        // screenshots without a real tap. Placing after 1987 (index 1) recenters 1987 to
+        // the left (left-move); placing before it (index 0) shifts 1987 right.
+        func playerTurnInteractive(autoPlaceAt index: Int? = nil) {
+            myPersistentId = originalId
+            currentPlayerId = originalId
+            timeline = [song("song-1987", "Confirmed A", 1987)]
+            currentCard = song("song-new", "New Track", 2001)  // the card being placed ("?")
+            placementResult = nil
+            challengeState = nil
+            gamePhase = "player-turn"
+            if let index {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { [weak self] in
+                    self?.selectPlacement(index: index)
+                }
+            }
+        }
+
+        // Observer watching the active player place in real time: local player is NOT the
+        // turn-holder, and a relayed preview index drives the pulsating "?" marker + name label.
+        func observerPreview() {
+            myPersistentId = challengerId       // local player is the observer ("You" is not placing)
+            currentPlayerId = originalId         // Alice is the active player
+            timeline = [song("song-1987", "Confirmed A", 1987)]
+            currentCard = song("song-new", "New Track", 2001)
+            placementResult = nil
+            challengeState = nil
+            gamePhase = "player-turn"
+            remotePendingIndex = 1               // Alice tentatively placed after 1987
+        }
+
+        switch scenario {
+        case "observer-preview":             observerPreview()
+        case "song-guess":                   songGuess()
+        case "challenge-resolved-won":       challengeResolved(challengerCorrect: true,  originalCorrect: false)
+        case "challenge-resolved-defended":  challengeResolved(challengerCorrect: false, originalCorrect: true)
+        case "challenge-resolved-both-wrong":challengeResolved(challengerCorrect: false, originalCorrect: false)
+        case "reveal-correct":               reveal(correct: true)
+        case "reveal-incorrect":             reveal(correct: false)
+        case "challenge-window":             challengeWindow()
+        case "challenge":                    challenge()
+        case "challenge-auto-place":         challenge(autoPlaceAt: 0)
+        case "player-turn-interactive":      playerTurnInteractive()
+        case "anim-move-left":               playerTurnInteractive(autoPlaceAt: 1)
+        case "anim-move-right":              playerTurnInteractive(autoPlaceAt: 0)
+        default:
+            print("[UITEST] Unknown seed scenario: \(scenario)")
+            return
+        }
+        view = .game
+    }
 
     private func persistSession() {
         let d = UserDefaults.standard
@@ -249,6 +436,16 @@ class GameViewModel {
             DispatchQueue.main.async { self?.applyGameUpdate(game) }
         }
 
+        // The acting player's tentative placement (observers only; the sender is excluded
+        // server-side). index null/negative clears the preview marker.
+        socket.on("placement_preview") { [weak self] data, _ in
+            guard let self, let dict = data.first as? [String: Any] else { return }
+            let idx = (dict["index"] as? Int) ?? (dict["index"] as? Double).map { Int($0) }
+            DispatchQueue.main.async {
+                self.remotePendingIndex = (idx ?? -1) >= 0 ? idx : nil
+            }
+        }
+
         socket.on("kicked") { [weak self] _, _ in
             DispatchQueue.main.async {
                 self?.errorMessage = "You were removed from the game."
@@ -329,6 +526,7 @@ class GameViewModel {
                 message = "\(actor) spent 1 credit for a new song"
             }
             DispatchQueue.main.async {
+                self.creditSpendAction = action
                 self.creditSpendMessage = message
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     self.creditSpendMessage = nil
@@ -454,6 +652,7 @@ class GameViewModel {
     func selectPlacement(index: Int) {
         guard (gamePhase == "player-turn" && isMyTurn) || (gamePhase == "challenge" && isChallenger) else { return }
         pendingPlacementIndex = index
+        socket.emit("preview_placement", ["code": roomCode, "index": index] as [String: Any])
     }
 
     func confirmPlacement() {
@@ -467,7 +666,10 @@ class GameViewModel {
     }
 
     func cancelPlacement() {
+        let had = pendingPlacementIndex != nil
         pendingPlacementIndex = nil
+        // Tell observers the preview marker is gone.
+        if had { socket.emit("preview_placement", ["code": roomCode, "index": -1] as [String: Any]) }
     }
 
     func placeCard(index: Int) {
@@ -530,6 +732,7 @@ class GameViewModel {
 
         // Clear pending placement on any phase update — server now owns the state
         pendingPlacementIndex = nil
+        remotePendingIndex = nil
 
         // Show song-guess UI for the active player; non-active players just wait
         if phase == "song-guess" {
@@ -587,7 +790,8 @@ class GameViewModel {
         if let w = game["winner"] as? [String: Any] {
             gameWinner = GameWinner(
                 name: w["name"] as? String ?? "Unknown",
-                score: w["score"] as? Int ?? 0
+                score: w["score"] as? Int ?? 0,
+                persistentId: w["persistentId"] as? String ?? ""
             )
         }
 

@@ -1,7 +1,6 @@
 import SwiftUI
 
 // MARK: - Challenge Window Panel
-// Shown during "challenge-window" phase. Non-active players choose to challenge or pass.
 
 struct ChallengeWindowPanel: View {
     @Environment(GameViewModel.self) private var vm
@@ -11,61 +10,71 @@ struct ChallengeWindowPanel: View {
         VStack {
             Spacer()
 
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
                 if vm.isMyTurn {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         ProgressView()
+                            .tint(Color.beatMuted)
                         Text("Waiting — others can challenge")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(Color.beatMuted)
                     }
                 } else if hasResponded {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
                         ProgressView()
+                            .tint(Color.beatMuted)
                         Text("Waiting for other players…")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(Color.beatMuted)
                     }
                 } else {
                     VStack(spacing: 8) {
                         Text("Challenge the placement?")
-                            .font(.headline)
+                            .font(.system(.headline, design: .rounded).bold())
+                            .foregroundStyle(Color.beatText)
 
                         Text("Spend 1 credit to place the card yourself. If you're right and \(vm.currentPlayerName) is wrong, you steal the card!")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color.beatMuted)
                             .multilineTextAlignment(.center)
                     }
 
                     if vm.canChallenge {
                         HStack(spacing: 12) {
-                            Button("Pass") {
+                            Button {
+                                SoundManager.shared.impact(.light)
                                 hasResponded = true
                                 vm.skipChallenge()
+                            } label: {
+                                BeatSecondaryLabel(title: "Pass")
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.large)
+                            .buttonStyle(PressScaleStyle())
+                            .frame(maxWidth: .infinity)
 
-                            Button("Challenge · 1 credit") {
+                            Button {
+                                SoundManager.shared.play(.challenge)
                                 hasResponded = true
                                 vm.initiateChallenge()
+                            } label: {
+                                BeatPrimaryLabel(title: "Challenge · 1 credit")
                             }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            .tint(.orange)
+                            .buttonStyle(PressScaleStyle())
+                            .frame(maxWidth: .infinity)
                         }
                     } else {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 10) {
                             Text("No credits to challenge")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            Button("Pass") {
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundStyle(Color.beatMuted)
+                            Button {
+                                SoundManager.shared.impact(.light)
                                 hasResponded = true
                                 vm.skipChallenge()
+                            } label: {
+                                BeatSecondaryLabel(title: "Pass")
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.large)
+                            .buttonStyle(PressScaleStyle())
+                            .frame(maxWidth: .infinity)
                         }
                     }
                 }
@@ -74,8 +83,18 @@ struct ChallengeWindowPanel: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.15), radius: 16, y: -4)
+                    .fill(Color.beatSurface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [Color.beatPurple.opacity(0.5), Color.beatCyan.opacity(0.2)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.4), radius: 24, y: -4)
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
@@ -84,8 +103,7 @@ struct ChallengeWindowPanel: View {
     }
 }
 
-// MARK: - Challenge Resolved Overlay
-// Shown during "challenge-resolved" phase with the outcome.
+// MARK: - Challenge Resolved Overlay (bottom slide-up panel)
 
 struct ChallengeResolvedOverlay: View {
     @Environment(GameViewModel.self) private var vm
@@ -95,99 +113,88 @@ struct ChallengeResolvedOverlay: View {
 
     private var title: String {
         guard let r = result else { return "Challenge resolved" }
-        if r.challengeWon {
-            return "\(vm.challengerName) won the challenge!"
-        } else if r.originalCorrect && !r.challengerCorrect {
-            return "\(vm.currentPlayerName) defended!"
-        } else if r.challengerCorrect && r.originalCorrect {
-            return "Both correct — \(vm.currentPlayerName) keeps it"
-        } else {
-            return "Both wrong — card discarded"
-        }
+        if r.challengeWon                            { return "\(vm.challengerName) won the challenge!" }
+        if r.originalCorrect && !r.challengerCorrect { return "\(vm.currentPlayerName) defended!" }
+        if r.challengerCorrect && r.originalCorrect  { return "Both correct — \(vm.currentPlayerName) keeps it" }
+        return "Both wrong — card discarded"
     }
 
     private var subtitle: String {
         guard let r = result else { return "" }
-        if r.challengeWon {
-            return "\(vm.challengerName) placed it correctly and steals the card."
-        } else if r.originalCorrect && !r.challengerCorrect {
-            return "The original placement was right. \(vm.challengerName)'s challenge failed."
-        } else if r.challengerCorrect && r.originalCorrect {
-            return "Both placements were correct, but \(vm.currentPlayerName) went first."
-        } else {
-            return "Neither placement was correct."
-        }
+        if r.challengeWon                            { return "\(vm.challengerName) placed it correctly and steals the card." }
+        if r.originalCorrect && !r.challengerCorrect { return "The original placement was right. Challenge failed." }
+        if r.challengerCorrect && r.originalCorrect  { return "Both placements were correct, but \(vm.currentPlayerName) went first." }
+        return "Neither placement was correct."
     }
 
     private var icon: String {
         guard let r = result else { return "questionmark.circle" }
-        if r.challengeWon { return "trophy.fill" }
+        if r.challengeWon    { return "trophy.fill" }
         if r.originalCorrect { return "shield.fill" }
         return "xmark.circle.fill"
     }
 
     private var iconColor: Color {
-        guard let r = result else { return .gray }
-        if r.challengeWon { return .orange }
-        if r.originalCorrect { return .green }
-        return .red
+        guard let r = result else { return Color.beatMuted }
+        if r.challengeWon    { return Color.beatMagenta }
+        if r.originalCorrect { return Color.beatGreen }
+        return Color.beatMagenta
     }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.5).ignoresSafeArea()
-
-            VStack(spacing: 20) {
-                Image(systemName: icon)
-                    .font(.system(size: 60))
-                    .foregroundStyle(iconColor)
-
-                VStack(spacing: 6) {
+        VStack(spacing: 20) {
+            // Outcome — centered, matching InlineRevealFooter
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Spacer()
+                    Image(systemName: icon)
+                        .font(.system(size: 18))
+                        .foregroundStyle(iconColor)
+                        .shadow(color: iconColor.opacity(0.7), radius: 6)
                     Text(title)
-                        .font(.title2.bold())
-                        .multilineTextAlignment(.center)
-                    if !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+                        .font(.system(.subheadline, design: .rounded).bold())
+                        .foregroundStyle(Color.beatText)
+                    Spacer()
                 }
-
-                // Song guess result (if someone guessed during the round)
-                if let sg = vm.lastSongGuess {
-                    let guessText = sg.correct
-                        ? "\(sg.playerName) guessed correctly — bonus credit earned!"
-                        : "\(sg.playerName) guessed \(sg.guessTitle) / \(sg.guessArtist) — wrong, no credit"
-                    Text(guessText)
-                        .font(.caption)
-                        .foregroundStyle(sg.correct ? Color.green : Color.secondary)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(Color.beatMuted)
                         .multilineTextAlignment(.center)
-                }
-
-                if vm.isCreator {
-                    Button("Continue to Next Turn") {
-                        continued = true
-                        vm.continueGame()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(continued)
-                    .padding(.top, 4)
-                } else {
-                    Text("Waiting for host to continue…")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
+                        .frame(maxWidth: .infinity)
                 }
             }
-            .padding(32)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.2), radius: 20)
-            )
-            .padding(.horizontal, 32)
+
+            if let sg = vm.lastSongGuess {
+                Text(sg.correct
+                    ? "\(sg.playerName) guessed correctly — bonus credit!"
+                    : "\(sg.playerName) guessed wrong — no credit")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(sg.correct ? Color.beatGreen : Color.beatMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+
+            if vm.isCreator {
+                Button {
+                    continued = true
+                    vm.continueGame()
+                } label: {
+                    BeatPrimaryLabel(title: "Continue to Next Turn", isLoading: continued)
+                }
+                .buttonStyle(PressScaleStyle())
+                .disabled(continued)
+            } else {
+                Text("Waiting for host to continue…")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(Color.beatMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+        .onAppear {
+            SoundManager.shared.play(.correct)
+            SoundManager.shared.notification(.success)
         }
     }
 }

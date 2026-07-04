@@ -49,3 +49,35 @@ targets:
       base:
         SWIFT_VERSION: 5.9
         GENERATE_INFOPLIST_FILE: YES
+
+  BeatableUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: BeatableUITests
+    dependencies:
+      - target: Beatably
+    settings:
+      base:
+        SWIFT_VERSION: 5.9
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Beatably
+
+schemes:
+  Beatably:
+    build:
+      targets:
+        Beatably: all
+    test:
+      targets:
+        - name: BeatableTests
+
+  BeatablyUI:
+    build:
+      targets:
+        Beatably: all
+        BeatableUITests: [test]
+    test:
+      targets:
+        - name: BeatableUITests

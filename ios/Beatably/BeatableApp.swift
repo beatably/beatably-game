@@ -2,8 +2,17 @@ import SwiftUI
 
 @main
 struct BeatableApp: App {
-    @State private var viewModel = GameViewModel()
+    @State private var viewModel: GameViewModel
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        // Must clear UI-test state BEFORE the ViewModel reads UserDefaults
+        GameViewModel.prepareForUITestsIfNeeded()
+        let vm = GameViewModel()
+        vm.seedStateForUITestsIfNeeded()
+        _viewModel = State(wrappedValue: vm)
+        SoundManager.shared.preload()
+    }
 
     var body: some Scene {
         WindowGroup {

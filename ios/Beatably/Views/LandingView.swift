@@ -4,65 +4,112 @@ struct LandingView: View {
     @Environment(GameViewModel.self) private var vm
     @State private var name = ""
     @State private var showJoin = false
+    @State private var showHowToPlay = false
     @State private var joinCode = ""
+    @FocusState private var nameFocused: Bool
+
+    private var nameIsEmpty: Bool { name.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
+        ZStack {
+            // ── Video background ────────────────────────────────────
+            VideoBackground(resource: "ghost5")
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
 
-            VStack(spacing: 8) {
-                Text("Beatably")
-                    .font(.system(size: 48, weight: .black))
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(vm.isConnected ? Color.green : Color.orange)
-                        .frame(width: 8, height: 8)
-                    Text(vm.isConnected ? "Connected" : "Connecting…")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            VStack(spacing: 16) {
-                TextField("Your name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-                    .textInputAutocapitalization(.words)
-                    .disableAutocorrection(true)
-                    .font(.title3)
-                    .padding(.horizontal)
-
-                Button {
-                    guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                    vm.createLobby(name: name.trimmingCharacters(in: .whitespaces))
-                } label: {
-                    Text("Create Game")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.accentColor)
+            // ── Content ─────────────────────────────────────────────
+            VStack(spacing: 0) {
+                // ── Top: Logo + connection status ────────────────────
+                VStack(spacing: 10) {
+                    Image("BeatableLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 56)
                         .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !vm.isConnected)
-                .padding(.horizontal)
+                        .shadow(color: Color.beatPurple.opacity(0.9), radius: 8)
+                        .shadow(color: Color.beatPurple.opacity(0.5), radius: 20)
+                        .shadow(color: Color.beatPurple.opacity(0.2), radius: 40)
 
-                Button {
-                    showJoin = true
-                } label: {
-                    Text("Join Game")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color(.secondarySystemBackground))
-                        .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(vm.isConnected ? Color.beatGreen : Color.orange)
+                            .frame(width: 7, height: 7)
+                            .scaleEffect(vm.isConnected ? connectedScale : 1)
+                            .animation(
+                                vm.isConnected
+                                    ? .easeInOut(duration: 1.4).repeatForever(autoreverses: true)
+                                    : .default,
+                                value: connectedScale
+                            )
+                        Text(vm.isConnected ? "Connected" : "Connecting…")
+                            .font(.system(.footnote, design: .rounded))
+                            .foregroundStyle(Color.beatMuted)
+                    }
                 }
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !vm.isConnected)
-                .padding(.horizontal)
+                .padding(.top, 60)
+                .padding(.horizontal, 24)
+
+                Spacer()
+
+                // ── Input + buttons ──────────────────────────────────
+                VStack(spacing: 12) {
+                    // Name field — brighter placeholder for contrast
+                    TextField("", text: $name, prompt: Text("Your name").foregroundStyle(Color.beatMuted))
+                        .font(.system(.body, design: .rounded))
+                        .accessibilityIdentifier("landing.nameField")
+                        .beatInput(focused: nameFocused)
+                        .focused($nameFocused)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+
+                    // Create — dims visually until name entered
+                    Button {
+                        let trimmed = name.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        SoundManager.shared.impact(.medium)
+                        vm.createLobby(name: trimmed)
+                    } label: {
+                        BeatPrimaryLabel(title: "Create Game")
+                    }
+                    .buttonStyle(PressScaleStyle(haptic: .medium))
+                    .opacity(nameIsEmpty || !vm.isConnected ? 0.4 : 1)
+                    .disabled(nameIsEmpty || !vm.isConnected)
+                    .animation(.easeInOut(duration: 0.2), value: nameIsEmpty)
+                    .accessibilityIdentifier("landing.createGameButton")
+
+                    // Join
+                    Button {
+                        SoundManager.shared.impact(.light)
+                        showJoin = true
+                    } label: {
+                        BeatSecondaryLabel(title: "Join Game")
+                    }
+                    .buttonStyle(PressScaleStyle(haptic: .light))
+                    .opacity(nameIsEmpty || !vm.isConnected ? 0.4 : 1)
+                    .disabled(nameIsEmpty || !vm.isConnected)
+                    .animation(.easeInOut(duration: 0.2), value: nameIsEmpty)
+                    .accessibilityIdentifier("landing.joinGameButton")
+
+                    // How to play button
+                    Button {
+                        showHowToPlay = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "questionmark.circle")
+                            Text("What is Beatably and how to play?")
+                        }
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color.beatMuted)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 48)
             }
-
-            Spacer()
         }
+        .onAppear { startConnectedPulse() }
+        .sheet(isPresented: $showHowToPlay) { HowToPlayView() }
+        .accessibilityIdentifier("landing.screen")
         .sheet(isPresented: $showJoin) {
             JoinSheet(name: $name, code: $joinCode, onJoin: { joinName, code in
                 vm.joinLobby(name: joinName, code: code)
@@ -81,8 +128,13 @@ struct LandingView: View {
         }
     }
 
-    // A deep link (beatably://join?code=XXXX) stashes a code on the view model;
-    // prefill the join field and open the sheet.
+    // Pulse scale state for the connection dot
+    @State private var connectedScale: CGFloat = 1.0
+
+    private func startConnectedPulse() {
+        connectedScale = 1.4
+    }
+
     private func consumePendingJoinCode() {
         if let c = vm.pendingJoinCode {
             joinCode = c
@@ -92,52 +144,136 @@ struct LandingView: View {
     }
 }
 
+// MARK: - Join sheet
+
 private struct JoinSheet: View {
     @Binding var name: String
     @Binding var code: String
     let onJoin: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var nameFocused: Bool
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
-    private var trimmedCode: String { code.trimmingCharacters(in: .whitespaces).uppercased() }
+    private var isReady: Bool { !trimmedName.isEmpty && code.count == 4 }
+
+    private func submit() {
+        guard isReady else { return }
+        SoundManager.shared.impact(.medium)
+        onJoin(trimmedName, code)
+        dismiss()
+    }
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Join a Game")
-                .font(.title2.bold())
-                .padding(.top)
+        ZStack {
+            Color.beatBg.ignoresSafeArea()
 
-            TextField("Your name", text: $name)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.words)
-                .disableAutocorrection(true)
-                .font(.title3)
-                .padding(.horizontal)
+            VStack(spacing: 20) {
+                Text("Join a Game")
+                    .font(.system(.title2, design: .rounded).bold())
+                    .foregroundStyle(Color.beatText)
+                    .padding(.top, 28)
 
-            TextField("Room code", text: $code)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.characters)
-                .disableAutocorrection(true)
-                .font(.title2.monospaced())
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                TextField("", text: $name, prompt: Text("Your name").foregroundStyle(Color.beatDim))
+                    .font(.system(.body, design: .rounded))
+                    .accessibilityIdentifier("join.nameField")
+                    .beatInput(focused: nameFocused)
+                    .focused($nameFocused)
+                    .textInputAutocapitalization(.words)
+                    .disableAutocorrection(true)
+                    .padding(.horizontal, 24)
 
-            Button {
-                guard !trimmedName.isEmpty, !trimmedCode.isEmpty else { return }
-                onJoin(trimmedName, trimmedCode)
-                dismiss()
-            } label: {
-                Text("Join")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 8) {
+                    Text("Room Code")
+                        .font(.system(.caption, design: .rounded).weight(.medium))
+                        .foregroundStyle(Color.beatMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+
+                    FourDigitCodeField(code: $code)
+                        .padding(.horizontal, 24)
+                        .accessibilityIdentifier("join.roomCodeField")
+                }
+
+                Button {
+                    submit()
+                } label: {
+                    BeatPrimaryLabel(title: "Join")
+                }
+                .buttonStyle(PressScaleStyle())
+                .disabled(!isReady)
+                .padding(.horizontal, 24)
+                .accessibilityIdentifier("join.submitButton")
+
+                Spacer()
             }
-            .disabled(trimmedName.isEmpty || trimmedCode.isEmpty)
-            .padding(.horizontal)
-
-            Spacer()
+        }
+        // Auto-proceed once the final digit is entered (name already filled).
+        .onChange(of: code) { _, newValue in
+            if newValue.count == 4 && isReady {
+                submit()
+            }
         }
     }
 }
+
+// MARK: - 4-digit code field
+
+private struct FourDigitCodeField: View {
+    @Binding var code: String
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        ZStack {
+            // Hidden text field captures actual keyboard input
+            TextField("", text: Binding(
+                get: { code },
+                set: { raw in
+                    code = String(raw
+                        .uppercased()
+                        .filter { $0.isLetter || $0.isNumber }
+                        .prefix(4))
+                }
+            ))
+            .focused($focused)
+            .textInputAutocapitalization(.characters)
+            .disableAutocorrection(true)
+            .opacity(0.001)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Visual 4-box display — narrow, centered boxes (~70% of full width)
+            HStack(spacing: 12) {
+                let chars = Array(code)
+                ForEach(0..<4, id: \.self) { i in
+                    let char = i < chars.count ? String(chars[i]) : ""
+                    let isActive = focused && i == min(chars.count, 3)
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.beatSurface2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .strokeBorder(
+                                    isActive ? Color.beatTeal : Color.beatBorder,
+                                    lineWidth: isActive ? 2 : 1.5
+                                )
+                        )
+                        .overlay(
+                            Text(char)
+                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .foregroundStyle(Color.beatText)
+                        )
+                        .frame(width: 52, height: 58)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(height: 58)
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
+        .onAppear {
+            // Slight delay so the sheet has settled before focus
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                focused = true
+            }
+        }
+    }
+}
+
