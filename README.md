@@ -59,7 +59,10 @@ Visit `http://127.0.0.1:5173`
 ## Docs
 
 - [Architecture](docs/architecture.md) — how the system works, socket events, components
+- [Codex App Setup Guide](codex-app-setup-guide.md) — how Codex App, Computer Use, and multiplayer testing work in this repo
+- [.codex/README.md](.codex/README.md) — shared Codex app local-environment action scripts for this repo
 - [Deployment](docs/deployment.md) — hosting setup, environment variables
+- [Codex Multiplayer Testing](docs/codex-multiplayer-testing.md) — using Codex App on macOS with browser sessions or dual iOS simulators
 - [Song Database Guide](song-database-guide.md) — managing the curated song database
 - [Design System](beatably-design-system.md) — UI/UX conventions
 - [Feature Plan](feature-plan.md) — upcoming features

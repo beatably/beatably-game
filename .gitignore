@@ -114,6 +114,8 @@ ios/Beatably.xcodeproj/
 ios/build/
 ios/DerivedData/
 DerivedData/
+# Dev/verification screenshots + captured animation frames (large, regenerable)
+ios/screenshots/
 *.xcuserstate
 xcuserdata/
 .swiftpm/

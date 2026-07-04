@@ -17,6 +17,7 @@ npm run setup      # installs playwright + downloads chromium
 ```bash
 e2e/run.sh                     # boots backend + frontend, runs the flow, tears down
 E2E_HEADED=1 e2e/run.sh        # show the browser windows
+e2e/dev-stack.sh               # boots backend + frontend and keeps them running
 ```
 Outputs (gitignored):
 - `e2e/logs/backend.log`, `frontend.log`, `playerA.log`, `playerB*.log`
@@ -34,3 +35,7 @@ state). Game progression that would otherwise need fragile SVG-timeline taps is
 driven via a **dev-only** hook, `window.__beatably` (socket + room state), which
 `import.meta.env.DEV` strips from production builds. Verification is always
 against the real rendered UI + `window.lastGameUpdate`.
+
+`dev-stack.sh` is the better entry point when you want Codex App on macOS to
+drive the game with the in-app browser, Chrome, or Computer Use while keeping
+the local stack alive between prompts.
