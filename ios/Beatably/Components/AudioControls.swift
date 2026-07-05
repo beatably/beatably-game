@@ -51,9 +51,9 @@ struct AudioControls: View {
             // Progress bar with inline time labels
             HStack(spacing: 6) {
                 Text(formatTime(audio.currentTime))
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.beatMuted)
-                    .frame(width: 28, alignment: .trailing)
+                    .frame(width: 34, alignment: .trailing)
                     .monospacedDigit()
 
                 GeometryReader { geo in
@@ -74,9 +74,9 @@ struct AudioControls: View {
                 .frame(height: 9)
 
                 Text(formatTime(audio.duration))
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.beatMuted)
-                    .frame(width: 28, alignment: .leading)
+                    .frame(width: 34, alignment: .leading)
                     .monospacedDigit()
             }
         }

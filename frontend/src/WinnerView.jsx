@@ -111,7 +111,7 @@ const WinnerView = ({ winner, players, onPlayAgain, onReturnToLobby }) => {
                         <span className={`text-sm font-bold ${index === 0 ? 'text-primary' : 'text-muted-foreground'}`}>#{index + 1}</span>
                         <span className={`text-foreground ${isWinner ? 'font-semibold' : ''}`}>{player.name}</span>
                       </div>
-                      <span className="text-muted-foreground text-sm">{player.score || 0} cards</span>
+                      <span className="text-muted-foreground text-sm">{player.score || 0} songs</span>
                     </div>
                   );
                 })}

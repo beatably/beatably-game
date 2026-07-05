@@ -46,6 +46,12 @@ final class SoundManager {
     private init() {}
 
     func preload() {
+        // Ensure sound effects play even when the ringer/mute switch is on.
+        // On devices that never instantiate AudioPlayer (e.g. non-host players)
+        // the session would otherwise stay .soloAmbient and be silenced by mute.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+
         let names = ["place", "correct", "challenge", "credit", "bonus", "casino", "win", "lose"]
         for name in names {
             guard

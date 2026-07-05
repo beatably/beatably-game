@@ -1,7 +1,7 @@
 import SwiftUI
 
 // Animated space background used behind the S-curve timeline and the full game view.
-// Three blurred orbs + 22 star particles drawn in Canvas for performance.
+// Three blurred orbs + 25 star particles drawn in Canvas for performance.
 
 struct SpaceBackground: View {
     private let stars = SpaceBackground.makeStars()
@@ -40,7 +40,7 @@ struct SpaceBackground: View {
                             let phase = (t / star.duration + star.phaseOffset) * 2 * .pi
                             let dx = sin(phase * 0.7) * 18.0
                             let dy = cos(phase * 0.5) * 18.0
-                            let opacity = 0.15 + 0.38 * (sin(phase) * 0.5 + 0.5)
+                            let opacity = 0.25 + 0.4 * (sin(phase) * 0.5 + 0.5)
                             let x = star.x * Double(size.width) + dx
                             let y = star.y * Double(size.height) + dy
                             let r = star.radius
@@ -58,19 +58,28 @@ struct SpaceBackground: View {
         .allowsHitTesting(false)
     }
 
-    // Faster durations: 10–20s (was 18–32s)
+    // Jittered grid (one star per cell) → evenly spread across the whole screen, including
+    // over the colour orbs, with no clustering. Durations 7–14s (30% faster than the old 10–20s).
     private static func makeStars() -> [SpaceStar] {
         let palette: [Color] = [.beatPurple, .beatCyan, .beatMagenta, .white, .beatPurple, .beatCyan]
         var rng = SpaceRNG(seed: 42)
-        return (0..<22).map { i in
-            SpaceStar(
-                x: rng.next01(), y: rng.next01(),
-                radius: 0.8 + rng.next01() * 1.6,
-                color: palette[i % palette.count],
-                duration: 10 + rng.next01() * 10,
-                phaseOffset: rng.next01()
-            )
+        let cols = 5, rows = 5
+        var stars: [SpaceStar] = []
+        var i = 0
+        for row in 0..<rows {
+            for col in 0..<cols {
+                stars.append(SpaceStar(
+                    x: (Double(col) + 0.15 + rng.next01() * 0.7) / Double(cols),
+                    y: (Double(row) + 0.15 + rng.next01() * 0.7) / Double(rows),
+                    radius: 0.8 + rng.next01() * 1.6,
+                    color: palette[i % palette.count],
+                    duration: 7 + rng.next01() * 7,
+                    phaseOffset: rng.next01()
+                ))
+                i += 1
+            }
         }
+        return stars
     }
 }
 

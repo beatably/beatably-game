@@ -24,6 +24,7 @@ struct GameView: View {
                         Image(systemName: "ellipsis.circle")
                             .font(.title3)
                             .foregroundStyle(Color.beatMuted)
+                            .frame(width: 24, height: 24)
                     }
                     .padding(.trailing, 16)
                 }
@@ -167,6 +168,13 @@ private struct ScoreHeader: View {
     @Binding var coinOrigins: [String: CGPoint]
     @State private var bouncingId: String? = nil
 
+    // Fixed card width so a full row of 4 cards leaves a gap to the menu button equal to the
+    // menu button's own 16pt margin to the screen edge. Consumed width across the row:
+    // leading 16 + 3×8 inter-card + trailing 16 + 24 menu + 16 menu-trailing = 96.
+    private var cardWidth: CGFloat {
+        floor((UIScreen.main.bounds.width - 96) / 4)
+    }
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -178,12 +186,13 @@ private struct ScoreHeader: View {
                             .font(.system(.caption2, design: .rounded))
                             .foregroundStyle(isCurrent ? Color.beatText : Color.beatMuted)
                             .lineLimit(1)
+                            .truncationMode(.tail)
                         HStack(alignment: .lastTextBaseline, spacing: 2) {
                             Text(verbatim: String(player.score))
                                 .font(.system(.headline, design: .rounded).bold())
                                 .foregroundStyle(Color.beatText)
                                 .contentTransition(.numericText())
-                            Text("pts")
+                            Text("songs")
                                 .font(.system(.caption2, design: .rounded))
                                 .foregroundStyle(Color.beatMuted)
                         }
@@ -197,6 +206,7 @@ private struct ScoreHeader: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
+                    .frame(width: cardWidth)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
                             .fill(isCurrent ? Color.beatMagenta.opacity(0.15) : Color.beatSurface2.opacity(0.85))
@@ -299,9 +309,9 @@ private struct NonCreatorProgressBar: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(formatTime(vm.syncedProgress))
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.beatMuted)
-                .frame(width: 28, alignment: .trailing)
+                .frame(width: 34, alignment: .trailing)
                 .monospacedDigit()
 
             GeometryReader { geo in
@@ -320,9 +330,9 @@ private struct NonCreatorProgressBar: View {
             .frame(height: 9)
 
             Text(formatTime(vm.syncedDuration))
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.beatMuted)
-                .frame(width: 28, alignment: .leading)
+                .frame(width: 34, alignment: .leading)
                 .monospacedDigit()
         }
         .padding(.horizontal, 16)
@@ -334,6 +344,17 @@ private struct NonCreatorProgressBar: View {
 
 private struct TimelineSection: View {
     @Environment(GameViewModel.self) private var vm
+
+    // One-time explainer shown in round one (single starter card visible). Persists across
+    // launches via AppStorage; `dismissed` hides it immediately within the session.
+    @AppStorage("beatably_seen_start_hint") private var seenStartHint = false
+    @State private var startHintDismissed = false
+    private var showStartHint: Bool { !seenStartHint && !startHintDismissed && vm.timeline.count == 1 }
+    private func dismissStartHint() {
+        guard showStartHint else { return }
+        startHintDismissed = true
+        seenStartHint = true
+    }
 
     var canPlace: Bool {
         (vm.isMyTurn && vm.gamePhase == "player-turn") ||
@@ -353,7 +374,7 @@ private struct TimelineSection: View {
         return vm.gamePlayers.first { $0.persistentId == originalId }?.name
     }
 
-    // Name shown above the "?" node while a card is being placed. During a challenge
+    // Name shown below the "?" node while a card is being placed. During a challenge
     // the challenger is placing on the original's timeline; otherwise it's the active player.
     var pendingLabel: String? {
         if vm.gamePhase == "challenge" {
@@ -423,6 +444,9 @@ private struct TimelineSection: View {
                 cardLabels: cardLabels,
                 placementResult: vm.placementResult,
                 challengeResult: vm.challengeState?.result,
+                // Round-one explainer, rendered inside TimelineView anchored just above
+                // the single starter node (only place the exact node position is known).
+                startHint: showStartHint ? "Everyone starts with one random song on their timeline" : nil,
                 onPlace: {
                     vm.selectPlacement(index: $0)
                     SoundManager.shared.play(.placement)
@@ -430,7 +454,17 @@ private struct TimelineSection: View {
                 }
             )
             .frame(maxHeight: .infinity)
+            // Tap anywhere in the timeline area to dismiss — simultaneous so it never
+            // blocks the gap circles from placing a card.
+            .simultaneousGesture(TapGesture().onEnded { dismissStartHint() })
+            // Auto-dismiss after a few seconds if untouched.
+            .task(id: showStartHint) {
+                guard showStartHint else { return }
+                try? await Task.sleep(for: .seconds(5))
+                dismissStartHint()
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: showStartHint)
     }
 }
 
@@ -825,7 +859,7 @@ private struct GameOverOverlay: View {
                                     .font(.system(.subheadline, design: .rounded))
                                     .foregroundStyle(i == 0 ? Color.beatText : Color.beatMuted)
                                 Spacer()
-                                Text("\(player.score) cards")
+                                Text("\(player.score) songs")
                                     .font(.system(.caption, design: .rounded))
                                     .foregroundStyle(Color.beatMuted)
                             }

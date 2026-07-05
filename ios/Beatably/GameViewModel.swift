@@ -178,6 +178,7 @@ class GameViewModel {
         d.removeObject(forKey: kPlayerName)
         d.removeObject(forKey: kRoomCode)
         d.removeObject(forKey: kIsCreator)
+        d.removeObject(forKey: "beatably_seen_start_hint")
         d.synchronize()
     }
 
@@ -207,11 +208,22 @@ class GameViewModel {
         ]
 
         func song(_ id: String, _ title: String, _ artist: String, _ year: Int,
-                  original: Bool = false, challenger: Bool = false) -> Song {
+                  art: String? = nil, original: Bool = false, challenger: Bool = false) -> Song {
             Song(id: id, title: title, artist: artist, year: year, previewURL: nil,
-                 albumArt: nil, isPreview: false,
+                 albumArt: art, isPreview: false,
                  challengerCard: challenger, originalCard: original, isYourGuess: challenger)
         }
+
+        // Test-only album-art fixtures (iTunes artworkUrl100). Used to verify the
+        // album-art timeline nodes render; one card per reveal scenario is left artless
+        // to also exercise the gradient/music-note fallback.
+        let artFeelGood = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/1c/0f/81/1c0f818a-e458-dd84-6f1b-ccbdf5fe14d6/825646291045.jpg/100x100bb.jpg"
+        let artDoves    = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/9d/14/10/9d141037-6ad8-4847-6622-bcff54e8584e/886448962830.jpg/100x100bb.jpg"
+        let artLose     = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/08/23/fc/0823fcd9-cb44-695b-32bf-b3bf51d9f800/00606949351229.rgb.jpg/100x100bb.jpg"
+        let artHeyJude  = "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/a6/8b/65/a68b657c-cac6-68e6-3bde-b79d58fbc795/18UMGIM30762.rgb.jpg/100x100bb.jpg"
+        let artU2       = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/9a/48/54/9a485494-b969-aaf4-a916-07452ea69869/06UMGIM72507.rgb.jpg/100x100bb.jpg"
+        let artFallin   = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/bb/4d/55/bb4d552c-04d8-29ba-1b41-6ff8bcd199a5/808132000222.jpg/100x100bb.jpg"
+        let artNothing  = "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/fa/19/3f/fa193fc7-f9cf-c84e-c7ef-77b2fceb3a3e/5054526647565.png/100x100bb.jpg"
 
         // The challenged card (2005) appears twice: once for each player's placement.
         // Timeline order shows original-before-1984 vs challenger-after-1984 so the two
@@ -221,13 +233,13 @@ class GameViewModel {
             currentPlayerId = originalId        // backend sends original's id in this phase
             // Correct side goes after 1984; wrong side goes before it.
             let originalAfter = originalCorrect
-            let orig = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, original: true)
-            let chal = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, challenger: true)
-            let mid  = song("song-1984", "When Doves Cry", "Prince", 1984)
+            let orig = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood, original: true)
+            let chal = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood, challenger: true)
+            let mid  = song("song-1984", "When Doves Cry", "Prince", 1984, art: artDoves)
             timeline = originalAfter
                 ? [chal, mid, orig]   // challenger wrong (before), original correct (after)
                 : [orig, mid, chal]   // original wrong (before), challenger correct (after)
-            currentCard = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005)
+            currentCard = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood)
             challengeState = ChallengeState(
                 challengerPersistentId: challengerId, originalPlayerId: originalId,
                 originalCardIndex: nil,
@@ -242,10 +254,17 @@ class GameViewModel {
         func reveal(correct: Bool) {
             myPersistentId = originalId
             currentPlayerId = originalId
+            // 1984 deliberately artless here to exercise the fallback node beside a real cover.
             timeline = [song("song-1984", "When Doves Cry", "Prince", 1984),
-                        song("song-2005", "Feel Good Inc.", "Gorillaz", 2005)]
-            currentCard = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005)
+                        song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood)]
+            currentCard = song("song-2005", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood)
             placementResult = PlacementResult(id: "song-2005", correct: correct, year: 2005)
+            lastSongGuess = LastSongGuess(
+                playerName: "You",
+                guessTitle: "Feel Good Inc.",
+                guessArtist: "Gorillaz",
+                correct: correct
+            )
             challengeState = nil
             gamePhase = "reveal"
         }
@@ -255,8 +274,8 @@ class GameViewModel {
         func songGuess() {
             myPersistentId = originalId
             currentPlayerId = originalId
-            let placed = song("song-placed", "Nothing Compares 2 U", "Sinéad O'Connor", 1990)
-            timeline = [placed, song("song-2002", "Lose Yourself", "Eminem", 2002)]
+            let placed = song("song-placed", "Nothing Compares 2 U", "Sinéad O'Connor", 1990, art: artNothing)
+            timeline = [placed, song("song-2002", "Lose Yourself", "Eminem", 2002, art: artLose)]
             currentCard = placed
             placementResult = PlacementResult(id: "song-placed", correct: true, year: 1990)
             challengeState = nil
@@ -268,8 +287,8 @@ class GameViewModel {
         func challengeWindow() {
             myPersistentId = originalId
             currentPlayerId = originalId
-            let placed = song("song-placed", "Nothing Compares 2 U", "Sinéad O'Connor", 1990)
-            timeline = [placed, song("song-2002", "Lose Yourself", "Eminem", 2002)]
+            let placed = song("song-placed", "Nothing Compares 2 U", "Sinéad O'Connor", 1990, art: artNothing)
+            timeline = [placed, song("song-2002", "Lose Yourself", "Eminem", 2002, art: artLose)]
             currentCard = placed
             placementResult = PlacementResult(id: "song-placed", correct: true, year: 1990)
             challengeState = nil
@@ -283,8 +302,8 @@ class GameViewModel {
         func challenge(autoPlaceAt index: Int? = nil) {
             myPersistentId = challengerId
             currentPlayerId = originalId
-            let challenged = song("song-2002", "Lose Yourself", "Eminem", 2002)
-            timeline = [song("song-1968", "Hey Jude", "The Beatles", 1968), challenged]  // A placed 2002 after 1968
+            let challenged = song("song-2002", "Lose Yourself", "Eminem", 2002, art: artLose)
+            timeline = [song("song-1968", "Hey Jude", "The Beatles", 1968, art: artHeyJude), challenged]  // A placed 2002 after 1968
             currentCard = challenged
             placementResult = PlacementResult(id: "song-2002", correct: true, year: 2002)
             challengeState = ChallengeState(
@@ -305,8 +324,8 @@ class GameViewModel {
         func playerTurnInteractive(autoPlaceAt index: Int? = nil) {
             myPersistentId = originalId
             currentPlayerId = originalId
-            timeline = [song("song-1987", "With or Without You", "U2", 1987)]
-            currentCard = song("song-new", "Fallin'", "Alicia Keys", 2001)  // the card being placed ("?")
+            timeline = [song("song-1987", "With or Without You", "U2", 1987, art: artU2)]
+            currentCard = song("song-new", "Fallin'", "Alicia Keys", 2001, art: artFallin)  // the card being placed ("?")
             placementResult = nil
             challengeState = nil
             gamePhase = "player-turn"
@@ -322,8 +341,8 @@ class GameViewModel {
         func observerPreview() {
             myPersistentId = challengerId       // local player is the observer ("You" is not placing)
             currentPlayerId = originalId         // Alice is the active player
-            timeline = [song("song-1987", "With or Without You", "U2", 1987)]
-            currentCard = song("song-new", "Fallin'", "Alicia Keys", 2001)
+            timeline = [song("song-1987", "With or Without You", "U2", 1987, art: artU2)]
+            currentCard = song("song-new", "Fallin'", "Alicia Keys", 2001, art: artFallin)
             placementResult = nil
             challengeState = nil
             gamePhase = "player-turn"
@@ -770,9 +789,10 @@ class GameViewModel {
         // feedback may be absent during challenge-window / challenge phase updates.
         if let result = GameViewModel.parsePlacementResult(from: game) {
             placementResult = result
-            let fb = game["feedback"] as? [String: Any]
 
-            if let fb, let sg = fb["lastSongGuess"] as? [String: Any],
+            // lastSongGuess is a top-level key in the game_update payload (sibling of feedback),
+            // not nested inside feedback.
+            if let sg = game["lastSongGuess"] as? [String: Any],
                let pn = sg["playerName"] as? String {
                 lastSongGuess = LastSongGuess(
                     playerName: pn,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Launch an auto-placing seed scenario and burst-capture screenshots across the
-# placement animation window (~1.8s..3.2s after launch) so the shrink/slide/expand
-# can be inspected frame-by-frame.
+# placement animation window (~1.8s..2.6s after launch) so the node slide + gap-grow
+# + bounce can be inspected frame-by-frame.
 #
 # Usage: ./scripts/capture-anim.sh <anim-move-left|anim-move-right>
 set -euo pipefail
@@ -24,7 +24,7 @@ echo "▶ $SCENARIO (udid: $UDID)"
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$UDID" "$BUNDLE_ID" UITEST_RESET_STATE UITEST_SEED_STATE "$SCENARIO" >/dev/null
 
-# Placement fires at ~1.8s; animation runs ~1.2s. Burst from ~1.7s onward.
+# Placement fires at ~1.8s; animation runs ~0.8s. Burst from ~1.7s onward.
 python3 -c "import time; time.sleep(1.7)"
 for i in $(seq -w 1 12); do
   xcrun simctl io "$UDID" screenshot "$OUT_DIR/frame_$i.png" >/dev/null 2>&1 &

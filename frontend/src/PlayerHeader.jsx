@@ -134,7 +134,7 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
               isPlayerAnimating(p) ? 'animate-pulse bg-primary/10 rounded-md px-1' : ''
             }`}>
               <span className="font-semibold text-base md:text-lg text-foreground">{p.score}</span>
-              <span className="text-muted-foreground xs:inline">pts</span>
+              <span className="text-muted-foreground xs:inline">songs</span>
               <div className={`transition-transform duration-300 ${
                 isPlayerAnimating(p) ? 'scale-110' : 'scale-100'
               }`}>

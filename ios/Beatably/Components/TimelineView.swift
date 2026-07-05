@@ -1,7 +1,10 @@
 import SwiftUI
 
-// Height of a year pill = circle diameter when minimised during animation.
-private let pillCircleSize: CGFloat = 24
+private let gapCircleSize: CGFloat = 24     // tappable placement slot (circle)
+private let nodeSize: CGFloat = 40          // album-art / mystery node side length
+private let nodeCornerRadius: CGFloat = 16  // node corner radius
+private let nodeLabelOffset: CGFloat = 33   // year/name label center, below the node center
+private let startHintGap: CGFloat = 14      // gap between the callout tail tip and the node top
 
 // MARK: - PathFollower
 
@@ -19,11 +22,37 @@ private struct PathFollower: GeometryEffect {
         set { progress = newValue }
     }
 
+    // One unit of spring oscillation (progress − 1) maps to this many pixels along the
+    // travel direction — a FIXED magnitude for every node regardless of slide distance,
+    // so a long row-crossing slide doesn't overshoot proportionally further than a short one.
+    static let overshootPixels: CGFloat = 105
+
     func effectValue(size: CGSize) -> ProjectionTransform {
-        let t = progress, mt = 1 - t
-        let x = mt*mt*mt*from.x + 3*mt*mt*t*c1.x + 3*mt*t*t*c2.x + t*t*t*to.x
-        let y = mt*mt*mt*from.y + 3*mt*mt*t*c1.y + 3*mt*t*t*c2.y + t*t*t*to.y
+        // Base motion follows the bezier for progress in [0,1] (clamped — no distance-
+        // proportional extrapolation).
+        let t = min(max(progress, 0), 1), mt = 1 - t
+        var x = mt*mt*mt*from.x + 3*mt*mt*t*c1.x + 3*mt*t*t*c2.x + t*t*t*to.x
+        var y = mt*mt*mt*from.y + 3*mt*mt*t*c1.y + 3*mt*t*t*c2.y + t*t*t*to.y
+
+        // Bounce: the spring makes `progress` oscillate around 1 (overshoot → rebound →
+        // overshoot, decaying). Applying the SIGNED (progress − 1) as a fixed-pixel offset
+        // along the travel direction reproduces that whole decaying oscillation — a real
+        // bounce, not a single overshoot. Weighted in only near arrival (smoothstep) so the
+        // negative values during the initial approach don't drag the node backward.
+        let dx = to.x - from.x, dy = to.y - from.y
+        let len = (dx * dx + dy * dy).squareRoot()
+        if len > 0.5 {
+            let w = PathFollower.smoothstep(progress, 0.7, 0.97)
+            let px = (progress - 1) * PathFollower.overshootPixels * w
+            x += dx / len * px
+            y += dy / len * px
+        }
         return ProjectionTransform(CGAffineTransform(translationX: x - from.x, y: y - from.y))
+    }
+
+    private static func smoothstep(_ x: CGFloat, _ e0: CGFloat, _ e1: CGFloat) -> CGFloat {
+        let t = min(max((x - e0) / (e1 - e0), 0), 1)
+        return t * t * (3 - 2 * t)
     }
 }
 
@@ -55,9 +84,7 @@ private struct GapSlide {
 
 private enum PlacementAnimPhase {
     case idle
-    case collapsing  // moving pills shrink to circles in-place
-    case animating   // circles slide along path + path grows
-    case expanding   // circles arrived, now expanding to pills
+    case animating   // nodes slide along the path (full size) while the path grows
 }
 
 // MARK: - TimelineView
@@ -75,11 +102,13 @@ struct TimelineView: View {
     var cardLabels: [String: String] = [:]
     var placementResult: PlacementResult? = nil
     var challengeResult: ChallengeResult? = nil
+    var startHint: String? = nil
     let onPlace: (Int) -> Void
 
     // ── Animation state ──────────────────────────────────────────────
     @State private var containerSize: CGSize = .zero
     @State private var animPhase: PlacementAnimPhase = .idle
+    @State private var startHintHeight: CGFloat = 84   // measured; seeded near the real height
 
     // Captured at animation start to keep Y locked during animation.
     @State private var capturedOffsetY: CGFloat? = nil
@@ -90,20 +119,12 @@ struct TimelineView: View {
     // Drives path trim growth (separate so we can ease independently).
     @State private var pathTrimEnd: CGFloat = 1.0
 
-    // Pills shrink/expand.
-    @State private var pillsMinimized = false
+    // The tapped gap grows from a 24pt slot to a full 32pt node while it slides.
+    @State private var gapGrown = false
 
-    // Slide data for moving pills and the tapped gap.
+    // Slide data for moving nodes and the tapped gap.
     @State private var pillSlides: [PillSlide] = []
     @State private var gapSlide: GapSlide? = nil
-
-    // IDs of pills that actually move (originalIndex >= pendingIdx).
-    @State private var movingIds: Set<String> = []
-
-    // All base card positions from the old layout, captured at animation start.
-    // Used during .collapsing so left-movers and right-movers both render at their
-    // correct pre-insertion positions.
-    @State private var capturedOldYearPositions: [String: CGPoint] = [:]
 
     // The original player's placement, shown to the challenger as a full "?" marker slot.
     // A distinct id keeps it separate from the challenger's pending card (same song), and
@@ -172,13 +193,8 @@ struct TimelineView: View {
 
             ZStack {
                 pathLayers(layout: layout, size: geo.size)
-
-                switch animPhase {
-                case .animating:
-                    animatingNodes(layout: layout)
-                case .idle, .collapsing, .expanding:
-                    staticNodes(layout: layout)
-                }
+                timelineNodes(layout: layout)
+                startHintOverlay(layout: layout)
             }
             .background(
                 Color.clear
@@ -191,15 +207,13 @@ struct TimelineView: View {
             } else if new == nil, animPhase != .idle {
                 // Cancel — snap back instantly.
                 animPhase = .idle
-                pillsMinimized = false
+                gapGrown = false
                 slideProgress = 0
                 pathTrimEnd = 1.0
                 pillSlides = []
                 gapSlide = nil
-                movingIds = []
                 capturedOffsetY = nil
                 capturedOldSegments = []
-                capturedOldYearPositions = [:]
             }
         }
         .onChange(of: cards.count) { _, _ in
@@ -213,32 +227,7 @@ struct TimelineView: View {
 
     @ViewBuilder
     private func pathLayers(layout: TimelineLayoutResult, size: CGSize) -> some View {
-        if animPhase == .collapsing {
-            // Pills are shrinking in place — show the old path unchanged.
-            Canvas { ctx, _ in
-                ctx.stroke(buildPath(from: capturedOldSegments),
-                           with: .color(Color.beatMagenta.opacity(0.6)),
-                           style: StrokeStyle(lineWidth: 30, lineCap: .round, lineJoin: .round))
-            }
-            .blur(radius: 12)
-            .opacity(0.18)
-            .allowsHitTesting(false)
-
-            Canvas { ctx, sz in
-                ctx.stroke(buildPath(from: capturedOldSegments),
-                           with: .linearGradient(
-                            Gradient(stops: [
-                                .init(color: Color.beatPurple.opacity(0.65),  location: 0),
-                                .init(color: Color.beatMagenta.opacity(0.55), location: 0.5),
-                                .init(color: Color.beatCyan.opacity(0.55),    location: 1),
-                            ]),
-                            startPoint: .zero,
-                            endPoint: CGPoint(x: sz.width, y: sz.height)),
-                           style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-            }
-            .allowsHitTesting(false)
-
-        } else if animPhase == .animating {
+        if animPhase == .animating {
             // Old path fades out quickly as slide starts.
             let oldOpacity = max(0, 1.0 - slideProgress * 3.0)
 
@@ -314,121 +303,39 @@ struct TimelineView: View {
         }
     }
 
-    // MARK: - Animating nodes (collapse + slide phase)
+    // MARK: - Timeline nodes (single render path for idle + slide)
 
+    // One ForEach over the layout drives both the idle and the animating state, so every
+    // node keeps a stable SwiftUI identity across the .animating → .idle transition and
+    // is never torn down / re-created (which previously flashed the whole timeline).
+    // Movement is a PathFollower whose params collapse to a no-op when a node isn't sliding.
     @ViewBuilder
-    private func animatingNodes(layout: TimelineLayoutResult) -> some View {
-        // Stationary pills — stay at full size, no movement.
-        ForEach(layout.items, id: \.stableId) { item in
-            if case .year(let song, _) = item.kind,
-               song.id != pendingSong?.id,
-               !movingIds.contains(song.id) {
-                let label = yearLabel(for: song)
-                if let label {
-                    Text(label)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .shadow(color: Color.beatMagenta.opacity(0.7), radius: 4)
-                        .lineLimit(1).fixedSize()
-                        .position(CGPoint(x: item.position.x, y: item.position.y - 26))
-                }
-                if isChallengeMarker(song) {
-                    ChallengeMarkerPill().position(item.position)
-                } else {
-                    YearPill(song: song, colorState: cardColor(song),
-                             minimized: false, skipEnterAnimation: true)
-                        .position(item.position)
-                }
-            }
-        }
-
-        // Moving pills — minimised circles sliding to new positions.
-        ForEach(pillSlides, id: \.songId) { slide in
-            if let song = cards.first(where: { $0.id == slide.songId }) {
-                YearPill(song: song, colorState: .normal, minimized: true, skipEnterAnimation: true)
-                    .position(slide.fromPos)
-                    .modifier(PathFollower(progress: slideProgress,
-                                          from: slide.fromPos, to: slide.toPos,
-                                          c1: slide.c1, c2: slide.c2))
-            }
-        }
-
-        // Tapped gap — opaque magenta circle, slides to pending position.
-        if let gs = gapSlide {
-            Circle()
-                .fill(Color.beatMagenta)
-                .frame(width: pillCircleSize, height: pillCircleSize)
-                .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 1.5))
-                .shadow(color: Color.beatMagenta.opacity(0.8), radius: 6)
-                .shadow(color: Color.beatMagenta.opacity(0.35), radius: 14)
-                .position(gs.fromPos)
-                .modifier(PathFollower(progress: slideProgress,
-                                       from: gs.fromPos, to: gs.toPos,
-                                       c1: gs.c1, c2: gs.c2))
-        }
-    }
-
-    // MARK: - Static nodes (idle + collapsing + expanding)
-
-    @ViewBuilder
-    private func staticNodes(layout: TimelineLayoutResult) -> some View {
-        let isCollapsing = animPhase == .collapsing
-        let isExpanding  = animPhase == .expanding
-        // Old-position lookup for moving pills during the collapse phase.
-        // Use explicitly captured old positions (covers all moving pills including
-        // left-movers) rather than re-deriving from pillSlides.
-        let fromLookup: [String: CGPoint] = isCollapsing ? capturedOldYearPositions : [:]
-
+    private func timelineNodes(layout: TimelineLayoutResult) -> some View {
         ForEach(layout.items, id: \.stableId) { item in
             switch item.kind {
             case .year(let song, _):
-                // Only the actively-placed card is a pending "?" pill. Gate on
-                // pendingIndex so that in reveal / challenge-resolved (where currentCard
-                // still equals a card already on the timeline) it renders as a year pill.
-                if pendingIndex != nil, let ps = pendingSong, song.id == ps.id {
-                    // Pending pill: hidden during collapse, expands from circle during expanding.
-                    if !isCollapsing {
-                        if let label = pendingLabel, !isExpanding {
-                            Text(label)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .shadow(color: Color.beatMagenta.opacity(0.7), radius: 4)
-                                .lineLimit(1).fixedSize()
-                                .position(CGPoint(x: item.position.x, y: item.position.y - 26))
-                        }
-                        PendingPill(song: song, minimized: isExpanding ? pillsMinimized : false)
-                            .position(item.position)
-                    }
-                } else {
-                    // Single branch for every non-pending year pill — moving or not — so a
-                    // card leaving `movingIds` at cleanup keeps the same SwiftUI identity
-                    // and doesn't reset its @State (which caused the end-of-animation flash).
-                    let isMoving = movingIds.contains(song.id)
-                    // Collapse: render at OLD position while shrinking. Expand/idle: new position.
-                    let pos = (isMoving && isCollapsing) ? (fromLookup[song.id] ?? item.position) : item.position
-                    let minimised = (isMoving && (isCollapsing || isExpanding)) ? pillsMinimized : false
-                    let state = cardColor(song)
-                    // Hide the label while a moving pill is collapsed/expanding; else show it.
-                    if let label = yearLabel(for: song), !(isMoving && (isCollapsing || isExpanding)) {
-                        Text(label)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .shadow(color: Color.beatPurple.opacity(0.8), radius: 4)
-                            .lineLimit(1).fixedSize()
-                            .position(CGPoint(x: pos.x, y: pos.y - 26))
-                    }
-                    if isChallengWindowMarker(song) || isChallengeMarker(song) {
-                        // Placed/challenged card shown as the wide pink "?" marker, year hidden.
-                        // In challenge this is the original's placement occupying a full slot.
-                        ChallengeMarkerPill()
-                            .position(pos)
+                let isPending = pendingIndex != nil && song.id == pendingSong?.id
+                let slide = slideFor(song: song, isPending: isPending)
+                Group {
+                    if isPending {
+                        // The placing player's node: solid magenta "?" that grows from the
+                        // tapped slot to full size as it slides into place.
+                        MysteryNode(size: (animPhase == .animating && !gapGrown) ? gapCircleSize : nodeSize,
+                                    label: pendingLabel)
+                    } else if isChallengWindowMarker(song) || isChallengeMarker(song) {
+                        // Placed/challenged card shown as the pink "?" marker, year hidden.
+                        MysteryNode(label: yearLabel(for: song))
                     } else {
-                        YearPill(song: song, colorState: state,
-                                 minimized: minimised,
-                                 skipEnterAnimation: isCollapsing || isExpanding)
-                            .position(pos)
+                        ArtNode(song: song, colorState: cardColor(song),
+                                label: nodeLabel(for: song))
                     }
                 }
+                .position(slide?.from ?? item.position)
+                .modifier(PathFollower(progress: slideProgress,
+                                       from: slide?.from ?? item.position,
+                                       to:   slide?.to   ?? item.position,
+                                       c1:   slide?.c1   ?? item.position,
+                                       c2:   slide?.c2   ?? item.position))
 
             case .gap(let idx):
                 // Map the layout gap to the confirmed index the backend expects; nil means
@@ -454,17 +361,33 @@ struct TimelineView: View {
                 }
             }
         }
+    }
 
-        // During collapse, show the tapped gap as an immediate opaque magenta circle.
-        if isCollapsing, let gs = gapSlide {
-            Circle()
-                .fill(Color.beatMagenta)
-                .frame(width: pillCircleSize, height: pillCircleSize)
-                .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 1.5))
-                .shadow(color: Color.beatMagenta.opacity(0.8), radius: 6)
-                .shadow(color: Color.beatMagenta.opacity(0.35), radius: 14)
-                .position(gs.fromPos)
+    // MARK: - Start-of-game hint
+
+    // The bubble sizes itself (via its own maxWidth); we measure its height and place its
+    // center so the tail tip lands `startHintGap` above the first node's top edge.
+    @ViewBuilder
+    private func startHintOverlay(layout: TimelineLayoutResult) -> some View {
+        if let text = startHint,
+           let nodePos = layout.items.first(where: { $0.isYear })?.position {
+            StartHintCallout(text: text)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { startHintHeight = $0 }
+                .position(x: nodePos.x,
+                          y: nodePos.y - nodeSize / 2 - startHintGap - startHintHeight / 2)
+                .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottom)))
         }
+    }
+
+    // The bezier a node follows this frame, or nil when it isn't moving (→ PathFollower no-op).
+    private func slideFor(song: Song, isPending: Bool)
+        -> (from: CGPoint, to: CGPoint, c1: CGPoint, c2: CGPoint)? {
+        guard animPhase == .animating else { return nil }
+        if isPending, let gs = gapSlide { return (gs.fromPos, gs.toPos, gs.c1, gs.c2) }
+        if let s = pillSlides.first(where: { $0.songId == song.id }) {
+            return (s.fromPos, s.toPos, s.c1, s.c2)
+        }
+        return nil
     }
 
     // MARK: - Animation trigger
@@ -484,11 +407,6 @@ struct TimelineView: View {
         )
         capturedOffsetY = oldLayout.offsetY
         capturedOldSegments = oldLayout.segments
-        capturedOldYearPositions = Dictionary(
-            uniqueKeysWithValues: oldLayout.items.compactMap { item -> (String, CGPoint)? in
-                guard let s = item.song else { return nil }; return (s.id, item.position)
-            }
-        )
 
         // New layout — uses old offsetY so positions stay in the same Y space.
         var newCards = baseCards
@@ -518,11 +436,9 @@ struct TimelineView: View {
         // timeline re-centers (e.g. 1 card → 2 cards), so we can't skip them by index —
         // we compare actual positions instead.
         var slides: [PillSlide] = []
-        var moving: Set<String> = []
         for (origIdx, card) in baseCards.enumerated() {
             guard let fromPos = oldYearPos[card.id], let toPos = newYearPos[card.id] else { continue }
             if fromPos == toPos { continue }  // didn't move — no slide
-            moving.insert(card.id)
             // Cards at/after the insertion point gain one index; earlier cards keep theirs.
             let newIdx = origIdx >= pendingIdx ? origIdx + 1 : origIdx
             let crossesRow = (origIdx / 3) != (newIdx / 3)
@@ -537,7 +453,6 @@ struct TimelineView: View {
             slides.append(PillSlide(songId: card.id, fromPos: fromPos, toPos: toPos, c1: c1, c2: c2))
         }
         pillSlides = slides
-        movingIds = moving
 
         // Gap slide: tapped gap → pending pill destination.
         if let gapFrom = oldGapPos[pendingIdx],
@@ -557,39 +472,28 @@ struct TimelineView: View {
             gapSlide = GapSlide(fromPos: gapFrom, toPos: gapTo, c1: c1, c2: c2)
         }
 
-        // ── Phase 1: collapse moving pills to circles in-place (0–220ms) ──
+        // ── Single slide phase: nodes move full-size; the tapped gap grows into a node.
+        // The slide spring overshoots past 1, so PathFollower extrapolates the bezier
+        // past the endpoint — nodes accelerate, overshoot, and snap back into place.
         slideProgress = 0
         pathTrimEnd = 0
-        animPhase = .collapsing
-        withAnimation(.spring(duration: 0.22, bounce: 0)) { pillsMinimized = true }
+        gapGrown = false
+        animPhase = .animating
+        withAnimation(.spring(duration: 0.35, bounce: 0.6))  { slideProgress = 1 }
+        withAnimation(.easeOut(duration: 0.35))              { pathTrimEnd = 1 }
+        withAnimation(.spring(duration: 0.32, bounce: 0.5))  { gapGrown = true }
 
-        // ── Phase 2: switch to slide phase; path grows + circles move (220–740ms) ──
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            guard animPhase == .collapsing else { return }
-            animPhase = .animating
-            withAnimation(.spring(duration: 0.5, bounce: 0.08)) { slideProgress = 1 }
-            withAnimation(.easeOut(duration: 0.52)) { pathTrimEnd = 1 }
-        }
-
-        // ── Phase 3: circles expand to pills at new positions (740–1080ms) ──
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.74) {
-            guard animPhase == .animating else { return }
-            animPhase = .expanding
-            withAnimation(.spring(duration: 0.35, bounce: 0.1)) { pillsMinimized = false }
-        }
-
-        // ── Cleanup: back to idle (~1.15s) ─────────────────────────────
+        // ── Cleanup: back to idle once the springs have visually settled (~0.6s) ──
         // capturedOffsetY intentionally NOT cleared here — cleared when cards.count
         // changes so the Y snap only happens at the start of the next confirmed placement.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.15) {
-            guard animPhase == .expanding else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            guard animPhase == .animating else { return }
             animPhase = .idle
             pillSlides = []
             gapSlide = nil
-            movingIds = []
             capturedOldSegments = []
-            capturedOldYearPositions = [:]
             pathTrimEnd = 1.0
+            gapGrown = false
         }
     }
 
@@ -626,6 +530,18 @@ struct TimelineView: View {
         return .normal
     }
 
+    // The label shown under an art node. Correct/normal cards show the year; an incorrect
+    // card keeps the player's name (the year sits in the same spot, so we surface whichever
+    // is meaningful). Applies per-copy to challenge-resolved doubled cards via cardColor.
+    private func nodeLabel(for card: Song) -> String? {
+        switch cardColor(card) {
+        case .incorrect: return yearLabel(for: card) ?? String(card.year)
+        case .correct, .normal: return String(card.year)
+        }
+    }
+
+    // The player-name label for a card (misnamed for historical reasons — it resolves the
+    // per-card name labels, not the year).
     private func yearLabel(for card: Song) -> String? {
         if isChallengeMarker(card) { return disabledLabel }
         if isChallengWindowMarker(card) { return disabledLabel ?? cardLabels[card.id] }
@@ -655,31 +571,55 @@ private func buildPath(from segments: [PathSegment]) -> Path {
 
 enum CardColorState { case normal, correct, incorrect }
 
-// MARK: - Challenge marker pill (original player's placement shown during challenger's turn)
+// MARK: - Node label (year or player name, shown below every node)
 
-private struct ChallengeMarkerPill: View {
+/// The text under a timeline node. Placed via `.overlay` inside the node so it travels
+/// with the node during slide animations and never shifts the node's `.position()` center.
+private struct NodeLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, weight: .black, design: .rounded))
+            .foregroundStyle(.white)
+            .shadow(color: Color.beatPurple.opacity(0.8), radius: 4)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: 84)
+            .fixedSize(horizontal: false, vertical: true)
+            .offset(y: nodeLabelOffset)
+    }
+}
+
+// MARK: - Mystery node (solid magenta "?" — pending placement and challenge markers)
+
+private struct MysteryNode: View {
+    var size: CGFloat = nodeSize   // shrinks to gapCircleSize while the tapped slot grows
+    var label: String? = nil
+
     @State private var ring1 = false
     @State private var ring2 = false
 
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: nodeCornerRadius) }
+
     var body: some View {
-        Text("?")
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .frame(minWidth: 44, minHeight: pillCircleSize, maxHeight: pillCircleSize)
-            .background {
-                Capsule()
-                    .fill(Color.beatMagenta)
-                    .overlay { Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1.5) }
+        shape
+            .fill(Color.beatMagenta)
+            .frame(width: size, height: size)
+            .overlay(shape.strokeBorder(.white.opacity(0.25), lineWidth: 1.5))
+            .overlay {
+                Text("?")
+                    .font(.system(size: size * 0.42, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
             }
             .overlay {
-                Capsule()
+                shape
                     .stroke(Color.beatMagenta, lineWidth: 2)
                     .scaleEffect(ring1 ? 2.8 : 1.0)
                     .opacity(ring1 ? 0 : 0.75)
                     .animation(.easeOut(duration: 2.2).repeatForever(autoreverses: false), value: ring1)
-                Capsule()
+                shape
                     .stroke(Color.beatMagenta, lineWidth: 1.5)
                     .scaleEffect(ring2 ? 2.8 : 1.0)
                     .opacity(ring2 ? 0 : 0.5)
@@ -687,6 +627,7 @@ private struct ChallengeMarkerPill: View {
             }
             .shadow(color: Color.beatMagenta.opacity(0.75), radius: 6)
             .shadow(color: Color.beatMagenta.opacity(0.35), radius: 14)
+            .overlay { if let label { NodeLabel(text: label) } }
             .onAppear { startRipple() }
     }
 
@@ -697,148 +638,64 @@ private struct ChallengeMarkerPill: View {
     }
 }
 
-// MARK: - Pending pill ("?" node — appears after placement tap)
+// MARK: - Art node (album-art rounded square with year/name label below)
 
-private struct PendingPill: View {
-    let song: Song
-    var minimized: Bool = false
-
-    @State private var ring1 = false
-    @State private var ring2 = false
-
-    var body: some View {
-        Text("?")
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .opacity(minimized ? 0 : 1)
-            .padding(.horizontal, minimized ? 0 : 8)
-            .padding(.vertical, 4)
-            // minWidth 44 ensures "?" pill matches the width of a 4-digit year pill.
-            .frame(minWidth: minimized ? pillCircleSize : 44,
-                   maxWidth: minimized ? pillCircleSize : nil,
-                   minHeight: pillCircleSize, maxHeight: pillCircleSize)
-            .background {
-                Capsule()
-                    .fill(Color.beatMagenta)
-                    .overlay { Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1.5) }
-            }
-            .overlay {
-                if !minimized {
-                    Capsule()
-                        .stroke(Color.beatMagenta, lineWidth: 2)
-                        .scaleEffect(ring1 ? 2.8 : 1.0)
-                        .opacity(ring1 ? 0 : 0.75)
-                        .animation(.easeOut(duration: 2.2).repeatForever(autoreverses: false), value: ring1)
-                    Capsule()
-                        .stroke(Color.beatMagenta, lineWidth: 1.5)
-                        .scaleEffect(ring2 ? 2.8 : 1.0)
-                        .opacity(ring2 ? 0 : 0.5)
-                        .animation(.easeOut(duration: 2.2).repeatForever(autoreverses: false), value: ring2)
-                }
-            }
-            .shadow(color: Color.beatMagenta.opacity(0.75), radius: 6)
-            .shadow(color: Color.beatMagenta.opacity(0.35), radius: 14)
-            .animation(.spring(duration: 0.32), value: minimized)
-            .onAppear { if !minimized { startRipple() } }
-            .onChange(of: minimized) { _, m in if !m { startRipple() } }
-    }
-
-    private func startRipple() {
-        ring1 = false; ring2 = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { ring1 = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9)  { ring2 = true }
-    }
-}
-
-// MARK: - Year pill
-
-private struct YearPill: View {
+private struct ArtNode: View {
     let song: Song
     var colorState: CardColorState = .normal
-    var hideYear: Bool = false
-    var outlined: Bool = false
-    var minimized: Bool = false
-    var skipEnterAnimation: Bool = false
+    var label: String? = nil
 
-    @State private var appear: Bool
     @State private var ring1 = false
     @State private var ring2 = false
 
-    init(song: Song, colorState: CardColorState = .normal, hideYear: Bool = false,
-         outlined: Bool = false, minimized: Bool = false, skipEnterAnimation: Bool = false) {
-        self.song = song
-        self.colorState = colorState
-        self.hideYear = hideYear
-        self.outlined = outlined
-        self.minimized = minimized
-        self.skipEnterAnimation = skipEnterAnimation
-        // Start already-visible when we're re-inserting into a new branch mid-animation,
-        // so the view doesn't flash from scale 0.5 / opacity 0.
-        self._appear = State(initialValue: skipEnterAnimation)
-    }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: nodeCornerRadius) }
 
+    // Normal: a subtle white ring so dark album art doesn't merge with the background.
     private var outlineColor: Color {
         switch colorState {
-        case .normal:    return outlined ? Color.beatMagenta : .clear
+        case .normal:    return .white.opacity(0.25)
         case .correct:   return Color.beatGreen
         case .incorrect: return Color(hex: "EF4444")
         }
     }
+    private var outlineWidth: CGFloat { colorState != .normal ? 3 : 1.5 }
     private var glowColor: Color {
         switch colorState {
-        case .normal:    return outlined ? Color.beatMagenta : Color.beatPurple
+        case .normal:    return Color.beatPurple
         case .correct:   return Color.beatGreen
         case .incorrect: return Color(hex: "EF4444")
         }
     }
-    private var outlineWidth: CGFloat { colorState != .normal ? 3 : (outlined ? 1.5 : 0) }
 
     var body: some View {
-        Text(verbatim: hideYear ? "?" : String(song.year))
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .opacity(minimized ? 0 : 1)
-            .padding(.horizontal, minimized ? 0 : 8)
-            .padding(.vertical, 4)
-            .frame(width: minimized ? pillCircleSize : nil, height: pillCircleSize)
-            .background {
-                ZStack {
-                    if colorState == .normal {
-                        Capsule().fill(LinearGradient(
-                            colors: [Color.beatPurple, Color(hex: "5A2BA8")],
-                            startPoint: .topLeading, endPoint: .bottomTrailing))
-                    } else {
-                        Capsule().fill(Color(hex: "252535"))
-                    }
-                    Capsule().strokeBorder(outlineColor, lineWidth: outlineWidth)
-                }
-            }
+        ArtworkImage(urlString: song.albumArt)
+            .frame(width: nodeSize, height: nodeSize)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(outlineColor, lineWidth: outlineWidth))
             .overlay {
-                if colorState != .normal {
-                    Capsule()
+                // Pulsating ring only for a correct placement (green); incorrect stays static.
+                if colorState == .correct {
+                    shape
                         .stroke(outlineColor, lineWidth: 2.5)
                         .scaleEffect(ring1 ? 2.5 : 1.0)
                         .opacity(ring1 ? 0 : 0.8)
                         .animation(.easeOut(duration: 2.5).repeatForever(autoreverses: false), value: ring1)
-                    Capsule()
+                    shape
                         .stroke(outlineColor, lineWidth: 2.0)
                         .scaleEffect(ring2 ? 2.5 : 1.0)
                         .opacity(ring2 ? 0 : 0.55)
                         .animation(.easeOut(duration: 2.5).repeatForever(autoreverses: false), value: ring2)
                 }
             }
-            .shadow(color: glowColor.opacity(0.7), radius: 5)
-            .shadow(color: glowColor.opacity(0.3), radius: 12)
-            .scaleEffect(appear ? 1 : 0.5)
-            .opacity(appear ? 1 : 0)
-            .animation(.spring(duration: 0.3), value: minimized)
-            .onAppear {
-                if !skipEnterAnimation {
-                    withAnimation(.spring(duration: 0.4)) { appear = true }
-                }
-                if colorState != .normal { startRipple() }
-            }
-            .onChange(of: colorState) { _, s in if s != .normal && !ring1 { startRipple() } }
+            // Purple glow on normal art nodes disabled (trial) — result rings keep their glow.
+            .shadow(color: colorState == .normal ? .clear : glowColor.opacity(0.7),
+                    radius: colorState == .normal ? 0 : 5)
+            .shadow(color: colorState == .normal ? .clear : glowColor.opacity(0.3),
+                    radius: colorState == .normal ? 0 : 12)
+            // Label overlay comes after the ripple so the rings emanate from the node only.
+            .overlay { if let label { NodeLabel(text: label) } }
+            .onAppear { if colorState == .correct { startRipple() } }
+            .onChange(of: colorState) { _, s in if s == .correct && !ring1 { startRipple() } }
     }
 
     private func startRipple() {
@@ -858,7 +715,7 @@ private struct GapCircle: View {
 
     @State private var ring1Active = false
     @State private var ring2Active = false
-    private let size: CGFloat = pillCircleSize
+    private let size: CGFloat = gapCircleSize
 
     var body: some View {
         Button { onPlace(index) } label: {
@@ -900,5 +757,68 @@ private struct GapCircle: View {
         ring1Active = false; ring2Active = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { ring1Active = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.72) { ring2Active = true }
+    }
+}
+
+// MARK: - Start-of-game hint callout
+
+/// Soft dark speech bubble with a downward tail, shown once above the round-one starter node.
+private struct StartHintCallout: View {
+    let text: String
+
+    private let bubble = SpeechBubble(cornerRadius: 16, tailWidth: 26, tailHeight: 16)
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 16, weight: .medium, design: .rounded))
+            .foregroundStyle(Color.beatText)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 240)
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, 14 + 16)   // reserve the tail height so text stays in the body
+            .background(bubble.fill(Color.beatSurface2.opacity(0.96)))
+            .overlay(bubble.stroke(Color.white.opacity(0.14), lineWidth: 1))
+            .shadow(color: .black.opacity(0.45), radius: 14, y: 5)
+            .allowsHitTesting(false)   // taps fall through to dismiss / place
+    }
+}
+
+/// Rounded rectangle with a centered, downward-pointing tail at the bottom edge.
+/// The tail occupies the bottom `tailHeight` of the rect; the body fills the rest.
+private struct SpeechBubble: Shape {
+    var cornerRadius: CGFloat = 16
+    var tailWidth: CGFloat = 26
+    var tailHeight: CGFloat = 16
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let r = cornerRadius
+        let bodyBottom = rect.maxY - tailHeight
+        let midX = rect.midX
+        let half = tailWidth / 2
+
+        p.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + r),
+                       control: CGPoint(x: rect.maxX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: bodyBottom - r))
+        p.addQuadCurve(to: CGPoint(x: rect.maxX - r, y: bodyBottom),
+                       control: CGPoint(x: rect.maxX, y: bodyBottom))
+        // Right base → tip (concave), then tip → left base.
+        p.addLine(to: CGPoint(x: midX + half, y: bodyBottom))
+        p.addQuadCurve(to: CGPoint(x: midX, y: rect.maxY),
+                       control: CGPoint(x: midX + half * 0.2, y: bodyBottom + tailHeight * 0.7))
+        p.addQuadCurve(to: CGPoint(x: midX - half, y: bodyBottom),
+                       control: CGPoint(x: midX - half * 0.2, y: bodyBottom + tailHeight * 0.7))
+        p.addLine(to: CGPoint(x: rect.minX + r, y: bodyBottom))
+        p.addQuadCurve(to: CGPoint(x: rect.minX, y: bodyBottom - r),
+                       control: CGPoint(x: rect.minX, y: bodyBottom))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+        p.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.minY),
+                       control: CGPoint(x: rect.minX, y: rect.minY))
+        p.closeSubpath()
+        return p
     }
 }
