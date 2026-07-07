@@ -25,8 +25,13 @@ function httpOk() {
   });
 }
 
-async function startServer() {
+async function startServer({ seedState, env } = {}) {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'beatably-test-'));
+  if (seedState) {
+    // Pre-populate state.json so the server boots with restored rooms,
+    // simulating zombies that survived a restart.
+    fs.writeFileSync(path.join(tmpDir, 'state.json'), JSON.stringify(seedState));
+  }
   serverProc = spawn(process.execPath, ['index.js'], {
     cwd: path.join(__dirname, '..'),
     env: {
@@ -35,6 +40,7 @@ async function startServer() {
       PORT: String(PORT),
       BEATABLY_CACHE_DIR: tmpDir,
       ADMIN_PASSWORD: 'test-admin-pw',
+      ...(env || {}),
     },
     stdio: 'ignore',
   });
@@ -111,6 +117,10 @@ function makeDeck() {
   ];
 }
 
+function getTmpDir() {
+  return tmpDir;
+}
+
 module.exports = {
   BASE_URL,
   startServer,
@@ -121,4 +131,5 @@ module.exports = {
   delay,
   newCode,
   makeDeck,
+  getTmpDir,
 };

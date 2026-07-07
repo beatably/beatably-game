@@ -42,18 +42,19 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
  * - Enforces a minimum gap between calls
  * - Retries on 429 and 5xx with exponential backoff or Retry-After
  */
-async function spotifyGet(url, opts = {}, label = '') {
-  // Enforce minimum gap between any Spotify calls
+async function spotifyGet(url, opts = {}, label = '', { minGapMs = SPOTIFY_MIN_GAP_MS } = {}) {
+  // Enforce minimum gap between any Spotify calls (hot in-request paths pass
+  // minGapMs: 0 to keep game-start latency, still gaining timeout + 429 retry)
   const now = Date.now();
   const gap = now - __lastSpotifyCallAt;
-  if (gap < SPOTIFY_MIN_GAP_MS) {
-    await sleep(SPOTIFY_MIN_GAP_MS - gap);
+  if (gap < minGapMs) {
+    await sleep(minGapMs - gap);
   }
 
   let attempt = 0;
   while (attempt < 6) { // up to 6 attempts with backoff
     try {
-      const res = await axios.get(url, opts);
+      const res = await axios.get(url, { timeout: 10000, ...opts });
       __lastSpotifyCallAt = Date.now();
       return res;
     } catch (e) {
@@ -129,8 +130,9 @@ function getStateDir() {
 const STATE_DIR = getStateDir();
 const STATE_FILE = path.join(STATE_DIR, 'state.json');
 
-function sanitizeForSave(obj) {
-  // JSON-safe deep clone with Set support
+// Serialize the whole state in a single stringify pass (Set support via
+// replacer). Returns null on failure so callers can skip the write.
+function serializeState() {
   const replacer = (key, value) => {
     if (value instanceof Set) {
       return { __type: 'Set', values: Array.from(value) };
@@ -138,9 +140,14 @@ function sanitizeForSave(obj) {
     return value;
   };
   try {
-    return JSON.parse(JSON.stringify(obj, replacer));
+    return JSON.stringify({
+      lobbies,
+      games,
+      playerSessions,
+      savedAt: new Date().toISOString()
+    }, replacer);
   } catch (e) {
-    console.warn('[State] sanitizeForSave failed:', e && e.message);
+    console.warn('[State] serializeState failed:', e && e.message);
     return null;
   }
 }
@@ -173,25 +180,55 @@ function reviveAfterLoad(data) {
   return data;
 }
 
-function persistState() {
+// Last-save metadata, exposed via /api/admin/server-health
+let lastStateSaveAt = null;
+let lastStateSaveBytes = null;
+
+let __persistInFlight = false;
+let __persistQueued = false;
+async function persistState() {
+  // Async write with an in-flight guard: never two overlapping writes; if a
+  // save is requested mid-write, run one more pass afterwards.
+  if (__persistInFlight) {
+    __persistQueued = true;
+    return;
+  }
+  __persistInFlight = true;
   try {
     if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
-    const payload = {
-      lobbies,
-      games,
-      playerSessions,
-      savedAt: new Date().toISOString()
-    };
-    const serializable = sanitizeForSave(payload);
-    if (!serializable) return;
+    const json = serializeState();
+    if (json == null) return;
     // Atomic write: write to a temp file then rename, so a crash mid-write
     // can never leave a truncated/corrupt state.json behind.
     const tmp = STATE_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(serializable));
-    fs.renameSync(tmp, STATE_FILE);
-    console.log('[State] Saved to', STATE_FILE);
+    await fs.promises.writeFile(tmp, json);
+    await fs.promises.rename(tmp, STATE_FILE);
+    lastStateSaveAt = new Date().toISOString();
+    lastStateSaveBytes = Buffer.byteLength(json);
   } catch (e) {
     console.warn('[State] Save failed:', e && e.message);
+    try { analytics.logError({ errorType: 'state_save', message: String(e && e.message || e) }); } catch (e2) {}
+  } finally {
+    __persistInFlight = false;
+    if (__persistQueued) {
+      __persistQueued = false;
+      schedulePersist();
+    }
+  }
+}
+
+// Synchronous variant for exit paths (signals / uncaughtException), where the
+// event loop won't get another turn to flush an async write.
+function persistStateSync() {
+  try {
+    if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
+    const json = serializeState();
+    if (json == null) return;
+    const tmp = STATE_FILE + '.tmp';
+    fs.writeFileSync(tmp, json);
+    fs.renameSync(tmp, STATE_FILE);
+  } catch (e) {
+    console.warn('[State] Sync save failed:', e && e.message);
   }
 }
 
@@ -207,9 +244,18 @@ function loadStateFromDisk() {
       console.warn('[State] Invalid state file format, ignoring');
       return false;
     }
-    // Populate existing containers
-    Object.keys(revived.lobbies).forEach(code => { lobbies[code] = revived.lobbies[code]; });
-    Object.keys(revived.games).forEach(code => { games[code] = revived.games[code]; });
+    // Populate existing containers. Rooms restored from disk get a fresh
+    // lastActivity so pre-restart zombies age out via the room sweeper
+    // (players reconnecting after a restart keep their full TTL window).
+    const loadedAt = Date.now();
+    Object.keys(revived.lobbies).forEach(code => {
+      lobbies[code] = revived.lobbies[code];
+      lobbies[code].lastActivity = loadedAt;
+    });
+    Object.keys(revived.games).forEach(code => {
+      games[code] = revived.games[code];
+      games[code].lastActivity = loadedAt;
+    });
     
     // Restore playerSessions if they exist
     if (revived.playerSessions && typeof revived.playerSessions === 'object') {
@@ -227,6 +273,7 @@ function loadStateFromDisk() {
     return true;
   } catch (e) {
     console.warn('[State] Load failed:', e && e.message);
+    try { analytics.logError({ errorType: 'state_load', message: String(e && e.message || e) }); } catch (e2) {}
     return false;
   }
 }
@@ -253,7 +300,7 @@ setInterval(() => {
     process.on(sig, () => {
       try {
         console.log('[State] Signal received:', sig, '- saving state');
-        persistState();
+        persistStateSync();
       } catch (e) {
         console.warn('[State] Failed to save on signal:', e && e.message);
       } finally {
@@ -269,8 +316,24 @@ setInterval(() => {
 try {
   process.on('uncaughtException', (err) => {
     console.error('[State] Uncaught exception - saving state:', err && err.stack || err);
-    try { persistState(); } catch (e) {}
+    try {
+      analytics.logError({ errorType: 'uncaught_exception', message: String(err && err.message || err) });
+    } catch (e) {}
+    try { persistStateSync(); } catch (e) {}
     process.exit(1);
+  });
+} catch (e) {
+  // ignore
+}
+
+// A rejected promise in any async handler (socket events, Spotify calls, …)
+// must not kill the process and every game with it: log it and keep running.
+try {
+  process.on('unhandledRejection', (reason) => {
+    console.error('[State] Unhandled promise rejection:', reason && reason.stack || reason);
+    try {
+      analytics.logError({ errorType: 'unhandled_rejection', message: String(reason && reason.message || reason) });
+    } catch (e) {}
   });
 } catch (e) {
   // ignore
@@ -293,7 +356,7 @@ async function getClientToken() {
         client_id: process.env.SPOTIFY_CLIENT_ID,
         client_secret: process.env.SPOTIFY_CLIENT_SECRET,
       }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 }
     );
 
     clientToken = response.data.access_token;
@@ -302,6 +365,9 @@ async function getClientToken() {
     return clientToken;
   } catch (error) {
     console.error('[Spotify] Error getting client token:', error);
+    try {
+      analytics.logError({ errorType: 'spotify_token', message: String(error && error.message || error) });
+    } catch (e) {}
     throw error;
   }
 }
@@ -380,7 +446,7 @@ app.get('/login', (req, res) => {
           client_id: process.env.SPOTIFY_CLIENT_ID,
           client_secret: process.env.SPOTIFY_CLIENT_SECRET,
         }),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 }
       );
       const access_token = tokenResponse.data.access_token;
       // Redirect back to frontend with token, using provided redirect URL
@@ -2279,10 +2345,10 @@ app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
       for (const entry of chartEntries) {
         try {
           const q = `artist:"${entry.artist}" track:"${entry.title}"${entry.year ? ` year:${entry.year}` : ''}`;
-          const resp = await axios.get('https://api.spotify.com/v1/search', {
+          const resp = await spotifyGet('https://api.spotify.com/v1/search', {
             headers: { Authorization: `Bearer ${clientToken}` },
             params: { q: q, type: 'track', limit: 5, market: markets[0] || 'US' },
-          });
+          }, 'chart-resolve', { minGapMs: 0 });
           const item = (resp.data.tracks.items || [])[0];
           if (item) {
             resolved.push({
@@ -2449,7 +2515,7 @@ app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
           // Use smaller random offset to get more consistent results per search
           const randomOffset = Math.floor(Math.random() * 50); // Smaller offset for more predictable results
 
-          const response = await axios.get('https://api.spotify.com/v1/search', {
+          const response = await spotifyGet('https://api.spotify.com/v1/search', {
             headers: {
               'Authorization': `Bearer ${clientToken}`
             },
@@ -2460,7 +2526,7 @@ app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
               market: market,
               offset: randomOffset
             }
-          });
+          }, 'song-search', { minGapMs: 0 });
 
           let tracks = response.data.tracks.items
             .filter(track => {
@@ -2528,7 +2594,7 @@ app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
             // Use random offset for fallback searches too
             const randomOffset = Math.floor(Math.random() * 200);
             
-            const response = await axios.get('https://api.spotify.com/v1/search', {
+            const response = await spotifyGet('https://api.spotify.com/v1/search', {
               headers: {
                 'Authorization': `Bearer ${clientToken}`
               },
@@ -2539,7 +2605,7 @@ app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
                 market: market,
                 offset: randomOffset
               }
-            });
+            }, 'fallback-search', { minGapMs: 0 });
 
             let tracks = response.data.tracks.items
               .filter(track => {
@@ -2695,6 +2761,7 @@ app.post('/api/fetch-songs', publicRateLimit, async (req, res) => {
     res.json(fetchResult);
   } catch (error) {
     console.error('Error fetching tracks:', error);
+    try { analytics.logError({ errorType: 'fetch_songs', message: String(error && error.message || error) }); } catch (e) {}
     res.status(500).json({ error: 'Failed to fetch tracks' });
   }
 });
@@ -2763,8 +2830,94 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000); // Clean up every 5 minutes
 
+// --- Stale room expiry ---
+// Lobbies/games whose sockets are all gone would otherwise squat on 4-digit
+// room codes forever (they persist to disk and survive restarts), which is
+// what produced spurious "Lobby already exists" errors. Sweep them by age.
+// While a room has connected sockets its lastActivity is refreshed, so the
+// TTL only starts counting once the room is empty.
+const LOBBY_TTL_MS = Number(process.env.LOBBY_TTL_MS) || 30 * 60 * 1000;
+const GAME_TTL_MS = Number(process.env.GAME_TTL_MS) || 2 * 60 * 60 * 1000;
+const FINISHED_GAME_TTL_MS = Number(process.env.FINISHED_GAME_TTL_MS) || 15 * 60 * 1000;
+
+function roomHasConnectedSockets(code) {
+  const room = io.sockets.adapter.rooms.get(code);
+  return !!(room && room.size > 0);
+}
+
+function sweepStaleRooms(now = Date.now()) {
+  let removed = 0;
+  for (const code of Object.keys(lobbies)) {
+    const lobby = lobbies[code];
+    if (roomHasConnectedSockets(code)) {
+      lobby.lastActivity = now;
+      continue;
+    }
+    if (!lobby.lastActivity) {
+      lobby.lastActivity = now;
+      continue;
+    }
+    if (now - lobby.lastActivity > LOBBY_TTL_MS) {
+      console.log('[Sweeper] Removing stale lobby:', code);
+      delete lobbies[code];
+      removed++;
+    }
+  }
+  for (const code of Object.keys(games)) {
+    const game = games[code];
+    if (roomHasConnectedSockets(code)) {
+      game.lastActivity = now;
+      continue;
+    }
+    if (!game.lastActivity) {
+      game.lastActivity = now;
+      continue;
+    }
+    const ttl = game.phase === 'game-over' ? FINISHED_GAME_TTL_MS : GAME_TTL_MS;
+    if (now - game.lastActivity > ttl) {
+      console.log('[Sweeper] Removing stale game:', code, game.phase === 'game-over' ? '(finished)' : '(abandoned)');
+      delete games[code];
+      removed++;
+    }
+  }
+  if (removed > 0) schedulePersist();
+  return removed;
+}
+const ROOM_SWEEP_INTERVAL_MS = Number(process.env.ROOM_SWEEP_INTERVAL_MS) || 60 * 1000;
+setInterval(sweepStaleRooms, ROOM_SWEEP_INTERVAL_MS);
+
+// Lightweight per-socket throttle for lobby ops. HTTP routes are rate-limited
+// (express-rate-limit) but socket events were not; each spammed create_lobby
+// allocates a persisted room. 20/min is far above legitimate use.
+const SOCKET_LOBBY_OPS_PER_MIN = 20;
+function allowSocketLobbyOp(socket) {
+  if (process.env.NODE_ENV === 'test') return true;
+  const now = Date.now();
+  let bucket = socket.data.__lobbyOps;
+  if (!bucket || now - bucket.windowStart > 60 * 1000) {
+    bucket = socket.data.__lobbyOps = { windowStart: now, count: 0 };
+  }
+  bucket.count++;
+  return bucket.count <= SOCKET_LOBBY_OPS_PER_MIN;
+}
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
+
+  // Socket.io does not catch exceptions thrown by event handlers: a single
+  // throwing/rejecting handler would take down the process (and every game).
+  // Wrap all handlers registered on this socket so failures are logged instead.
+  const rawOn = socket.on.bind(socket);
+  socket.on = (event, handler) => rawOn(event, async (...args) => {
+    try {
+      await handler(...args);
+    } catch (err) {
+      console.error(`[Socket] Handler for '${event}' failed:`, err && err.stack || err);
+      try {
+        analytics.logError({ errorType: 'socket_handler', message: `${event}: ${String(err && err.message || err)}` });
+      } catch (e) {}
+    }
+  });
 
   // Session reconnection
   socket.on('reconnect_session', ({ sessionId, roomCode, playerName }, callback) => {
@@ -3127,11 +3280,26 @@ io.on('connection', (socket) => {
 
   // Create lobby
   socket.on('create_lobby', ({ name, code, settings, sessionId }, callback) => {
-    if (lobbies[code]) {
-      callback({ error: "Lobby already exists" });
+    if (!allowSocketLobbyOp(socket)) {
+      callback({ error: "Too many requests, please slow down" });
       return;
     }
-    
+    if (lobbies[code] || games[code]) {
+      // Only reject if the room is genuinely alive: someone is connected to
+      // it, or a mid-game room has a session still eligible to reconnect.
+      // Otherwise it's a zombie squatting on the code — evict and reuse.
+      const roomActive = roomHasConnectedSockets(code);
+      const gameAwaitingReconnect = games[code] && games[code].phase !== 'game-over' &&
+        Object.values(playerSessions).some(s => s.roomCode === code);
+      if (roomActive || gameAwaitingReconnect) {
+        callback({ error: "Lobby already exists" });
+        return;
+      }
+      console.log('[Lobby] Evicting stale room squatting on code:', code);
+      delete lobbies[code];
+      delete games[code];
+    }
+
     // Generate persistent player ID
     const persistentId = generatePersistentPlayerId();
     socketToPlayerMap[socket.id] = persistentId;
@@ -3146,7 +3314,9 @@ io.on('connection', (socket) => {
     lobbies[code] = {
       players: [player],
       settings: settings || { difficulty: "normal" },
-      status: "waiting"
+      status: "waiting",
+      createdAt: Date.now(),
+      lastActivity: Date.now()
     };
     socket.join(code);
     
@@ -3171,6 +3341,10 @@ io.on('connection', (socket) => {
 
   // Join lobby
   socket.on('join_lobby', ({ name, code }, callback) => {
+    if (!allowSocketLobbyOp(socket)) {
+      callback({ error: "Too many requests, please slow down" });
+      return;
+    }
     console.log('[Backend] Player joining lobby:', { name, code, playerId: socket.id });
     console.log('[Backend] Available lobbies:', Object.keys(lobbies));
     console.log('[Backend] Lobby details for code', code, ':', lobbies[code]);
@@ -3452,6 +3626,8 @@ const lobby = lobbies[code];
     });
 
     games[code] = {
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
       timelines, // { [playerId]: [cards] } - each player has their own timeline
       sharedDeck, // All players draw from the same deck
       beatablyDeck: shuffle([...beatablyCards]), // Shuffled beatably cards
@@ -5438,6 +5614,11 @@ app.get('/', (req, res) => {
   res.send('Beatably backend running');
 });
 
+// Lightweight health check for Render and external uptime monitors.
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, uptime: Math.round(process.uptime()) });
+});
+
 /**
  * Feature flags endpoint
  * Returns server-side feature flags so the frontend can reflect defaults (e.g. CHART_MODE_ENABLE).
@@ -5574,18 +5755,22 @@ app.post('/api/wake-device', express.json(), async (req, res) => {
 });
 
 // Background periodic scan to refresh localDevicesCache every N seconds (if running in LAN)
+// Skipped in production: the cloud host has no LAN devices to discover, so the
+// scan is pure wasted CPU/network there.
 const LOCAL_DISCOVERY_POLL_MS = Number(process.env.LOCAL_DISCOVERY_POLL_MS) || 15000;
-setInterval(async () => {
-  try {
-    const devices = await discovery.discoverLocalDevices(3000);
-    localDevicesCache = devices;
-    lastLocalDevicesScanAt = Date.now();
-    pushLocalDevicesToSse();
-    console.log(`[LocalDiscovery] Background scan found ${devices.length} devices at ${new Date().toISOString()}`);
-  } catch (e) {
-    console.warn('[LocalDiscovery] Background scan failed:', e && e.message);
-  }
-}, LOCAL_DISCOVERY_POLL_MS);
+if (process.env.NODE_ENV !== 'production') {
+  setInterval(async () => {
+    try {
+      const devices = await discovery.discoverLocalDevices(3000);
+      localDevicesCache = devices;
+      lastLocalDevicesScanAt = Date.now();
+      pushLocalDevicesToSse();
+      console.log(`[LocalDiscovery] Background scan found ${devices.length} devices at ${new Date().toISOString()}`);
+    } catch (e) {
+      console.warn('[LocalDiscovery] Background scan failed:', e && e.message);
+    }
+  }, LOCAL_DISCOVERY_POLL_MS);
+}
 
 // Debug endpoint to validate Spotify backend configuration (safe: masks secrets)
 app.get('/api/debug/spotify-config', (req, res) => {
@@ -5623,7 +5808,7 @@ app.get('/api/debug/spotify-token-test', async (req, res) => {
         client_id: process.env.SPOTIFY_CLIENT_ID,
         client_secret: process.env.SPOTIFY_CLIENT_SECRET,
       }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 }
     );
     res.json({
       ok: true,
@@ -5689,6 +5874,48 @@ app.post('/api/admin/clear-all', requireAdmin, (req, res) => {
 });
 
 // --- Usage Analytics Admin Endpoints ---
+
+// Live server health snapshot for the admin dashboard
+app.get('/api/admin/server-health', requireAdmin, (req, res) => {
+  try {
+    const now = Date.now();
+    const countRooms = (map) => {
+      let live = 0, stale = 0;
+      for (const code of Object.keys(map)) {
+        if (roomHasConnectedSockets(code)) live++;
+        else stale++;
+      }
+      return { total: live + stale, live, stale };
+    };
+    const mem = process.memoryUsage();
+    let stateFileBytes = null;
+    try { stateFileBytes = fs.statSync(STATE_FILE).size; } catch (e) {}
+    res.json({
+      ok: true,
+      uptimeSeconds: Math.round(process.uptime()),
+      nodeVersion: process.version,
+      memory: {
+        rss: mem.rss,
+        heapUsed: mem.heapUsed,
+        heapTotal: mem.heapTotal
+      },
+      connectedSockets: io.engine.clientsCount,
+      lobbies: countRooms(lobbies),
+      games: countRooms(games),
+      sessions: Object.keys(playerSessions).length,
+      state: {
+        file: STATE_FILE,
+        bytes: stateFileBytes,
+        lastSaveAt: lastStateSaveAt,
+        lastSaveBytes: lastStateSaveBytes
+      },
+      timestamp: new Date(now).toISOString()
+    });
+  } catch (e) {
+    console.error('[Admin] Server health failed:', e?.message);
+    res.status(500).json({ ok: false, error: e?.message || 'Health check failed' });
+  }
+});
 
 // Get aggregated usage statistics
 app.get('/api/admin/usage-stats', requireAdmin, (req, res) => {
@@ -6004,7 +6231,7 @@ const frontendLogs = [];
 const MAX_FRONTEND_LOGS = 200;
 
 // POST endpoint to receive frontend logs
-app.post('/api/debug/frontend-logs', (req, res) => {
+app.post('/api/debug/frontend-logs', publicRateLimit, (req, res) => {
   try {
     const { level, message, timestamp, playerInfo, data } = req.body || {};
     const logEntry = {

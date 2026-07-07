@@ -295,10 +295,19 @@ function getStats({ dateFrom, dateTo } = {}) {
     gamesOverTime[date] = (gamesOverTime[date] || 0) + 1;
   });
   
-  // Error statistics
-  const totalErrors = _errors.length;
+  // Error statistics (respect the same date range as sessions)
+  let errors = _errors;
+  if (dateFrom || dateTo) {
+    const fromTime = dateFrom ? new Date(dateFrom).getTime() : 0;
+    const toTime = dateTo ? new Date(dateTo).getTime() : Date.now();
+    errors = errors.filter(e => {
+      const errorTime = new Date(e.timestamp).getTime();
+      return errorTime >= fromTime && errorTime <= toTime;
+    });
+  }
+  const totalErrors = errors.length;
   const errorTypesDist = {};
-  _errors.forEach(e => {
+  errors.forEach(e => {
     const type = e.errorType || 'unknown';
     errorTypesDist[type] = (errorTypesDist[type] || 0) + 1;
   });
