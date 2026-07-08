@@ -40,7 +40,7 @@ struct BottomCard<Content: View>: View {
                 // Neutral edge so the card separates from a dark background behind it.
                 .overlay(alignment: .top) {
                     UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner)
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
                         .ignoresSafeArea(edges: .bottom)
                         .allowsHitTesting(false)
                 }
