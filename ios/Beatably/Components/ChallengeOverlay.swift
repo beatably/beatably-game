@@ -34,7 +34,7 @@ struct ChallengeWindowPanel: View {
                             .foregroundStyle(Color.beatText)
 
                         Text("Spend 1 credit to place the card yourself. If you're right and \(vm.currentPlayerName) is wrong, you steal the card!")
-                            .font(.system(.caption, design: .rounded))
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundStyle(Color.beatMuted)
                             .multilineTextAlignment(.center)
                     }
@@ -64,7 +64,7 @@ struct ChallengeWindowPanel: View {
                     } else {
                         VStack(spacing: 10) {
                             Text("No credits to challenge")
-                                .font(.system(.caption, design: .rounded))
+                                .font(.system(.subheadline, design: .rounded))
                                 .foregroundStyle(Color.beatMuted)
                             Button {
                                 SoundManager.shared.impact(.light)
@@ -152,7 +152,7 @@ struct ChallengeResolvedOverlay: View {
                         .foregroundStyle(iconColor)
                         .shadow(color: iconColor.opacity(0.7), radius: 6)
                     Text(title)
-                        .font(.system(.subheadline, design: .rounded).bold())
+                        .font(.system(.headline, design: .rounded).bold())
                         .foregroundStyle(Color.beatText)
                     Spacer()
                 }
@@ -169,7 +169,7 @@ struct ChallengeResolvedOverlay: View {
                 Text(sg.correct
                     ? "\(sg.playerName) guessed correctly — bonus credit!"
                     : "\(sg.playerName) guessed wrong — no credit")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(sg.correct ? Color.beatGreen : Color.beatMuted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)

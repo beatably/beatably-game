@@ -62,6 +62,20 @@ struct GameView: View {
             }
 
             // ── Full-screen overlays ────────────────────────────────────────────
+            if let song = songDetail {
+                BottomCard(glow: .beatPurple, onClose: { songDetail = nil }) {
+                    SongDetailSheet(song: song)
+                }
+                .zIndex(9)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            if vm.showSongGuess {
+                BottomCard(glow: .beatTeal, onClose: { vm.skipSongGuess() }) {
+                    SongGuessSheet()
+                }
+                .zIndex(9)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if vm.gamePhase == "game-over"              { GameOverOverlay() }
 
             // Player-left modal (centered popup)
@@ -147,21 +161,8 @@ struct GameView: View {
         .sheet(isPresented: $showHowToPlay) {
             HowToPlayView()
         }
-        .sheet(item: $songDetail) { song in
-            SongDetailSheet(song: song) { songDetail = nil }
-                .presentationDetents([.height(470)])
-                .presentationBackground(Color.beatBg)
-                .presentationCornerRadius(28)
-        }
-        .sheet(isPresented: Binding(
-            get: { vm.showSongGuess },
-            set: { if !$0 && vm.showSongGuess { vm.skipSongGuess() } }
-        )) {
-            SongGuessSheet { vm.skipSongGuess() }
-                .presentationDetents([.height(440)])
-                .presentationBackground(Color.beatBg)
-                .presentationCornerRadius(28)
-        }
+        .animation(.spring(duration: 0.35), value: songDetail)
+        .animation(.spring(duration: 0.35), value: vm.showSongGuess)
     }
 }
 
@@ -620,7 +621,7 @@ private struct ChallengeWindowFooter: View {
                 }
             } else {
                 Text("No credits to challenge")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(Color.beatMuted)
                 Button {
                     SoundManager.shared.impact(.light)
@@ -650,7 +651,7 @@ private struct ChallengeInProgressFooter: View {
                     .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.white)
                 Text("Waiting for challenger to place their guess…")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(.white)
             }
         }
@@ -704,11 +705,11 @@ private struct InlineRevealFooter: View {
             HStack(spacing: 8) {
                 Spacer()
                 Image(systemName: outcomeIcon)
-                    .font(.system(size: 16))
+                    .font(.system(size: 18))
                     .foregroundStyle(outcomeColor)
                     .shadow(color: outcomeColor.opacity(0.7), radius: 4)
                 Text(outcomeText)
-                    .font(.system(.subheadline, design: .rounded).bold())
+                    .font(.system(.headline, design: .rounded).bold())
                     .foregroundStyle(Color.beatText)
                 Spacer()
             }
@@ -717,7 +718,7 @@ private struct InlineRevealFooter: View {
                 Text(sg.correct
                     ? "\(sg.playerName) guessed correctly — bonus credit!"
                     : "\(sg.playerName) guessed wrong — no credit")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(sg.correct ? Color.beatGreen : Color.beatMuted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -733,7 +734,7 @@ private struct InlineRevealFooter: View {
                 .disabled(continued)
             } else {
                 Text("Waiting for host to continue…")
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundStyle(Color.beatMuted)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
@@ -759,7 +760,6 @@ private struct InlineRevealFooter: View {
 
 private struct SongGuessSheet: View {
     @Environment(GameViewModel.self) private var vm
-    let onClose: () -> Void
     @State private var title = ""
     @State private var artist = ""
     @State private var submitted = false
@@ -768,8 +768,6 @@ private struct SongGuessSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            SheetCloseHeader(onClose: onClose)
-
             VStack(spacing: 6) {
                 Text("Guess the Song")
                     .font(.system(.title2, design: .rounded).bold())
@@ -812,11 +810,9 @@ private struct SongGuessSheet: View {
                 .disabled(submitted || (title.trimmingCharacters(in: .whitespaces).isEmpty && artist.trimmingCharacters(in: .whitespaces).isEmpty))
             }
 
-            Spacer(minLength: 4)
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 16)
-        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
     }
 
     private func submitGuess() {
@@ -866,7 +862,7 @@ private struct GameOverOverlay: View {
                 if vm.gamePlayers.count > 1 {
                     VStack(spacing: 0) {
                         Text("Final Scores")
-                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .font(.system(.footnote, design: .rounded).weight(.semibold))
                             .foregroundStyle(Color.beatMuted)
                             .padding(.bottom, 10)
 
@@ -874,7 +870,7 @@ private struct GameOverOverlay: View {
                         ForEach(Array(sorted.enumerated()), id: \.element.id) { i, player in
                             HStack {
                                 Text("#\(i + 1)")
-                                    .font(.system(.caption, design: .rounded).bold())
+                                    .font(.system(.footnote, design: .rounded).bold())
                                     .foregroundStyle(i == 0 ? Color.beatTeal : Color.beatMuted)
                                     .frame(width: 28, alignment: .leading)
                                 Text(player.name)
@@ -882,7 +878,7 @@ private struct GameOverOverlay: View {
                                     .foregroundStyle(i == 0 ? Color.beatText : Color.beatMuted)
                                 Spacer()
                                 Text("\(player.score) songs")
-                                    .font(.system(.caption, design: .rounded))
+                                    .font(.system(.footnote, design: .rounded))
                                     .foregroundStyle(Color.beatMuted)
                             }
                             .padding(.horizontal, 16)
@@ -960,7 +956,7 @@ private struct EventNotificationCard: View {
                         .font(.system(.subheadline, design: .rounded).weight(.semibold))
                         .foregroundStyle(Color.beatText)
                     Text(subtitle)
-                        .font(.system(.caption, design: .rounded))
+                        .font(.system(.footnote, design: .rounded))
                         .foregroundStyle(Color.beatMuted)
                 }
                 Spacer(minLength: 0)

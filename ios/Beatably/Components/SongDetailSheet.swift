@@ -1,38 +1,20 @@
 import SwiftUI
 
-/// Shared close-cross header for the bottom-sheet cards (song detail, guess).
-/// Keeps dismissal consistent across sheets.
-struct SheetCloseHeader: View {
-    let onClose: () -> Void
-    var body: some View {
-        HStack {
-            Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.beatMuted)
-                    .padding(9)
-                    .background(Circle().fill(Color.beatSurface2))
-            }
-            .buttonStyle(PressScaleStyle(haptic: .light))
-        }
-        .padding(.top, 14)
-        .padding(.horizontal, 18)
-    }
-}
-
-/// Bottom-sheet card shown when a player taps a revealed album-art node on the
-/// timeline. Doubles as the "Listen on Apple Music" attribution/link, and lets
-/// players look up a title/year they missed.
+/// Content of the song detail card (wrapped by BottomCard). Shown when a player
+/// taps a revealed album-art node. Doubles as the "Listen on Apple Music"
+/// attribution/link, and lets players look up a title/year they missed.
 struct SongDetailSheet: View {
     let song: Song
-    let onClose: () -> Void
+
+    // Apple artwork URLs bake in a size token (we store 640x640); request a
+    // larger render for the enlarged card so it isn't upscaled/blurry.
+    private var highResArt: String? {
+        song.albumArt?.replacingOccurrences(of: "640x640", with: "1200x1200")
+    }
 
     var body: some View {
         VStack(spacing: 16) {
-            SheetCloseHeader(onClose: onClose)
-
-            ArtworkImage(urlString: song.albumArt)
+            ArtworkImage(urlString: highResArt)
                 .frame(width: 176, height: 176)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16)
@@ -66,11 +48,9 @@ struct SongDetailSheet: View {
                         .frame(height: 46)
                         .accessibilityLabel("Listen on Apple Music")
                 }
+                .padding(.top, 2)
             }
-
-            Spacer(minLength: 8)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 24)
     }
 }

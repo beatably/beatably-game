@@ -114,7 +114,7 @@ struct LandingView: View {
                             Image(systemName: "questionmark.circle")
                             Text("What is Beatably and how to play?")
                         }
-                        .font(.system(.caption, design: .rounded))
+                        .font(.system(.subheadline, design: .rounded))
                         .foregroundStyle(Color.beatMuted)
                     }
                     .buttonStyle(.plain)
@@ -222,7 +222,7 @@ private struct JoinSheet: View {
 
                 VStack(spacing: 8) {
                     Text("Room Code")
-                        .font(.system(.caption, design: .rounded).weight(.medium))
+                        .font(.system(.footnote, design: .rounded).weight(.medium))
                         .foregroundStyle(Color.beatMuted)
                         .frame(maxWidth: .infinity, alignment: .center)
 

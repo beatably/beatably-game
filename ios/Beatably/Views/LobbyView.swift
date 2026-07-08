@@ -57,7 +57,7 @@ struct LobbyView: View {
                 VStack(spacing: 10) {
                     if let hint = startHint, vm.isCreator {
                         Text(hint)
-                            .font(.system(.caption, design: .rounded))
+                            .font(.system(.footnote, design: .rounded))
                             .foregroundStyle(Color.beatMuted)
                     }
 
@@ -130,7 +130,7 @@ private struct RoomCodeCard: View {
     var body: some View {
         VStack(spacing: 4) {
             Text("Room Code")
-                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .font(.system(.footnote, design: .rounded).weight(.semibold))
                 .foregroundStyle(Color.beatMuted)
 
             Text(code)
@@ -222,7 +222,7 @@ private struct SectionHeader: View {
     init(_ title: String) { self.title = title }
     var body: some View {
         Text(title)
-            .font(.system(.caption, design: .rounded).weight(.bold))
+            .font(.system(.footnote, design: .rounded).weight(.bold))
             .foregroundStyle(Color.beatMuted)
             .textCase(.uppercase)
             .tracking(1)
@@ -350,7 +350,7 @@ private struct SettingRow<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .font(.system(.footnote, design: .rounded).weight(.semibold))
                 .foregroundStyle(Color.beatMuted)
             content
         }
@@ -414,11 +414,11 @@ private struct YearRangeRow: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Year Range")
-                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
                     .foregroundStyle(Color.beatMuted)
                 Spacer()
                 Text(verbatim: "\(String(min)) – \(String(max))")
-                    .font(.system(.caption, design: .rounded).weight(.medium))
+                    .font(.system(.footnote, design: .rounded).weight(.medium))
                     .foregroundStyle(Color.beatText)
             }
             RangeSlider(low: $min, high: $max, bounds: bounds, step: 5, onCommit: onCommit)
@@ -540,7 +540,7 @@ private struct GenreRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Genres")
-                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .font(.system(.footnote, design: .rounded).weight(.semibold))
                 .foregroundStyle(Color.beatMuted)
 
             FlowLayout(spacing: 8) {
@@ -557,7 +557,7 @@ private struct GenreRow: View {
                         }
                     } label: {
                         Text(g.label)
-                            .font(.system(.caption, design: .rounded).weight(.medium))
+                            .font(.system(.footnote, design: .rounded).weight(.medium))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background {
