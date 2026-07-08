@@ -16,11 +16,13 @@ struct BottomCard<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Dimmed backdrop — tap outside the card to dismiss.
+            // Dimmed backdrop — tap outside the card to dismiss. Fades in on its
+            // own so it doesn't slide up with the card.
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { onClose() }
+                .transition(.opacity)
 
             content()
                 .frame(maxWidth: .infinity)
@@ -31,15 +33,15 @@ struct BottomCard<Content: View>: View {
                         .fill(Color.beatSurface)
                         // Extend the fill under the home indicator for a flush bottom edge.
                         .ignoresSafeArea(edges: .bottom)
-                        // Soft glow rising from behind the card's top edge.
-                        .shadow(color: glow.opacity(0.55), radius: 32, y: -1)
-                        .shadow(color: glow.opacity(0.28), radius: 60, y: -1)
+                        // Soft glow rising from behind the card's top edge (subtle).
+                        .shadow(color: glow.opacity(0.165), radius: 32, y: -1)
+                        .shadow(color: glow.opacity(0.084), radius: 60, y: -1)
                 }
                 // Subtle top-edge highlight so the card separates from the glow.
                 .overlay(alignment: .top) {
                     UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner)
                         .strokeBorder(
-                            LinearGradient(colors: [glow.opacity(0.5), .clear],
+                            LinearGradient(colors: [glow.opacity(0.3), .clear],
                                            startPoint: .top, endPoint: .bottom),
                             lineWidth: 1
                         )
@@ -58,6 +60,8 @@ struct BottomCard<Content: View>: View {
                     .padding(.top, 14)
                     .padding(.trailing, 16)
                 }
+                // Only the card slides up; the backdrop fades in separately.
+                .transition(.move(edge: .bottom))
         }
     }
 }

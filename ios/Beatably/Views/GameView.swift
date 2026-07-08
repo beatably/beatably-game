@@ -67,14 +67,12 @@ struct GameView: View {
                     SongDetailSheet(song: song)
                 }
                 .zIndex(9)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if vm.showSongGuess {
-                BottomCard(glow: .beatTeal, onClose: { vm.skipSongGuess() }) {
+                BottomCard(glow: .beatPurple, onClose: { vm.skipSongGuess() }) {
                     SongGuessSheet()
                 }
                 .zIndex(9)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             if vm.gamePhase == "game-over"              { GameOverOverlay() }
 
