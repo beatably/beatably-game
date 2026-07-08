@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { API_BASE_URL } from './config';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { usePreviewMode } from './contexts/PreviewModeContext';
 
 const DECADES_NODES = [
   { year: 1960, label: '1960' },
@@ -147,7 +145,7 @@ function DecadesTimeline({ min, max, onChange }) {
   );
 }
 
-function GameSettings({ settings, onUpdate, isGameStarted }) {
+function GameSettings({ settings, onUpdate }) {
   const [localSettings, setLocalSettings] = useState(settings || {
     difficulty: "easy",
     winCondition: 10,
@@ -189,46 +187,6 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
     const updated = { ...localSettings, [key]: value };
     setLocalSettings(updated);
     onUpdate(updated);
-  };
-
-  // Preview mode context
-  const { isFullPlayMode, setFullPlayMode } = usePreviewMode();
-
-  // Check for canceled Spotify auth on component mount
-  useEffect(() => {
-    // If user returned without access token but had pending full play mode, they canceled
-    if (localStorage.getItem('pending_full_play_mode') === 'true' && !localStorage.getItem('access_token')) {
-      console.log('[GameSettings] Spotify auth was canceled, resetting full play mode');
-      localStorage.removeItem('pending_full_play_mode');
-      setFullPlayMode(false);
-    }
-  }, [setFullPlayMode]);
-
-  // Full play mode toggle handler
-  const [showSpotifyConfirm, setShowSpotifyConfirm] = useState(false);
-
-  const handleFullPlayModeToggle = () => {
-    const newValue = !isFullPlayMode;
-
-    // If disabling, just turn it off
-    if (!newValue) {
-      setFullPlayMode(false);
-      return;
-    }
-
-    // If enabling, show confirmation first
-    setShowSpotifyConfirm(true);
-  };
-
-  const confirmSpotifyEnable = () => {
-    setShowSpotifyConfirm(false);
-    if (!localStorage.getItem('access_token')) {
-      console.log('[GameSettings] Use Spotify Account enabled, triggering Spotify auth');
-      localStorage.setItem('pending_full_play_mode', 'true');
-      window.location.href = `${API_BASE_URL}/login`;
-    } else {
-      setFullPlayMode(true);
-    }
   };
 
   const handleMusicPreferenceChange = (key, value) => {
@@ -402,7 +360,7 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
         </div>
       )}
 
-      {/* Hits to Win - always last before Spotify/Reset */}
+      {/* Hits to Win - always last before Reset */}
       <div className="space-y-3">
         <Label className="text-xl font-semibold text-foreground">Hits to Win</Label>
         <div className="grid grid-cols-3 gap-2">
@@ -422,38 +380,6 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
             </Button>
           ))}
         </div>
-      </div>
-
-      {/* Use Spotify Account - de-emphasised, invite-only */}
-      <div className="rounded-lg border border-border/50 bg-white/5 px-4 py-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="text-base font-medium text-foreground/70">Use Spotify account</Label>
-          <button
-            onClick={handleFullPlayModeToggle}
-            disabled={isGameStarted}
-            type="button"
-            className={`
-              relative inline-flex h-8 w-[51px] min-w-0 min-h-0 items-center rounded-full
-              transition-colors duration-200 ease-in-out p-0
-              ${isGameStarted ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-              ${isFullPlayMode ? 'bg-[#7D3BED]' : 'bg-gray-400'}
-            `}
-            role="switch"
-            aria-checked={isFullPlayMode}
-            aria-label={`Toggle Spotify account ${isFullPlayMode ? 'off' : 'on'}`}
-          >
-            <span
-              className={`
-                inline-block h-7 w-7 transform rounded-full bg-white shadow-lg
-                transition-transform duration-200 ease-in-out
-                ${isFullPlayMode ? 'translate-x-[20px]' : 'translate-x-0.5'}
-              `}
-            />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground/70">
-          Enables full-length tracks and playback on other devices. Requires an invite from the Game Developer and login with your Spotify account.
-        </p>
       </div>
 
       {/* Reset to Defaults (inline text action) */}
@@ -495,25 +421,6 @@ function GameSettings({ settings, onUpdate, isGameStarted }) {
       </div>
 
     </div>
-    {/* Spotify confirmation modal */}
-    {showSpotifyConfirm && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={() => setShowSpotifyConfirm(false)}>
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-        <div className="relative bg-background border border-border rounded-xl p-6 max-w-sm w-full space-y-4 shadow-xl" onClick={e => e.stopPropagation()}>
-          <h2 className="text-lg font-semibold text-foreground">Enable Spotify?</h2>
-          <p className="text-sm text-muted-foreground">
-            This feature requires an invite from the Game Developer and a Spotify Premium account. It enables full-length tracks and playback on other devices.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            You'll be redirected to log in with Spotify.
-          </p>
-          <div className="flex gap-3 pt-1">
-            <Button className="flex-1" onClick={confirmSpotifyEnable}>Yes, continue</Button>
-            <Button variant="ghost" className="flex-1 border border-border" onClick={() => setShowSpotifyConfirm(false)}>No, cancel</Button>
-          </div>
-        </div>
-      </div>
-    )}
     </>
   );
 }

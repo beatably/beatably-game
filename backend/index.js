@@ -94,7 +94,6 @@ const app = express();
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
-const discovery = require('./discovery');
 
 // --- Persistent state (lobbies/games) across backend restarts ---
 const fs = require('fs');
@@ -384,78 +383,6 @@ const ALLOWED_FRONTEND_ORIGINS = (
       ]
     : ['http://127.0.0.1:5173', 'http://localhost:5173']
 ).filter(Boolean);
-
-// Validate a caller-supplied redirect target against the allowlist.
-// Returns a safe absolute URL string, falling back to FRONTEND_URI.
-function safeRedirectBase(requested) {
-  const fallback = process.env.FRONTEND_URI || ALLOWED_FRONTEND_ORIGINS[0] || '';
-  if (!requested) return fallback;
-  try {
-    const u = new URL(requested);
-    if (ALLOWED_FRONTEND_ORIGINS.includes(u.origin)) {
-      return requested;
-    }
-    console.warn('[Spotify] Rejected non-allowlisted redirect target:', requested);
-  } catch (e) {
-    console.warn('[Spotify] Rejected malformed redirect target:', requested);
-  }
-  return fallback;
-}
-
-// Spotify OAuth login endpoint
-app.get('/login', (req, res) => {
-  console.log('[Spotify] Login endpoint called');
-  console.log('[Spotify] Environment check:', {
-    NODE_ENV: process.env.NODE_ENV,
-    SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ? 'SET' : 'MISSING',
-    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ? 'SET' : 'MISSING',
-    SPOTIFY_REDIRECT_URI: process.env.SPOTIFY_REDIRECT_URI,
-    FRONTEND_URI: process.env.FRONTEND_URI
-  });
-  
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    console.error('[Spotify] Missing required environment variables');
-    return res.status(500).send('Spotify configuration error - missing credentials');
-  }
-  
-  const scope = 'user-read-private user-read-email streaming user-read-playback-state user-modify-playback-state';
-  const params = querystring.stringify({
-    client_id: process.env.SPOTIFY_CLIENT_ID,
-    response_type: 'code',
-    redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
-    scope,
-  });
-  
-  const spotifyUrl = `https://accounts.spotify.com/authorize?${params}`;
-  console.log('[Spotify] Redirecting to:', spotifyUrl);
-  res.redirect(spotifyUrl);
-});
-
-  // Spotify OAuth callback endpoint
-  app.get('/callback', async (req, res) => {
-    const code = req.query.code || null;
-    // Validate the redirect target against an allowlist to prevent an open
-    // redirect that would leak the Spotify access token to an attacker domain.
-    const redirectUrl = safeRedirectBase(req.query.redirect);
-    try {
-      const tokenResponse = await axios.post('https://accounts.spotify.com/api/token',
-        querystring.stringify({
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
-          client_id: process.env.SPOTIFY_CLIENT_ID,
-          client_secret: process.env.SPOTIFY_CLIENT_SECRET,
-        }),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 }
-      );
-      const access_token = tokenResponse.data.access_token;
-      // Redirect back to frontend with token, using provided redirect URL
-      res.redirect(`${redirectUrl}?access_token=${access_token}`);
-    } catch (error) {
-      console.error('Error fetching Spotify token', error);
-      res.status(500).send('Authentication failed');
-    }
-  });
 
 // CORS configuration for production
 const corsOptions = {
@@ -2241,8 +2168,10 @@ app.post('/api/curated/select', (req, res) => {
       musicPreferences = {},
       difficulty = (config.difficulty || 'normal'),
       playerCount = 2,
-      previewMode = false
     } = req.body || {};
+    // Full Play (Spotify Premium) was removed — previews are the only audio
+    // mode, so always restrict selection to preview-capable songs.
+    const previewMode = true;
 
     const {
       genres = ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
@@ -5784,175 +5713,6 @@ app.get('/api/feature-flags', (req, res) => {
   }
 });
 
-/**
- * Local network discovery endpoints and background scanner
- * - GET /api/local-devices : on-demand discovery (runs a scan)
- * - GET /api/local-devices/stream : Server-Sent Events pushing periodic device lists
- * - POST /api/wake-device : best-effort "wake" attempt (TCP probe to common ports)
- *
- * Notes:
- * - Discovery runs on the backend host and can only see devices on the same LAN.
- * - SSE stream pushes the latest cached scan results.
- */
-
-// In-memory cache for discovered devices and SSE clients
-let localDevicesCache = [];
-let lastLocalDevicesScanAt = null;
-const sseClients = new Set();
-
-// Helper: push update to connected SSE clients
-function pushLocalDevicesToSse() {
-  const payload = JSON.stringify({ devices: localDevicesCache, timestamp: new Date().toISOString() });
-  sseClients.forEach(res => {
-    try {
-      res.write(`data: ${payload}\n\n`);
-    } catch (e) {
-      // ignore broken clients; they'll be cleaned up on error
-    }
-  });
-}
-
-// On-demand discovery (runs a scan)
-app.get('/api/local-devices', async (req, res) => {
-  try {
-    const timeoutMs = Number(req.query.timeout) || 3000;
-    const devices = await discovery.discoverLocalDevices(timeoutMs);
-    // Update cache
-    localDevicesCache = devices;
-    lastLocalDevicesScanAt = Date.now();
-    // Push to SSE clients
-    pushLocalDevicesToSse();
-    res.json({ ok: true, devices, timestamp: new Date().toISOString() });
-  } catch (e) {
-    console.error('[LocalDiscovery] Error:', e && e.message);
-    res.status(500).json({ ok: false, error: e?.message || 'Discovery failed' });
-  }
-});
-
-// SSE stream for continuous updates
-app.get('/api/local-devices/stream', (req, res) => {
-  // Set headers for SSE
-  res.writeHead(200, {
-    Connection: 'keep-alive',
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Access-Control-Allow-Origin': corsOptions.origin
-  });
-  res.write('\n');
-
-  // Send initial payload immediately if we have cache
-  if (localDevicesCache && localDevicesCache.length) {
-    const payload = JSON.stringify({ devices: localDevicesCache, timestamp: new Date().toISOString() });
-    res.write(`data: ${payload}\n\n`);
-  }
-
-  // Track client
-  sseClients.add(res);
-  req.on('close', () => {
-    sseClients.delete(res);
-  });
-});
-
-// POST /api/wake-device - best-effort probe to a device IP/host
-const net = require('net');
-
-app.post('/api/wake-device', express.json(), async (req, res) => {
-  try {
-    const { ip, ports } = req.body || {};
-    if (!ip) {
-      return res.status(400).json({ ok: false, error: 'Missing ip in body' });
-    }
-
-    const probePorts = Array.isArray(ports) && ports.length ? ports : [8009, 1900, 8008, 8000, 5353]; // common cast/ssdp/http/mdns ports
-
-    let success = false;
-    const results = [];
-
-    // Try TCP connect attempts with short timeout
-    for (const port of probePorts) {
-      /* eslint-disable no-await-in-loop */
-      try {
-        const ok = await new Promise((resolve) => {
-          const socket = new net.Socket();
-          let done = false;
-          socket.setTimeout(1200);
-          socket.on('connect', () => {
-            done = true;
-            socket.destroy();
-            resolve(true);
-          });
-          socket.on('error', () => {
-            if (!done) { done = true; resolve(false); }
-          });
-          socket.on('timeout', () => {
-            if (!done) { done = true; socket.destroy(); resolve(false); }
-          });
-          socket.connect(port, ip);
-        });
-        results.push({ port, ok });
-        if (ok) {
-          success = true;
-          // continue probing other ports for richer diagnostics
-        }
-      } catch (e) {
-        results.push({ port, ok: false, err: e.message });
-      }
-      /* eslint-enable no-await-in-loop */
-    }
-
-    res.json({ ok: success, results, timestamp: new Date().toISOString() });
-  } catch (e) {
-    console.error('[WakeDevice] Error:', e && e.message);
-    res.status(500).json({ ok: false, error: e?.message || 'Wake failed' });
-  }
-});
-
-// Background periodic scan to refresh localDevicesCache every N seconds (if running in LAN)
-// Skipped in production: the cloud host has no LAN devices to discover, so the
-// scan is pure wasted CPU/network there.
-const LOCAL_DISCOVERY_POLL_MS = Number(process.env.LOCAL_DISCOVERY_POLL_MS) || 15000;
-if (process.env.NODE_ENV !== 'production') {
-  setInterval(async () => {
-    try {
-      const devices = await discovery.discoverLocalDevices(3000);
-      localDevicesCache = devices;
-      lastLocalDevicesScanAt = Date.now();
-      pushLocalDevicesToSse();
-      console.log(`[LocalDiscovery] Background scan found ${devices.length} devices at ${new Date().toISOString()}`);
-    } catch (e) {
-      console.warn('[LocalDiscovery] Background scan failed:', e && e.message);
-    }
-  }, LOCAL_DISCOVERY_POLL_MS);
-}
-
-// Debug endpoint to validate Spotify backend configuration (safe: masks secrets)
-app.get('/api/debug/spotify-config', (req, res) => {
-  try {
-    const cfg = {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      spotify: {
-        clientIdSet: !!process.env.SPOTIFY_CLIENT_ID,
-        clientSecretSet: !!process.env.SPOTIFY_CLIENT_SECRET,
-        redirectUri: process.env.SPOTIFY_REDIRECT_URI || null
-      },
-      frontendUri: process.env.FRONTEND_URI || null,
-      corsOrigins: (process.env.NODE_ENV === 'production'
-        ? [process.env.FRONTEND_URI, 'https://beatably-frontend.netlify.app']
-        : ['http://127.0.0.1:5173', 'http://localhost:5173']),
-      notes: [
-        'clientSecret is not returned for security reasons; only a boolean is shown.',
-        'Ensure SPOTIFY_REDIRECT_URI exactly matches what is configured in the Spotify Dashboard.',
-        'In development, dotenv is loaded (see top of file). In production, ensure env vars are provided by the host.'
-      ],
-      timestamp: new Date().toISOString()
-    };
-    res.json(cfg);
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to read config', message: e.message });
-  }
-});
-
-// On-demand client credentials token test to diagnose invalid_client
 app.get('/api/debug/spotify-token-test', async (req, res) => {
   try {
     const response = await axios.post('https://accounts.spotify.com/api/token',

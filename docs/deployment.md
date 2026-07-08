@@ -27,22 +27,19 @@ Create `backend/.env`:
 NODE_ENV=development
 SPOTIFY_CLIENT_ID=your_id
 SPOTIFY_CLIENT_SECRET=your_secret
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/callback
 ADMIN_PASSWORD=anything
 ```
-
-In your Spotify Developer Dashboard, add `http://127.0.0.1:5173/callback` as a Redirect URI.
 
 ---
 
 ## Spotify Developer App Setup
 
+Spotify is used **admin-side only** (song search/curation via client credentials).
+There is no user-facing Spotify auth or playback — no Redirect URIs needed.
+
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create or edit your app
-3. Add Redirect URIs:
-   - `http://127.0.0.1:5173/callback` (local dev)
-   - `https://beatably-backend.onrender.com/callback` (production)
-4. Note your Client ID and Client Secret
+3. Note your Client ID and Client Secret
 
 ---
 
@@ -60,7 +57,6 @@ In your Spotify Developer Dashboard, add `http://127.0.0.1:5173/callback` as a R
 | `NODE_ENV` | `production` |
 | `SPOTIFY_CLIENT_ID` | From Spotify dashboard |
 | `SPOTIFY_CLIENT_SECRET` | From Spotify dashboard |
-| `SPOTIFY_REDIRECT_URI` | `https://beatably-backend.onrender.com/callback` |
 | `FRONTEND_URI` | `https://beatably.app` |
 | `ADMIN_PASSWORD` | Your chosen admin password |
 
@@ -116,6 +112,43 @@ The song database lives at `/var/data/cache/curated-songs.json` in production.
 On each deploy, the backend compares the bundled `backend/cache/curated-songs.json` against the persistent disk version. If the disk version is meaningfully newer, it keeps the disk version. If the bundled version has significantly more songs, it migrates.
 
 To manage songs, use the admin API or the admin panel at `/admin`.
+
+---
+
+## Apple Music Enrichment (preview URLs + album art)
+
+Consumer-facing 30s previews and album art come from the Apple Music catalog
+(`applePreviewUrl` / `appleAlbumArt` per song, with the legacy scraped Spotify
+`previewUrl` as fallback). Spotify remains admin-side only (curation/sourcing).
+
+**Render env vars** (Environment tab of the backend service):
+
+| Var | Value |
+|---|---|
+| `APPLE_MUSIC_TEAM_ID` | Apple Developer Team ID (10 chars) |
+| `APPLE_MUSIC_KEY_ID` | MusicKit key ID (10 chars) |
+| `APPLE_MUSIC_PRIVATE_KEY` | Contents of the MusicKit `.p8` file. Use a Render **Secret File** mounted at e.g. `/etc/secrets/apple-musickit.p8` and set `APPLE_MUSIC_PRIVATE_KEY_PATH` to that path instead, or paste the PEM with `\n`-escaped newlines. |
+
+**Run enrichment against production** (one-time backfill, then after imports):
+
+```bash
+# Dry-run first (writes nothing; report only)
+curl -X POST https://beatably-backend.onrender.com/api/admin/enrich-apple-music \
+  -H "Content-Type: application/json" -H "x-admin-secret: $ADMIN" -d '{}'
+
+# Inspect the report
+curl https://beatably-backend.onrender.com/api/admin/enrich-apple-music/report \
+  -H "x-admin-secret: $ADMIN"
+
+# Persist (auto-backs-up curated-songs.json first)
+curl -X POST https://beatably-backend.onrender.com/api/admin/enrich-apple-music \
+  -H "Content-Type: application/json" -H "x-admin-secret: $ADMIN" -d '{"write":true}'
+```
+
+Options: `storefront` (default `se` — best measured coverage incl. US songs),
+`limit`, `force` (re-enrich songs that already have `applePreviewUrl`).
+Progress: `GET /api/admin/import/progress`. New songs imported later need an
+enrichment run too (only un-enriched songs are processed by default).
 
 ---
 

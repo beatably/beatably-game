@@ -5,15 +5,12 @@ import PlayerHeader from "./PlayerHeader";
 import GameFooter from "./GameFooter";
 import Landing from "./Landing";
 import WaitingRoom from "./WaitingRoom";
-import SpotifyPlayer from "./SpotifyPlayer";
 import SongDebugPanel from "./SongDebugPanel";
 import SongGuessNotification from "./SongGuessNotification";
 import CreditSpendNotification from "./CreditSpendNotification";
 import SessionRestore from "./SessionRestore";
-import SpotifyAuthRenewal from "./components/SpotifyAuthRenewal";
 import HowToPlayView from "./HowToPlayView";
 import GameStartModal from "./GameStartModal";
-import spotifyAuth from "./utils/spotifyAuth";
 import sessionManager from "./utils/sessionManager";
 import debugLogger from './utils/debugLogger';
 import viewportManager from "./utils/viewportUtils";
@@ -29,64 +26,7 @@ import { usePreviewMode } from './contexts/PreviewModeContext';
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
 
 function App() {
-  const { isPreviewMode, setFullPlayMode, stopPreview, isPlaying: previewIsPlaying } = usePreviewMode();
-  
-  // Expose setFullPlayMode globally for auth callback
-  useEffect(() => {
-    window.enableFullPlayMode = setFullPlayMode;
-    return () => {
-      delete window.enableFullPlayMode;
-    };
-  }, [setFullPlayMode]);
-  
-  // Spotify authentication
-  const [spotifyToken, setSpotifyToken] = useState(localStorage.getItem('access_token') || null);
-  // pending creator name saved during OAuth redirect
-  const [pendingCreate, setPendingCreate] = useState(
-    localStorage.getItem('pending_create') || null
-  );
-  // track socket connection status
-  const [socketReady, setSocketReady] = useState(false);
-  // Capture access_token coming back from Spotify
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("access_token");
-    if (token) {
-      setSpotifyToken(token);
-      localStorage.setItem("access_token", token);
-      window.history.replaceState({}, "", window.location.pathname);
-
-      // Check if this is a re-authentication (restore game state)
-      const restored = restoreGameState();
-      if (restored) {
-        console.log("[Spotify] Game state restored after re-authentication");
-        return;
-      }
-
-      // Check if this was from enabling full play mode
-      const pendingFullPlayMode = localStorage.getItem("pending_full_play_mode");
-      if (pendingFullPlayMode) {
-        console.log("[Spotify] Full Play Mode auth completed, enabling full play mode");
-        localStorage.removeItem("pending_full_play_mode");
-        // Enable full play mode via context
-        if (window.enableFullPlayMode) {
-          window.enableFullPlayMode(true);
-        }
-        return;
-      }
-
-      // resume a pending "create game" request (saved before redirect)
-      const pending = localStorage.getItem("pending_create");
-      if (pending) {
-        localStorage.removeItem("pending_create");
-        setPendingCreate(pending);
-      }
-
-      // Do NOT auto-transfer on load; this can override user's device choice unintentionally.
-      // If needed, the user can switch devices via the UI.
-      // spotifyAuth.transferToStoredDevice();
-    }
-  }, []);
+  const { stopPreview, isPlaying: previewIsPlaying } = usePreviewMode();
 
   // Socket, view, and restore modal state must be declared before effects that reference them
   const socketRef = useRef(null);
@@ -94,59 +34,6 @@ function App() {
   const [showSessionRestore, setShowSessionRestore] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showGameStartModal, setShowGameStartModal] = useState(false);
-
-  // Create lobby when we have token + pending name + socket ready
-  useEffect(() => {
-    if (spotifyToken && pendingCreate && socketReady && socketRef.current && !showSessionRestore && view === 'landing') {
-      console.log("[App] All conditions met, creating lobby for:", pendingCreate);
-      const name = pendingCreate;
-      setPendingCreate(null);
-      
-      const code = randomCode();
-      setPlayerName(name);
-      setRoomCode(code);
-      setIsCreator(true);
-      const settings = {
-        difficulty: "normal",
-        winCondition: 10,
-        musicPreferences: {
-          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
-          yearRange: { min: 1960, max: 2025 },
-          markets: ['US']
-        }
-      };
-      console.log("[Socket] Emitting create_lobby", { name, code, settings });
-      
-      // Add a small delay to ensure socket is fully ready
-      setTimeout(() => {
-        if (socketRef.current && socketRef.current.connected) {
-          socketRef.current.emit(
-            "create_lobby",
-            {
-              name,
-              code,
-              settings,
-            },
-            ({ error, lobby, player }) => {
-              console.log("[Socket] create_lobby callback", { error, lobby, player });
-              if (error) {
-                alert(error);
-                setView("landing");
-                return;
-              }
-              setPlayers(lobby.players);
-              setGameSettings(lobby.settings);
-              setView("waiting");
-            }
-          );
-        } else {
-          console.error("[Socket] Socket not connected when trying to create lobby");
-          alert("Connection error. Please try again.");
-          setView("landing");
-        }
-      }, 100);
-    }
-  }, [spotifyToken, pendingCreate, socketReady, showSessionRestore, view]);
 
   // Socket.IO connection
   // socketRef declared earlier to satisfy hook ordering for upper effects
@@ -162,7 +49,7 @@ function App() {
   const [currentPlayerIdx, setCurrentPlayerIdx] = useState(0);
   const [timeline, setTimeline] = useState([]);
   const [deck, setDeck] = useState([]);
-  const [currentCard, setCurrentCard] = useState(null);
+  const [, setCurrentCard] = useState(null);
   const [phase, setPhase] = useState('player-turn');
   const [feedback, setFeedback] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -220,8 +107,7 @@ const [, setChallengeResponseGiven] = useState(false);
   // Track current player id for turn logic
   const [currentPlayerId, setCurrentPlayerId] = useState("");
 
-  // Spotify player state
-  const [spotifyDeviceId, setSpotifyDeviceId] = useState(null);
+  // Music playback state
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
 
   // Suppress sound effects on the creator's device while music is playing (prevents AirPlay interruption)
@@ -256,10 +142,6 @@ const [, setChallengeResponseGiven] = useState(false);
   const [sessionRestoreData, setSessionRestoreData] = useState(null);
   const [isRestoring, setIsRestoring] = useState(false);
 
-  // Spotify authorization renewal state
-  const [showSpotifyAuthRenewal, setShowSpotifyAuthRenewal] = useState(false);
-  const [authRenewalGameState, setAuthRenewalGameState] = useState(null);
-
   // Player left game notification state
   const [playerLeftNotification, setPlayerLeftNotification] = useState(null);
 
@@ -270,7 +152,7 @@ const [, setChallengeResponseGiven] = useState(false);
   const latestRef = useRef({});
   useEffect(() => {
     latestRef.current = {
-      showWinnerView, winner, currentPlayerId, isCreator, spotifyDeviceId, roomCode,
+      showWinnerView, winner, currentPlayerId, isCreator, roomCode,
     };
     // Dev-only testing hook (stripped from production builds): exposes the live
     // socket + key state so the e2e harness can drive game progression
@@ -354,23 +236,6 @@ const [, setChallengeResponseGiven] = useState(false);
 
     // Only check for session if we're on the landing page and not already restoring
     if (view === 'landing' && !isRestoring && !showSessionRestore) {
-      // Skip restore modal during OAuth callback or when explicit user intent exists
-      try {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('access_token')) {
-          // OAuth callback: do not block flows or show restore modal
-          suppressAutoRejoinRef.current = false;
-          return;
-        }
-      } catch { /* ignore */ }
-      const hasPendingCreate = !!localStorage.getItem('pending_create');
-      const hasPendingReauth = !!localStorage.getItem('pending_reauth');
-      if (hasPendingCreate || hasPendingReauth) {
-        // Explicit intent flows: allow to proceed, no modal
-        suppressAutoRejoinRef.current = false;
-        return;
-      }
-
       const hasAnySaved =
         (sessionManager.hasValidSession && sessionManager.hasValidSession()) ||
         (sessionManager.hasValidGameBackup && sessionManager.hasValidGameBackup());
@@ -606,7 +471,6 @@ const [, setChallengeResponseGiven] = useState(false);
       socketRef.current.on("connect", () => {
         console.log("[Socket] Connected, id:", socketRef.current.id);
         setPlayerId(socketRef.current.id);
-        setSocketReady(true);
 
         // AUTO-REJOIN gating: if a session restore prompt is active, defer automatic rejoin until user decides.
         if (suppressAutoRejoinRef.current) {
@@ -872,10 +736,6 @@ const [, setChallengeResponseGiven] = useState(false);
       console.log("[App] Game over detected, showing winner view");
       setWinner(game.winner);
       setShowWinnerView(true);
-      // Stop any Spotify playback if creator
-      if (latestRef.current.isCreator && latestRef.current.spotifyDeviceId) {
-        pauseSpotifyPlayback();
-      }
       return;
     }
     
@@ -1033,61 +893,14 @@ const [, setChallengeResponseGiven] = useState(false);
   // Listen for music stop events
   socketRef.current.on("stop_music", (data) => {
     console.log("[App] Received stop_music event:", data);
-    console.log("[App] Current state:", { isCreator, spotifyDeviceId: !!spotifyDeviceId, isPlayingMusic });
-    
+    console.log("[App] Current state:", { isCreator, isPlayingMusic });
+
     // Always reset music state for all players
     setIsPlayingMusic(false);
 
-    // Mark intent to autoplay next concrete URI if this stop was caused by a new song
-    if (data?.reason === 'new_song') {
-      window.__beatablyPendingAutoplay = true;
-      console.log("[App] Marked pending autoplay for upcoming new song URI.");
-    }
-    // Also mark intent when a skip/new song is requested via token to guarantee autoplay on payload
-    if (data?.reason === 'skip_song') {
-      window.__beatablyPendingAutoplay = true;
-      console.log("[App] Marked pending autoplay for skip_song payload.");
-    }
-    
-    // ENHANCED FIX: Ensure we stop playback on ANY active device, not just stored device
-    const hasSpotifyToken = !!localStorage.getItem('access_token');
-    
-    if (hasSpotifyToken) {
-      console.log("[App] Creator detected, ensuring playback is stopped on all devices due to:", data.reason);
-      
-      // Enhanced stop logic: pause on current device AND any active device
-      (async () => {
-        try {
-          // First, try to pause on the current known device
-          if (spotifyDeviceId) {
-            console.log("[App] Pausing on current device:", spotifyDeviceId);
-            await pauseSpotifyPlayback().catch(e => console.warn("[App] Failed to pause current device:", e));
-          }
-          
-          // Then, check for any active devices and pause them too
-          const devices = await spotifyAuth.getDevices();
-          const activeDevice = devices.find(d => d.is_active);
-          
-          if (activeDevice && activeDevice.id !== spotifyDeviceId) {
-            console.log("[App] Found different active device, pausing it too:", activeDevice.name);
-            await spotifyAuth.pausePlayback(activeDevice.id).catch(e => 
-              console.warn("[App] Failed to pause active device:", e)
-            );
-          }
-          
-          // Also clear the last played URI to ensure fresh start
-          lastPlayedUriRef.current = null;
-          console.log("[App] Cleared last played URI for fresh start");
-          
-        } catch (e) {
-          console.warn("[App] Error during enhanced stop music:", e?.message || e);
-        }
-      })();
-    } else {
-      // Preview mode: stop audio so currentTime resets to 0, ensuring next play loads the new song
-      stopPreview();
-      console.log("[App] Preview mode: stopped preview audio for new song");
-    }
+    // Stop audio so currentTime resets to 0, ensuring next play loads the new song
+    stopPreview();
+    console.log("[App] Stopped preview audio for new song");
   });
 
   // Listen for new song loaded events
@@ -1103,11 +916,8 @@ const [, setChallengeResponseGiven] = useState(false);
       // Listen for progress synchronization from creator
       socketRef.current.on("progress_sync", (data) => {
         console.log("[App] Received progress sync:", data);
-        // This is for non-creators to sync their progress with creator
-        if (!localStorage.getItem('access_token')) {
-          setIsPlayingMusic(data.isPlaying);
-          // Additional progress sync logic will be handled in GameFooter
-        }
+        setIsPlayingMusic(data.isPlaying);
+        // Additional progress sync logic will be handled in GameFooter
       });
 
       // Listen for new song requests (creator only)
@@ -1202,97 +1012,6 @@ const [, setChallengeResponseGiven] = useState(false);
     return Math.floor(1000 + Math.random() * 9000).toString();
   }
 
-  // Restore game state after re-authentication
-  const restoreGameState = () => {
-    const savedState = localStorage.getItem('game_state_backup');
-    const pendingReauth = localStorage.getItem('pending_reauth');
-    
-    if (savedState && pendingReauth) {
-      try {
-        const gameState = JSON.parse(savedState);
-        
-        // Check if backup is recent (within 10 minutes)
-        if (Date.now() - gameState.timestamp < 10 * 60 * 1000) {
-          console.log("[Spotify] Restoring game state after re-authentication");
-          
-          // Show the auth renewal success modal first
-          setAuthRenewalGameState(gameState);
-          setShowSpotifyAuthRenewal(true);
-          
-          // Auto-restore the game state after a brief delay
-          setTimeout(() => {
-            setView(gameState.view);
-            setPlayerName(gameState.playerName);
-            setRoomCode(gameState.roomCode);
-            setIsCreator(gameState.isCreator);
-            setPlayers(gameState.players);
-            setCurrentPlayerId(gameState.currentPlayerId);
-            setPhase(gameState.phase);
-            setTimeline(gameState.timeline);
-            setDeck(gameState.deck);
-            setCurrentCard(gameState.currentCard);
-            setFeedback(gameState.feedback);
-            setShowFeedback(gameState.showFeedback);
-            setLastPlaced(gameState.lastPlaced);
-            setRemovingId(gameState.removingId);
-            setChallenge(gameState.challenge);
-            setGameRound(gameState.gameRound);
-            setGameSettings(gameState.gameSettings);
-            
-            // Hide the renewal modal after restoration
-            setShowSpotifyAuthRenewal(false);
-            setAuthRenewalGameState(null);
-            
-            // Clear backup
-            localStorage.removeItem('game_state_backup');
-            localStorage.removeItem('pending_reauth');
-            
-            // If we're in a game, try to reconnect to the backend session
-            if (gameState.view === 'game' && socketRef.current && socketRef.current.connected) {
-              console.log('[Spotify] Attempting to reconnect to backend session after auth');
-              socketRef.current.emit('reconnect_session', {
-                sessionId: gameState.sessionId,
-                roomCode: gameState.roomCode,
-                playerName: gameState.playerName
-              }, (response) => {
-                if (response.success) {
-                  console.log('[Spotify] Successfully reconnected to backend after auth');
-                  // Update with fresh game state from backend
-                  if (response.view === 'game' && response.gameState) {
-                    const freshGameState = response.gameState;
-                    setPlayers(freshGameState.players);
-                    setCurrentPlayerIdx(freshGameState.currentPlayerIdx || 0);
-                    setTimeline(freshGameState.timeline || []);
-                    setDeck(freshGameState.deck || []);
-                    setPhase(freshGameState.phase);
-                    setFeedback(freshGameState.feedback);
-                    setShowFeedback(!!freshGameState.feedback && freshGameState.phase === 'reveal');
-                    setLastPlaced(freshGameState.lastPlaced);
-                    setRemovingId(freshGameState.removingId);
-                    setChallenge(freshGameState.challenge);
-                    setCurrentPlayerId(freshGameState.currentPlayerId);
-                  }
-                } else {
-                  console.warn('[Spotify] Failed to reconnect to backend after auth:', response.error);
-                }
-              });
-            }
-          }, 2000); // Show success message for 2 seconds before auto-restoring
-          
-          return true;
-        }
-      } catch (error) {
-        console.error("[Spotify] Error restoring game state:", error);
-      }
-      
-      // Clear old backup
-      localStorage.removeItem('game_state_backup');
-      localStorage.removeItem('pending_reauth');
-    }
-    
-    return false;
-  };
-
   // Fetch curated songs for game (no Web API usage during gameplay)
   const fetchCuratedSongs = async (musicPreferences = null) => {
     try {
@@ -1304,7 +1023,7 @@ const [, setChallengeResponseGiven] = useState(false);
           musicPreferences: musicPreferences || gameSettings.musicPreferences,
           difficulty: gameSettings.difficulty,
           playerCount: players.length || 2,
-          previewMode: isPreviewMode
+          previewMode: true
         })
       });
 
@@ -1328,31 +1047,6 @@ const [, setChallengeResponseGiven] = useState(false);
     }
   };
 
-  // Spotify player event handlers
-  const handlePlayerReady = (deviceId) => {
-    console.log("[Spotify] Player ready with device ID:", deviceId);
-
-    // IMPORTANT: Do NOT override a user-selected device with SDK device.
-    // If a user already picked a device (spotifyDeviceId set) and it differs from the SDK device,
-    // keep the user's device to prevent silent reversion to "Beatably Game Player".
-    setSpotifyDeviceId(prev => {
-      if (prev && prev !== deviceId) {
-        console.log("[Spotify] Preserving user-selected device over SDK device:", { selected: prev, sdk: deviceId });
-        return prev;
-      }
-      return deviceId;
-    });
-
-    console.log("[Spotify] Device state updated, deviceId now:", deviceId);
-  };
-
-  const handlePlayerStateChange = (state) => {
-    // Removed excessive logging - only update state
-    if (state) {
-      setIsPlayingMusic(!state.paused);
-    }
-  };
-
   // Attempt to ensure audio is unlocked on first meaningful user gesture.
   // This reduces friction on iOS Safari so that future auto-plays succeed.
   useEffect(() => {
@@ -1360,10 +1054,6 @@ const [, setChallengeResponseGiven] = useState(false);
       // Preload + unlock local SFX pipeline on first gesture for lower latency
       preloadAudio();
 
-      if (window.beatablyPlayback && !window.beatablyPlayback.isUnlocked()) {
-        const ok = await window.beatablyPlayback.ensureUnlockedViaGesture();
-        console.log('[Audio] Early unlock attempted, result:', ok);
-      }
       document.removeEventListener('click', handler);
       document.removeEventListener('touchstart', handler);
     };
@@ -1374,27 +1064,6 @@ const [, setChallengeResponseGiven] = useState(false);
       document.removeEventListener('touchstart', handler);
     };
   }, []);
-
-  // Function to pause Spotify playback with enhanced error handling
-  const pauseSpotifyPlayback = async () => {
-    if (!isCreator || !spotifyDeviceId) return false;
-
-    try {
-      console.log('[App] Pausing Spotify playback');
-      const success = await spotifyAuth.pausePlayback(spotifyDeviceId);
-      if (success) {
-        setIsPlayingMusic(false);
-      }
-      return success;
-    } catch (error) {
-      console.error('[App] Error pausing Spotify playback:', error);
-      if (error.message.includes('Token expired')) {
-        // Handle token expiration - could trigger re-auth here if needed
-        console.log('[App] Token expired during pause operation');
-      }
-      return false;
-    }
-  };
 
   // Session restoration handlers
   const handleRestoreSession = async () => {
@@ -1548,7 +1217,6 @@ const [, setChallengeResponseGiven] = useState(false);
   };
 
   // Create game handler (calls backend)
-  // Create game - No Spotify auth required (preview mode is default)
   const handleCreate = (name) => {
     const code = randomCode();
     setPlayerName(name);
@@ -1948,14 +1616,7 @@ const [, setChallengeResponseGiven] = useState(false);
       
       // Stop any music that's playing
       setIsPlayingMusic(false);
-      if (spotifyDeviceId) {
-        try {
-          await pauseSpotifyPlayback();
-        } catch (e) {
-          console.warn('[App] Failed to pause playback during restart:', e);
-        }
-      }
-      
+
       // Start a new game with fresh songs
       await handleStart();
     } catch (error) {
@@ -2037,10 +1698,6 @@ const [, setChallengeResponseGiven] = useState(false);
     };
   }, [phase, roomCode]);
 
-  // NOTE: Legacy autoplay-on-turn effect removed.
-  // Autoplay is now handled exclusively by the URI-change effect below (lastPlayedUriRef watcher),
-  // to ensure we only start when a concrete new currentCard.uri is present and avoid resuming the previous track.
-
   // Add user interaction listener for Safari audio unlock
   useEffect(() => {
     const unlockAudio = () => {
@@ -2079,59 +1736,14 @@ const [, setChallengeResponseGiven] = useState(false);
     };
   }, []);
 
-  // Track the last URI we successfully started to avoid duplicate starts
-  const lastPlayedUriRef = useRef(null);
-
-  // Track current card for device switching - no auto-play
-  useEffect(() => {
-    // Expose current card globally for device switching
-    if (currentCard) {
-      window.currentGameCard = currentCard;
-    }
-    
-    // Update last played URI ref when card changes to track state
-    if (currentCard?.uri && currentCard.uri !== lastPlayedUriRef.current) {
-      console.log("[Spotify] New song URI detected (no auto-play):", currentCard.uri);
-      // Don't set lastPlayedUriRef here - let manual play button set it
-    }
-  }, [currentCard?.uri]);
-
-  // Additional effect to trigger playback when device becomes ready
-  useEffect(() => {
-    if (!isCreator || !spotifyDeviceId) return;
-    // If device becomes ready and we have a currentCard.uri that hasn't been played yet, the above effect will handle it.
-  }, [spotifyDeviceId]);
-
-  // Respect user-selected device for all future autoplay: lock target device
-  // Once a user selects a device (via DeviceSwitchModal), store it and always use it.
-  const lockedDeviceRef = useRef(null);
-
-  useEffect(() => {
-    // Initialize lock from stored device if present
-    const stored = localStorage.getItem('spotify_device_id');
-    if (stored && !lockedDeviceRef.current) {
-      lockedDeviceRef.current = stored;
-    }
-    const handler = (e) => {
-      const id = e?.detail?.deviceId;
-      if (id) {
-        lockedDeviceRef.current = id;
-        // Also update state to reflect selection
-        setSpotifyDeviceId(id);
-      }
-    };
-    window.addEventListener('beatably_device_switched', handler);
-    return () => window.removeEventListener('beatably_device_switched', handler);
-  }, []);
-
-  // Fetch Spotify songs when creator enters waiting room (for preview/testing)
+  // Fetch curated songs when creator enters waiting room (for preview/testing)
   useEffect(() => {
     if (isCreator && view === 'waiting') {
-      console.log("[Spotify] Pre-fetching songs for preview (fresh songs will be fetched on game start)...");
+      console.log("[Curated] Pre-fetching songs for preview (fresh songs will be fetched on game start)...");
       fetchCuratedSongs().then((songsData) => {
         if (songsData && songsData.tracks && songsData.tracks.length > 0) {
           setRealSongs(songsData.tracks);
-          console.log("[Spotify] Preview songs loaded");
+          console.log("[Curated] Preview songs loaded");
         }
       });
     }
@@ -2140,102 +1752,10 @@ const [, setChallengeResponseGiven] = useState(false);
   // Clear songs when settings change to force fresh fetch on game start
   useEffect(() => {
     if (isCreator) {
-      console.log("[Spotify] Settings changed, will fetch fresh songs on game start");
+      console.log("[Curated] Settings changed, will fetch fresh songs on game start");
       setRealSongs(null); // Clear existing songs to force fresh fetch
     }
   }, [gameSettings.musicPreferences, isCreator]);
-
-  // Auto-detect missing/expired Spotify auth at initialization and when host enters views
-  useEffect(() => {
-    const autoDetectAndReauth = async () => {
-      // Only for host/creator
-      if (!isCreator) return;
-
-      // Skip if we're currently processing an OAuth callback with access_token in the URL
-      try {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('access_token')) return;
-      } catch { /* ignore */ }
-
-      const minimalGameState = {
-        view,
-        playerName,
-        roomCode,
-        isCreator,
-        timestamp: Date.now()
-      };
-
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        // Triggers centralized listener which immediately redirects
-        spotifyAuth.initiateReauth(minimalGameState);
-        return;
-      }
-
-      try {
-        const status = await spotifyAuth.ensureValidToken();
-        if (!status.valid) {
-          spotifyAuth.initiateReauth(minimalGameState);
-        }
-      } catch (e) {
-        // Network or transient error; do not block UX here
-        console.warn('[App] Token validation error during init check:', e?.message || e);
-      }
-    };
-    autoDetectAndReauth();
-  }, [isCreator, view, playerName, roomCode]);
-
-  // Listen for Spotify auth required events
-  useEffect(() => {
-    const handleSpotifyAuthRequired = (event) => {
-      console.log('[App] Spotify auth required event received:', event.detail);
-      
-      // Prepare game state for restoration
-      const gameState = {
-        view,
-        playerName,
-        roomCode,
-        isCreator,
-        players,
-        currentPlayerId,
-        phase,
-        timeline,
-        deck,
-        currentCard,
-        feedback,
-        showFeedback,
-        lastPlaced,
-        removingId,
-        challenge,
-        gameRound,
-        gameSettings,
-        timestamp: Date.now()
-      };
-      
-      // Immediately redirect to Spotify auth without requiring any user interaction
-      spotifyAuth.redirectToAuth(gameState);
-    };
-
-    window.addEventListener('spotify_auth_required', handleSpotifyAuthRequired);
-    
-    return () => {
-      window.removeEventListener('spotify_auth_required', handleSpotifyAuthRequired);
-    };
-  }, [view, playerName, roomCode, isCreator, players, currentPlayerId, phase, 
-      timeline, deck, currentCard, feedback, showFeedback, lastPlaced, 
-      removingId, challenge, gameRound, gameSettings]);
-
-  // Spotify auth renewal handlers
-  const handleSpotifyAuthRenewal = () => {
-    console.log('[App] User confirmed Spotify auth renewal');
-    spotifyAuth.redirectToAuth(authRenewalGameState);
-  };
-
-  const handleSpotifyAuthRenewalDismiss = () => {
-    console.log('[App] User dismissed Spotify auth renewal');
-    setShowSpotifyAuthRenewal(false);
-    setAuthRenewalGameState(null);
-  };
 
   // WinnerView takes priority over all other views
   if (showWinnerView && winner) {
@@ -2295,27 +1815,6 @@ const [, setChallengeResponseGiven] = useState(false);
             isRestoring={isRestoring}
           />
         )}
-        {/* Show Spotify login ONLY when the user is (or will be) the host AND no session restore is available */}
-        {isCreator && !spotifyToken && !showSessionRestore && !isPreviewMode && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-lg p-6 text-center">
-              <h2 className="text-xl font-bold text-white mb-4">Spotify Login Required</h2>
-              <p className="text-gray-300 mb-6">As a game creator, you need to connect with Spotify to play music.</p>
-              <a href={`${API_BASE_URL}/login`} className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded transition-colors">
-                Login with Spotify
-              </a>
-            </div>
-          </div>
-        )}
-        {showSpotifyAuthRenewal && (
-          <SpotifyAuthRenewal
-            isVisible={showSpotifyAuthRenewal}
-            onRenew={handleSpotifyAuthRenewal}
-            onDismiss={handleSpotifyAuthRenewalDismiss}
-            gameState={authRenewalGameState}
-            autoRedirect={false}
-          />
-        )}
       </>
     );
   }
@@ -2358,15 +1857,6 @@ const [, setChallengeResponseGiven] = useState(false);
           externalLoadingStage={externalLoadingStage}
           isLoadingExternally={isLoadingExternally}
         />
-        {showSpotifyAuthRenewal && (
-          <SpotifyAuthRenewal
-            isVisible={showSpotifyAuthRenewal}
-            onRenew={handleSpotifyAuthRenewal}
-            onDismiss={handleSpotifyAuthRenewalDismiss}
-            gameState={authRenewalGameState}
-            autoRedirect={false}
-          />
-        )}
       </>
     );
   }
@@ -2448,19 +1938,6 @@ const [, setChallengeResponseGiven] = useState(false);
             />
           )}
           <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 z-10 bg-background overflow-hidden min-h-0">
-            {/* Hidden Spotify Player for initialization only */}
-            {isCreator && spotifyToken && (
-              <div style={{ display: 'none' }}>
-                <SpotifyPlayer
-                  token={spotifyToken}
-                  currentTrack={currentCard}
-                  isPlaying={isPlayingMusic}
-                  onPlayerReady={handlePlayerReady}
-                  onPlayerStateChange={handlePlayerStateChange}
-                />
-              </div>
-            )}
-            
             <TimelineBoard
               timeline={timeline || []}
               currentCard={currentCard}
@@ -2506,7 +1983,6 @@ const [, setChallengeResponseGiven] = useState(false);
             onContinueAfterChallenge={handleContinueAfterChallenge}
             onSkipChallenge={handleSkipChallenge}
             onSkipSongGuess={handleSkipSongGuess}
-            spotifyDeviceId={spotifyDeviceId}
             isPlayingMusic={isPlayingMusic}
             isCreator={isCreator}
             socketRef={socketRef}
@@ -2518,22 +1994,6 @@ const [, setChallengeResponseGiven] = useState(false);
             placeCardError={placeCardError}
             lastSongGuess={lastSongGuess}
           />
-          {/* Device switch propagation from GameFooter / DeviceSwitchModal */}
-          <script dangerouslySetInnerHTML={{
-            __html: `
-              window.handleDeviceSwitch = (newDeviceId) => {
-                try {
-                  localStorage.setItem('spotify_device_id', newDeviceId);
-                  // Broadcast an app-level event so any listeners can update
-                  const evt = new CustomEvent('beatably_device_switched', { detail: { deviceId: newDeviceId } });
-                  window.dispatchEvent(evt);
-                } catch (e) {
-                  console.warn('[App] Failed to persist deviceId', e);
-                }
-              };
-            `
-          }} />
-          
           {/* Debug Panel */}
           <SongDebugPanel
             roomCode={roomCode}
@@ -2552,18 +2012,6 @@ const [, setChallengeResponseGiven] = useState(false);
             myPersistentId={myPersistentId}
             onClose={() => setCreditSpendEvent(null)}
           />
-          
-
-          {/* Spotify Authorization Renewal Modal */}
-          {showSpotifyAuthRenewal && (
-            <SpotifyAuthRenewal
-              isVisible={showSpotifyAuthRenewal}
-              onRenew={handleSpotifyAuthRenewal}
-              onDismiss={handleSpotifyAuthRenewalDismiss}
-              gameState={authRenewalGameState}
-              autoRedirect={false}
-            />
-          )}
 
           {/* Player Left Game Notification Modal */}
           {playerLeftNotification && (

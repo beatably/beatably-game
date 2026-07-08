@@ -26,15 +26,13 @@ export function PreviewModeProvider({ children }) {
   const isIOSRef = useRef(false);
   const isAirPlayActiveRef = useRef(false);
   
-  // Default to preview mode (full play mode is opt-in via settings)
-  const [isFullPlayMode, setIsFullPlayMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentPreviewUrl, setCurrentPreviewUrl] = useState(null);
-  
-  // Derive preview mode from full play mode state
-  const isPreviewMode = !isFullPlayMode;
+
+  // Preview mode is the only audio mode
+  const isPreviewMode = true;
   
   // Detect iOS
   useEffect(() => {
@@ -45,7 +43,7 @@ export function PreviewModeProvider({ children }) {
   
   // Log initial state
   useEffect(() => {
-    console.log('[PreviewMode] Initialized - Preview Mode:', isPreviewMode, 'Full Play Mode:', isFullPlayMode);
+    console.log('[PreviewMode] Initialized - Preview Mode:', isPreviewMode);
   }, []);
   
   // Initialize media element (using <video> for AirPlay compatibility on Safari/iOS)
@@ -55,7 +53,7 @@ export function PreviewModeProvider({ children }) {
       audioRef.current = document.createElement('video');
       audioRef.current.setAttribute('playsinline', '');
       audioRef.current.setAttribute('webkit-playsinline', '');
-      audioRef.current.setAttribute('crossorigin', 'anonymous'); // For Spotify CDN
+      audioRef.current.setAttribute('crossorigin', 'anonymous'); // For cross-origin audio CDN
       audioRef.current.setAttribute('x-webkit-airplay', 'allow'); // Enable AirPlay
       audioRef.current.setAttribute('airplay', 'allow'); // Future-proof
       audioRef.current.style.display = 'none'; // Hidden — audio only
@@ -234,7 +232,7 @@ export function PreviewModeProvider({ children }) {
       }
       
       // Load new audio
-      audioRef.current.crossOrigin = 'anonymous'; // For Spotify CDN CORS
+      audioRef.current.crossOrigin = 'anonymous'; // For cross-origin audio CDN CORS
       audioRef.current.src = previewUrl;
       audioRef.current.load();
       
@@ -354,16 +352,8 @@ export function PreviewModeProvider({ children }) {
     }
   };
   
-  // Method to enable/disable full play mode
-  const setFullPlayMode = (enabled) => {
-    console.log('[PreviewMode] Setting Full Play Mode:', enabled);
-    setIsFullPlayMode(enabled);
-  };
-  
   const value = {
     isPreviewMode,
-    isFullPlayMode,
-    setFullPlayMode,
     isPlaying,
     currentTime,
     duration,

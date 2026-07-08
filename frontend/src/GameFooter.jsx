@@ -1,7 +1,4 @@
 import React, { useState } from "react";
-import spotifyAuth from "./utils/spotifyAuth";
-import productionPlaybackFix from "./utils/productionPlaybackFix";
-import DeviceSwitchModal from './DeviceSwitchModal';
 import SongGuessModal from './SongGuessModal';
 import { usePreviewMode } from './contexts/PreviewModeContext';
 import {
@@ -28,7 +25,6 @@ function GameFooter({
   onSkipChallenge,
   onSkipSongGuess,
   lastSongGuess,
-  spotifyDeviceId,
   isPlayingMusic,
   isCreator,
   socketRef,
@@ -97,32 +93,19 @@ function GameFooter({
   const [localIsPlaying, setLocalIsPlaying] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [duration, setDuration] = React.useState(30); // Default 30 seconds
-  const [, setSpotifyPosition] = React.useState(0);
-  
+
   // Track when a new song has been loaded but not yet played
   const [showNewSongMessage, setShowNewSongMessage] = React.useState(false);
   const lastCardIdRef = React.useRef(null);
-  
+
   // Track if play has been pressed at least once for current song
   const [, setHasPlayedOnce] = React.useState(false);
 
-  // Use real Spotify playing state if available, otherwise use local state
-  const [isSpotifyPlaying, setIsSpotifyPlaying] = React.useState(false);
-  const [currentSpotifyUri, setCurrentSpotifyUri] = React.useState(null);
-  
-  // Add optimistic UI state for instant visual feedback
-  const [optimisticIsPlaying, setOptimisticIsPlaying] = React.useState(null);
-  
   // Pulsating glow effect for paused state
   const [glowIntensity, setGlowIntensity] = React.useState(0.3);
-  
-  // Use optimistic state if available, otherwise fall back to actual state
+
   // In preview mode, use preview playing state
-  const actualIsPlaying = usingPreviewMode 
-    ? previewIsPlaying
-    : (optimisticIsPlaying !== null 
-      ? optimisticIsPlaying 
-      : (isCreator && spotifyDeviceId ? isSpotifyPlaying : localIsPlaying));
+  const actualIsPlaying = usingPreviewMode ? previewIsPlaying : localIsPlaying;
   
   // Use preview mode progress/duration when active
   const displayProgress = usingPreviewMode ? previewCurrentTime : progress;
@@ -149,47 +132,8 @@ function GameFooter({
     }
   }, [actualIsPlaying, isCreator]);
 
-  // Get real Spotify playback position with enhanced error handling
-  React.useEffect(() => {
-    if (!isCreator || !spotifyDeviceId || !window.Spotify) return;
-
-    const getPlaybackState = async () => {
-      try {
-        const state = await spotifyAuth.getPlaybackState(spotifyDeviceId);
-        // Update now-playing details for creator UI and controls
-        const playing = !!state?.is_playing;
-        const uri = state?.item?.uri || null;
-        setIsSpotifyPlaying(playing);
-        setCurrentSpotifyUri(uri);
-
-        if (state && state.item) {
-          const positionMs = state.progress_ms || 0;
-          const durationMs = state.item.duration_ms || 30000;
-
-          setSpotifyPosition(Math.floor(positionMs / 1000));
-          setDuration(Math.floor(durationMs / 1000));
-          setProgress(Math.floor(positionMs / 1000));
-        }
-      } catch (error) {
-        console.log('[GameFooter] Error getting playback state:', error);
-        if (error.message?.includes('Token expired')) {
-          handleTokenExpiration();
-        }
-      }
-    };
-
-    // Update position every second when playing
-    if (isCreator && spotifyDeviceId) {
-      // Poll state every second while creator is connected to a device
-      const interval = setInterval(getPlaybackState, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [actualIsPlaying, isCreator, spotifyDeviceId]);
-
   // Fallback progress for non-creators - sync with creator's music state
   React.useEffect(() => {
-    if (isCreator && spotifyDeviceId) return; // Use real Spotify data
-
     // For non-creators, sync with the actual playing state from creator
     if (!actualIsPlaying) return;
     if (progress >= duration) {
@@ -198,19 +142,17 @@ function GameFooter({
     }
     const interval = setInterval(() => setProgress((p) => Math.min(p + 1, duration)), 1000);
     return () => clearInterval(interval);
-  }, [actualIsPlaying, progress, duration, isCreator, spotifyDeviceId]);
+  }, [actualIsPlaying, progress, duration]);
 
   // Sync non-creator progress with creator's music state
   React.useEffect(() => {
-    if (isCreator && spotifyDeviceId) return; // Creator uses real Spotify state
-
     // When music starts/stops, sync the local playing state
     if (isPlayingMusic && !localIsPlaying) {
       setLocalIsPlaying(true);
     } else if (!isPlayingMusic && localIsPlaying) {
       setLocalIsPlaying(false);
     }
-  }, [isPlayingMusic, localIsPlaying, isCreator, spotifyDeviceId]);
+  }, [isPlayingMusic, localIsPlaying]);
 
   // Detect when a new song is loaded and show message
   React.useEffect(() => {
@@ -232,10 +174,8 @@ function GameFooter({
   React.useEffect(() => {
     console.log('[GameFooter] Current card changed, resetting progress:', currentCard?.title);
     setProgress(0);
-    if (!isCreator || !spotifyDeviceId) {
-      setLocalIsPlaying(false);
-    }
-  }, [currentCard?.id, isCreator, spotifyDeviceId]);
+    setLocalIsPlaying(false);
+  }, [currentCard?.id]);
 
   // CRITICAL FIX: Reset progress when new turn/round starts (even if auto-play fails)
   React.useEffect(() => {
@@ -248,206 +188,16 @@ function GameFooter({
     // Reset progress whenever a new turn starts or we enter player-turn phase
     if (phase === 'player-turn') {
       setProgress(0);
-      if (!isCreator || !spotifyDeviceId) {
-        setLocalIsPlaying(false);
-      }
+      setLocalIsPlaying(false);
     }
-  }, [currentPlayerId, phase, isCreator, spotifyDeviceId]);
+  }, [currentPlayerId, phase]);
 
-  // Function to trigger Spotify playback with enhanced error handling
-  const triggerSpotifyPlayback = async () => {
-    const trackUri = currentCard?.uri || currentCard?.spotifyUri;
-    if (!isCreator || !spotifyDeviceId || !trackUri) {
-      console.log('[GameFooter] Cannot play - missing requirements:', {
-        isCreator,
-        spotifyDeviceId: !!spotifyDeviceId,
-        hasUri: !!trackUri,
-        currentCard: currentCard ? { title: currentCard.title, uri: currentCard.uri, spotifyUri: currentCard.spotifyUri } : null
-      });
-      return false;
-    }
-
-    try {
-      console.log('[GameFooter] Triggering Spotify playback for:', currentCard.title);
-
-      // Validate token before making request
-      const tokenValidation = await spotifyAuth.ensureValidToken();
-      if (!tokenValidation.valid) {
-        console.error('[GameFooter] Token validation failed');
-        if (tokenValidation.requiresAuth) {
-          handleTokenExpiration();
-          return false;
-        }
-        return false;
-      }
-
-      // CRITICAL FIX: Always transfer to the current SDK device first to ensure it's active
-      console.log('[GameFooter] Transferring to current SDK device:', spotifyDeviceId);
-      const transferSuccess = await spotifyAuth.transferPlayback(spotifyDeviceId, false);
-      if (!transferSuccess) {
-        console.warn('[GameFooter] Transfer to SDK device failed, continuing anyway');
-      }
-
-      // Small delay to let transfer take effect
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Now start playback on the active device (without device_id to avoid 404)
-      const success = await spotifyAuth.verifiedStartPlayback(null, trackUri, 0, {
-        pauseFirst: false, // Don't pause since we just transferred
-        transferFirst: false, // Already transferred above
-        maxVerifyAttempts: 4,
-        verifyDelayMs: 250
-      });
-
-      if (success) {
-        console.log('[GameFooter] Successfully started Spotify playback');
-        // Update stored device to current SDK device
-        spotifyAuth.storeDeviceId(spotifyDeviceId);
-        return true;
-      } else {
-        console.log('[GameFooter] Spotify playback failed, trying fallback');
-        return false;
-      }
-    } catch (error) {
-      console.error('[GameFooter] Error triggering Spotify playback:', error);
-
-      if (error.message.includes('Token expired')) {
-        handleTokenExpiration();
-        return false;
-      }
-
-      // Try preview fallback on any error
-      return false;
-    }
-  };
-
-
-  // Function to pause Spotify playback with enhanced error handling
-  const pauseSpotifyPlayback = async () => {
-    if (!isCreator) return false;
-
-    try {
-      console.log('[GameFooter] Pausing Spotify playback on current SDK device:', spotifyDeviceId);
-      
-      // Always ensure the current SDK device is active first
-      if (spotifyDeviceId) {
-        await spotifyAuth.transferPlayback(spotifyDeviceId, false);
-        // Small delay to let transfer take effect
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-      
-      // Pause the active device (without device_id to avoid 404)
-      return await spotifyAuth.pausePlayback();
-    } catch (error) {
-      console.error('[GameFooter] Error pausing Spotify playback:', error);
-      if (error.message?.includes?.('Token expired')) {
-        handleTokenExpiration();
-      }
-      return false;
-    }
-  };
-
-  // Function to restart current track with enhanced error handling
-  const restartSpotifyTrack = async () => {
-    if (!isCreator || !currentCard?.uri) return false;
-
-    try {
-      const locked = localStorage.getItem('spotify_device_id');
-      const target = locked || spotifyDeviceId;
-      console.log('[GameFooter] Restarting Spotify track on target:', target || 'unknown');
-      // Wake/activate the selected device first, then start from 0 on that device
-      if (target) {
-        await spotifyAuth.transferPlayback(target, false);
-      }
-      const ok = await spotifyAuth.verifiedStartPlayback(
-        target,
-        currentCard.uri,
-        0,
-        { pauseFirst: true, transferFirst: false, maxVerifyAttempts: 3, verifyDelayMs: 250 }
-      );
-      return ok;
-    } catch (error) {
-      console.error('[GameFooter] Error restarting Spotify track:', error);
-      if (error.message?.includes?.('Token expired')) {
-        handleTokenExpiration();
-      }
-      return false;
-    }
-  };
-
-  // Function to resume Spotify playback with enhanced error handling
-  const resumeSpotifyPlayback = async () => {
-    if (!isCreator) return false;
-
-    try {
-      const locked = localStorage.getItem('spotify_device_id');
-      const target = locked || spotifyDeviceId;
-      console.log('[GameFooter] Resuming Spotify playback on target:', target || 'active');
-
-      // 1) Make sure the selected device is the active one (but do not auto-play)
-      if (target) {
-        await spotifyAuth.transferPlayback(target, false);
-      }
-
-      // 2) Attempt a true resume on the active device (continues from paused position)
-      const resumed = await spotifyAuth.resumePlayback(); // no device_id -> active device
-      if (resumed) return true;
-
-      // 3) Fallback: if resume fails and we know the intended track, try to continue from last known position
-      //    using verifiedStartPlayback at the current Spotify-reported position (not 0).
-      if (currentCard?.uri) {
-        let state = null;
-        try {
-          state = await spotifyAuth.getPlaybackState(target);
-        } catch (_) { /* ignore */ }
-        const positionMs = state?.progress_ms ?? 0;
-        const ok = await spotifyAuth.verifiedStartPlayback(
-          target,
-          currentCard.uri,
-          positionMs,
-          { pauseFirst: false, transferFirst: false, maxVerifyAttempts: 3, verifyDelayMs: 250 }
-        );
-        return ok;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('[GameFooter] Error resuming Spotify playback:', error);
-      if (error.message?.includes?.('Token expired')) {
-        handleTokenExpiration();
-      }
-      return false;
-    }
-  };
-
-  // Handle Spotify token expiration
-  const handleTokenExpiration = () => {
-    console.log('[GameFooter] Spotify token expired, requesting re-authentication');
-    
-    // Save current game state with actual room code and player info
-    const myPlayer = players?.find(p => p.id === myPlayerId);
-    const gameState = {
-      view: 'game',
-      playerName: myPlayer?.name || 'Current Player',
-      roomCode: roomCode || 'UNKNOWN_ROOM',
-      isCreator: isCreator,
-      timestamp: Date.now()
-    };
-    
-    // Use the new spotifyAuth system to trigger re-authentication
-    spotifyAuth.initiateReauth(gameState);
-  };
-
-  // Handle play/pause button click with real Spotify state awareness
+  // Handle play/pause button click
   const handlePlayPauseClick = async () => {
     console.log('[GameFooter] Play button clicked:', {
       isCreator,
       usingPreviewMode,
-      spotifyDeviceId: !!spotifyDeviceId,
       actualIsPlaying,
-      isSpotifyPlaying,
-      currentSpotifyUri,
-      currentCardUri: currentCard?.uri,
       currentCardTitle: currentCard?.title,
       previewUrl: currentCard?.previewUrl || currentCard?.preview_url
     });
@@ -462,20 +212,18 @@ function GameFooter({
     if (!actualIsPlaying && phase === 'player-turn') {
       console.log('[GameFooter] Manual play detected, resetting progress as fallback');
       setProgress(0);
-      if (!isCreator || !spotifyDeviceId) {
-        setLocalIsPlaying(false);
-      }
+      setLocalIsPlaying(false);
     }
 
     // PREVIEW MODE: Handle preview playback for creators
     if (usingPreviewMode) {
       const previewUrl = currentCard?.previewUrl || currentCard?.preview_url;
-      
+
       if (!previewUrl) {
         console.warn('[PreviewMode] No preview URL available for:', currentCard?.title);
         return;
       }
-      
+
       if (previewIsPlaying) {
         pausePreview();
       } else {
@@ -488,102 +236,7 @@ function GameFooter({
       return;
     }
 
-    // Check if this is a creator who should have Spotify access
-    const hasSpotifyToken = !!localStorage.getItem('access_token');
-    
-    // If creator has no token at all, immediately trigger re-auth (no buttons)
-    if (isCreator && !hasSpotifyToken && !isPreviewMode) {
-      console.log('[GameFooter] No Spotify token for creator - triggering re-auth');
-      handleTokenExpiration();
-      return;
-    }
-    
-    if (isCreator && hasSpotifyToken) {
-      // Validate token first before attempting any Spotify operations
-      const tokenValidation = await spotifyAuth.ensureValidToken();
-      if (!tokenValidation.valid) {
-        console.log('[GameFooter] Token validation failed, triggering re-auth');
-        handleTokenExpiration();
-        return;
-      }
-    }
-
-    if (isCreator && spotifyDeviceId) {
-      try {
-        // Safari activate element if available (no-op elsewhere)
-        if (window.Spotify && window.spotifyPlayerInstance?.activateElement) {
-          try {
-            const footerElement = document.querySelector('footer') || document.body;
-            await window.spotifyPlayerInstance.activateElement(footerElement);
-            console.log('[GameFooter] Spotify player activated for Safari');
-          } catch (e) {
-            console.log('[GameFooter] Error activating Spotify player:', e);
-          }
-        }
-
-        // Always fetch current state first to avoid racing against autoplay
-        let state = null;
-        try {
-          state = await spotifyAuth.getPlaybackState(spotifyDeviceId);
-        } catch (e) {
-          console.log('[GameFooter] Error reading playback state:', e);
-        }
-        const statePlaying = !!state?.is_playing;
-        const stateUri = state?.item?.uri || null;
-        const targetUri = currentCard?.uri || currentCard?.spotifyUri || null;
-        const sameTrack = !!targetUri && targetUri === stateUri;
-
-        // If currently playing the same track -> pause
-        if (statePlaying && sameTrack) {
-          // Set optimistic state for instant feedback
-          setOptimisticIsPlaying(false);
-          setTimeout(() => setOptimisticIsPlaying(null), 2000);
-          
-          await pauseSpotifyPlayback();
-          // update UI immediately; poller will refresh soon
-          setIsSpotifyPlaying(false);
-          return;
-        }
-
-        // If same track but paused -> resume
-        if (!statePlaying && sameTrack) {
-          // Set optimistic state for instant feedback
-          setOptimisticIsPlaying(true);
-          setTimeout(() => setOptimisticIsPlaying(null), 2000);
-          
-          const ok = await resumeSpotifyPlayback();
-          if (ok) setIsSpotifyPlaying(true);
-          return;
-        }
-
-        // Different or no track -> check if we need production fix first
-        const needsFix = await productionPlaybackFix.shouldApplyFix();
-        
-        if (needsFix) {
-          console.log('[GameFooter] Applying production playback fix...');
-          const fixSuccess = await productionPlaybackFix.forcePlaybackReset(spotifyDeviceId, targetUri);
-          if (fixSuccess) {
-            setIsSpotifyPlaying(true);
-            setCurrentSpotifyUri(targetUri);
-            return;
-          } else {
-            console.warn('[GameFooter] Production fix failed, falling back to normal playback');
-          }
-        }
-        
-        // Normal playback start
-        const started = await triggerSpotifyPlayback();
-        if (started) {
-          setIsSpotifyPlaying(true);
-          setCurrentSpotifyUri(targetUri);
-        }
-      } catch (error) {
-        console.log('[GameFooter] Error in Spotify playback:', error);
-      }
-    } else {
-      // Non-creator: no-op (creator controls playback)
-      return;
-    }
+    // Non-creator: no-op (creator controls playback)
   };
 
   // Handle restart button click
@@ -595,8 +248,6 @@ function GameFooter({
       if (previewUrl) {
         playPreview(previewUrl);
       }
-    } else if (isCreator && spotifyDeviceId) {
-      restartSpotifyTrack();
     } else {
       setProgress(0);
       setLocalIsPlaying(true);
@@ -606,8 +257,6 @@ function GameFooter({
 // Song guessing state - now handled by modal
   const [showSongGuessModal, setShowSongGuessModal] = useState(false);
   const [, setNewSongRequest] = useState(null); // For creator notifications
-  // Removed tokenExpiredNotification UI: re-auth is mandatory; no local fallback
-  const [showDeviceModal, setShowDeviceModal] = useState(false);
   // Prevent spamming skip_song while backend reconnects or processes the request
   const skipInFlightRef = React.useRef(false);
 
@@ -615,7 +264,6 @@ function GameFooter({
   const compactPlayButtonRef = React.useRef(null);
   const restartButtonRef = React.useRef(null);
   const mainPlayButtonRef = React.useRef(null);
-  const deviceSwitchButtonRef = React.useRef(null);
   const songGuessModalGuessButtonRef = React.useRef(null);
   const songGuessModalSkipButtonRef = React.useRef(null);
   const challengeWindowChallengeButtonRef = React.useRef(null);
@@ -657,15 +305,9 @@ function GameFooter({
     }
     
     // CRITICAL FIX: Stop music immediately when "New Song" is clicked
-    // This works for both preview mode and Spotify mode
-    if (action === 'skip_song') {
-      if (usingPreviewMode) {
-        console.log('[GameFooter] Stopping preview before new song');
-        stopPreview();
-      } else if (spotifyDeviceId && isPlayingMusic) {
-        console.log('[GameFooter] Pausing Spotify before new song');
-        pauseSpotifyPlayback();
-      }
+    if (action === 'skip_song' && usingPreviewMode) {
+      console.log('[GameFooter] Stopping preview before new song');
+      stopPreview();
     }
     
     // If this is a non-creator requesting a new song, send request to server
@@ -719,20 +361,16 @@ function GameFooter({
     };
   }, [socketRef, isCreator]);
 
-  // Broadcast progress updates (creator only) - works in both Spotify and preview mode
+  // Broadcast progress updates (creator only)
   React.useEffect(() => {
     // Only creator should broadcast, and only if we have a room and socket
     if (!socketRef?.current || !isCreator || !roomCode) return;
-    
-    // In Spotify mode, wait for device to be ready; in preview mode, always broadcast
-    if (!usingPreviewMode && !spotifyDeviceId) return;
 
     const broadcastProgress = () => {
-      console.log('[GameFooter] Broadcasting progress:', { 
-        progress: displayProgress, 
-        duration: displayDuration, 
-        isPlaying: actualIsPlaying,
-        mode: usingPreviewMode ? 'preview' : 'spotify'
+      console.log('[GameFooter] Broadcasting progress:', {
+        progress: displayProgress,
+        duration: displayDuration,
+        isPlaying: actualIsPlaying
       });
       socketRef.current.emit('progress_update', {
         code: roomCode,
@@ -752,18 +390,7 @@ function GameFooter({
       // Broadcast pause state immediately
       broadcastProgress();
     }
-  }, [socketRef, roomCode, displayProgress, displayDuration, actualIsPlaying, isCreator, usingPreviewMode, spotifyDeviceId]);
-
-  // Enhanced creator detection
-  React.useEffect(() => {
-    const hasSpotifyToken = !!localStorage.getItem('access_token');
-    console.log('[GameFooter] Creator detection:', { 
-      isCreator, 
-      hasSpotifyToken, 
-      spotifyDeviceId: !!spotifyDeviceId,
-      shouldBroadcast: hasSpotifyToken && spotifyDeviceId 
-    });
-  }, [isCreator, spotifyDeviceId]);
+  }, [socketRef, roomCode, displayProgress, displayDuration, actualIsPlaying, isCreator]);
 
 
   const handleContinueClick = () => {
@@ -776,25 +403,18 @@ function GameFooter({
       feedback 
     });
     
-    // CRITICAL FIX: Stop all music (both preview and Spotify) when continuing to next turn
+    // CRITICAL FIX: Stop all music when continuing to next turn
     if (usingPreviewMode) {
       console.log('[GameFooter] Stopping preview mode music before continue');
       stopPreview();
-    } else if (spotifyDeviceId && isPlayingMusic) {
-      console.log('[GameFooter] Pausing Spotify before continue');
-      pauseSpotifyPlayback();
     }
-    
+
     // Reset progress and state for next turn
     setProgress(0);
     setLocalIsPlaying(false);
-    setIsSpotifyPlaying(false);
     setShowNewSongMessage(false);
     setHasPlayedOnce(false);
-    
-    // Clear optimistic state
-    setOptimisticIsPlaying(null);
-    
+
     onContinue();
   };
 
@@ -1019,39 +639,7 @@ function GameFooter({
                   <div className="absolute left-0 top-0 h-2 bg-primary rounded-full" style={{ width: `${(displayProgress/displayDuration)*100}%` }}></div>
                 </div>
                 <span>{formatTime(displayDuration)}</span>
-                {/* Spotify device switcher (non-preview mode) */}
-                {isCreator && !isPreviewMode && (
-                  <button
-                  ref={deviceSwitchButtonRef}
-                  onClick={() => {
-                    setShowDeviceModal(true);
-                    if (deviceSwitchButtonRef.current) {
-                      setTimeout(() => { deviceSwitchButtonRef.current.blur(); }, 0);
-                    }
-                  }}
-                  onTouchStart={() => { deviceSwitchButtonRef.current?.blur(); }}
-                  onTouchEnd={() => { deviceSwitchButtonRef.current?.blur(); }}
-                  className="ml-2 w-6 h-6 flex items-center p-0 justify-center rounded-full bg-input hover:bg-input/90 text-foreground text-xs"
-                  title="Switch device"
-                  aria-label="Switch Spotify device"
-                  style={{ 
-                    WebkitTapHighlightColor: 'transparent',
-                    outline: 'none !important',
-                    border: 'none !important', 
-                    boxShadow: 'none !important',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
-                    appearance: 'none'
-                  }}
-                  >
-                  <img
-                    src="/img/speaker-icon.svg"
-                    alt="Switch device"
-                    className="w-5 h-5"
-                  />
-                  </button>
-                )}
-                {/* AirPlay button (Safari/iOS - preview & Spotify mode) */}
+                {/* AirPlay button (Safari/iOS) */}
                 {showAirPlayButton && (
                   <button
                     ref={airPlayButtonRef}
@@ -1081,30 +669,6 @@ function GameFooter({
                 </div>
               </div>
               </div>
-              
-              {/* Spotify Debug Info - only for creator */}
-          {isCreator && (
-<div className="hidden text-xs text-muted-foreground text-center space-y-1">
-              {spotifyDeviceId ? (
-                <div className="text-primary">
-                  ✓ Spotify Ready | {isPlayingMusic ? 'Playing' : 'Paused'}
-                </div>
-              ) : (
-                <div className="text-muted-foreground">
-                  ⚠ Spotify Initializing...
-                </div>
-              )}
-              <div className="text-muted-foreground">
-                Device: {spotifyDeviceId ? spotifyDeviceId.substring(0, 8) + '...' : 'None'}
-              </div>
-              <div className="text-muted-foreground">
-                Track: {currentCard?.title || 'None'} | Progress: {progress}s/{duration}s
-              </div>
-              <div className="text-muted-foreground">
-                Phase: {phase} | My Turn: {isMyTurn ? 'Yes' : 'No'}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1115,30 +679,6 @@ function GameFooter({
         onGuessSong={onGuessSong}
         onSkipSongGuess={onSkipSongGuess}
       />
-
-      {/* Device switch modal */}
-      {showDeviceModal && (
-        <DeviceSwitchModal
-          isOpen={showDeviceModal}
-          onClose={() => setShowDeviceModal(false)}
-          currentDeviceId={spotifyDeviceId}
-          onDeviceSwitch={(newDeviceId) => {
-            console.log('[GameFooter] Device switched to:', newDeviceId);
-            
-            // Notify parent component about device change
-            if (window.parent && window.parent.handleDeviceSwitch) {
-              window.parent.handleDeviceSwitch(newDeviceId);
-            }
-            // Also emit to socket for real-time updates
-            if (socketRef?.current && roomCode) {
-              socketRef.current.emit('device_switched', {
-                code: roomCode,
-                deviceId: newDeviceId
-              });
-            }
-          }}
-        />
-      )}
 
 
       {/* Song guess section - only for current player */}
@@ -1417,19 +957,14 @@ function GameFooter({
                 if (usingPreviewMode) {
                   console.log('[GameFooter] Stopping preview mode music before continue after challenge');
                   stopPreview();
-                } else if (spotifyDeviceId && isPlayingMusic) {
-                  console.log('[GameFooter] Pausing Spotify before continue after challenge');
-                  pauseSpotifyPlayback();
                 }
-                
+
                 // Reset progress and state for next turn
                 setProgress(0);
                 setLocalIsPlaying(false);
-                setIsSpotifyPlaying(false);
                 setShowNewSongMessage(false);
                 setHasPlayedOnce(false);
-                setOptimisticIsPlaying(null);
-                
+
                 onContinueAfterChallenge();
                 // Immediately blur after click to prevent focus ring
                 if (challengeResolvedContinueButtonRef.current) {

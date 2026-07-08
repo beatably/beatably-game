@@ -19,7 +19,6 @@ Create `backend/.env` before starting:
 NODE_ENV=development
 SPOTIFY_CLIENT_ID=your_id
 SPOTIFY_CLIENT_SECRET=your_secret
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/callback
 FRONTEND_URI=http://127.0.0.1:5173
 ADMIN_PASSWORD=anything
 ```
@@ -39,7 +38,7 @@ Use `127.0.0.1` not `localhost` — Spotify OAuth requires the exact registered 
 | `backend/curatedDb.js` | File-backed song database (reads/writes `cache/curated-songs.json`) |
 | `backend/config.js` | Feature flags: `CHART_MODE_ENABLE`, `MUSICBRAINZ_ENABLE`, `REMASTER_FILTER_ENABLE` |
 | `frontend/src/config.js` | API URL: dev → `:3001`, prod → `beatably-backend.onrender.com` |
-| `frontend/src/contexts/PreviewModeContext.jsx` | Audio mode context (Preview vs Full Play) |
+| `frontend/src/contexts/PreviewModeContext.jsx` | Preview playback context (30s Apple Music clips — the only audio mode) |
 
 ---
 
@@ -48,7 +47,7 @@ Use `127.0.0.1` not `localhost` — Spotify OAuth requires the exact registered 
 - **Real-time**: Socket.io WebSockets; game state persisted to `cache/state.json` every 250ms
 - **Production disk**: Render persistent disk mounts at `/var/data/cache/` (not `cache/`)
 - **Game phases**: `setup → player-turn → song-guess → challenge-window → challenge → challenge-resolved → reveal → game-over`
-- **Audio modes**: Preview (30s Spotify clips, no account needed) vs Full Play (Spotify Premium)
+- **Audio**: 30s Apple Music preview clips only (Full Play/Spotify Premium removed July 2026); Spotify is admin-side sourcing only
 - **Song DB genres**: includes `'soundtrack'` (TV/movie themes) — gameplay integration not yet wired up
 
 ---
