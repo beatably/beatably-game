@@ -130,6 +130,8 @@ struct TimelineView: View {
     // Slide data for moving nodes and the tapped gap.
     @State private var pillSlides: [PillSlide] = []
     @State private var gapSlide: GapSlide? = nil
+    // Tapping a revealed art node opens a song detail popup (with Apple Music link).
+    @State private var detailSong: Song? = nil
 
     // The original player's placement, shown to the challenger as a full "?" marker slot.
     // A distinct id keeps it separate from the challenger's pending card (same song), and
@@ -226,6 +228,19 @@ struct TimelineView: View {
             capturedOffsetY = nil
         }
         .animation(.spring(duration: 0.35), value: cards.count)
+        .onAppear {
+            // Test hook: auto-open the song detail popup for screenshot verification.
+            if ProcessInfo.processInfo.arguments.contains("UITEST_SHOW_SONGDETAIL"),
+               detailSong == nil, let s = displayCards.first {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { detailSong = s }
+            }
+        }
+        .sheet(item: $detailSong) { song in
+            SongDetailView(song: song)
+                .presentationDetents([.height(440)])
+                .presentationBackground(Color.beatBg)
+                .presentationDragIndicator(.visible)
+        }
     }
 
     // MARK: - Path layers
@@ -335,6 +350,8 @@ struct TimelineView: View {
                     } else {
                         ArtNode(song: song, colorState: cardColor(song),
                                 label: nodeLabel(for: song))
+                            .contentShape(Rectangle())
+                            .onTapGesture { detailSong = song }
                     }
                 }
                 .position(slide?.from ?? item.position)

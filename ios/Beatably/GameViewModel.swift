@@ -17,6 +17,7 @@ struct Song: Identifiable, Equatable {
     let year: Int
     let previewURL: String?
     let albumArt: String?
+    var appleMusicURL: String? = nil
     var isPreview: Bool = false
     // Challenge-resolved display flags sent by backend
     var challengerCard: Bool = false
@@ -210,7 +211,8 @@ class GameViewModel {
         func song(_ id: String, _ title: String, _ artist: String, _ year: Int,
                   art: String? = nil, original: Bool = false, challenger: Bool = false) -> Song {
             Song(id: id, title: title, artist: artist, year: year, previewURL: nil,
-                 albumArt: art, isPreview: false,
+                 albumArt: art, appleMusicURL: "https://music.apple.com/se/song/1440818689",
+                 isPreview: false,
                  challengerCard: challenger, originalCard: original, isYourGuess: challenger)
         }
 
@@ -1025,6 +1027,7 @@ class GameViewModel {
             id: id, title: title, artist: artist, year: year,
             previewURL: dict["preview_url"] as? String,
             albumArt: dict["album_art"] as? String,
+            appleMusicURL: dict["apple_music_url"] as? String,
             isPreview: dict["preview"] as? Bool ?? false,
             challengerCard: dict["challengerCard"] as? Bool ?? false,
             originalCard: dict["originalCard"] as? Bool ?? false,

@@ -658,6 +658,10 @@ function selectForGame(criteria = {}) {
     preview_url: s.applePreviewUrl || s.previewUrl || null,
     preview_source: s.applePreviewUrl ? 'apple' : (s.previewUrl ? 'spotify' : null),
     external_url: null,
+    // Deep link to the song on Apple Music (for the "Listen on Apple Music"
+    // affordance on revealed timeline cards). Storefront matches enrichment (se);
+    // Apple redirects to the viewer's storefront if the song exists there.
+    apple_music_url: s.appleSongId ? `https://music.apple.com/se/song/${s.appleSongId}` : null,
     album_art: s.appleAlbumArt || s.albumArt || null,
     market: (Array.isArray(s.markets) && s.markets.length ? s.markets[0] : (s.geography || null)),
     genre: s.genre || 'curated',
