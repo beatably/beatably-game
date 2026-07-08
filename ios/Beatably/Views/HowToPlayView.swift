@@ -46,21 +46,25 @@ struct HowToPlayView: View {
                             .font(.system(.subheadline, design: .rounded))
                             .foregroundStyle(Color.beatText)
                         Link(destination: URL(string: "https://music.apple.com")!) {
-                            HStack(spacing: 5) {
-                                Text("Listen on")
-                                    .foregroundStyle(Color.beatText.opacity(0.6))
-                                Text("Apple Music")
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(Color(red: 0.980, green: 0.243, blue: 0.337))
-                            }
-                            .font(.system(.subheadline, design: .rounded))
+                            Image("ListenOnAppleMusic")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 44)
+                                .accessibilityLabel("Listen on Apple Music")
                         }
+                        .padding(.top, 2)
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.beatSurface)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.beatBorder, lineWidth: 1))
+
+                    Text(Self.versionString)
+                        .font(.system(.caption2, design: .rounded))
+                        .foregroundStyle(Color.beatMuted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4)
                 }
                 .padding(16)
                 .padding(.top, 8)
@@ -80,6 +84,15 @@ struct HowToPlayView: View {
             }
         }
         } // NavigationStack
+    }
+
+    // "Version 1.0 (254)" — read live from the bundle so it always reflects the
+    // shipped build (MARKETING_VERSION) and git-stamped build number (CFBundleVersion).
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Version \(version) (\(build))"
     }
 
     private struct Section: Identifiable {
