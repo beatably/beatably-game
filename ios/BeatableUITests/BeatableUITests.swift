@@ -32,7 +32,7 @@ final class BeatableUITests: XCTestCase {
         // Find the name TextField by placeholder (ZStack identifier propagation means
         // .accessibilityIdentifier on children isn't visible via identifier queries)
         let nameField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == 'Your name'")
+            NSPredicate(format: "placeholderValue == 'Your nickname or team name'")
         ).firstMatch
         XCTAssertTrue(nameField.waitForExistence(timeout: 12), "Landing screen did not appear")
         save(screenshot: "01_landing")
@@ -72,7 +72,7 @@ final class BeatableUITests: XCTestCase {
 
         // ── Landing → Lobby ───────────────────────────────────────────────
         let nameField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == 'Your name'")
+            NSPredicate(format: "placeholderValue == 'Your nickname or team name'")
         ).firstMatch
         XCTAssertTrue(nameField.waitForExistence(timeout: 10), "Landing screen did not appear")
         nameField.tap()
@@ -140,7 +140,7 @@ final class BeatableUITests: XCTestCase {
         app.launch()
 
         let nameField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == 'Your name'")
+            NSPredicate(format: "placeholderValue == 'Your nickname or team name'")
         ).firstMatch
         XCTAssertTrue(nameField.waitForExistence(timeout: 10))
         nameField.tap()
@@ -179,7 +179,7 @@ final class BeatableUITests: XCTestCase {
         app.launch()
 
         let nameField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == 'Your name'")
+            NSPredicate(format: "placeholderValue == 'Your nickname or team name'")
         ).firstMatch
         XCTAssertTrue(nameField.waitForExistence(timeout: 10))
         nameField.tap()
@@ -194,23 +194,34 @@ final class BeatableUITests: XCTestCase {
 
         joinButton.tap()
 
-        // After tapping Join, a sheet appears with name + room code fields
-        let joinCodeField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == 'Room code'")
+        // After tapping Join, a compact sheet appears with just the room code boxes —
+        // it auto-submits on the 4th digit, so there is no name field or Join button
+        // (the name was entered on the landing page).
+        let sheetTitle = app.staticTexts.matching(
+            NSPredicate(format: "label == 'Join a Game'")
         ).firstMatch
-        if !joinCodeField.waitForExistence(timeout: 10) {
+        if !sheetTitle.waitForExistence(timeout: 10) {
             // Dump tree to diagnose what's visible
             let tree = app.debugDescription
             try? tree.write(toFile: "/tmp/join_failure_tree.txt", atomically: true, encoding: .utf8)
             let shot = XCUIScreen.main.screenshot()
             try? shot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/join_failure.png"))
         }
-        XCTAssertTrue(joinCodeField.exists, "Join sheet did not appear")
-        let joinNameField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == 'Your name'")
-        ).element(boundBy: 0)
-        XCTAssertTrue(joinNameField.exists)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == 'Join'")).firstMatch.exists)
+        XCTAssertTrue(sheetTitle.exists, "Join sheet did not appear")
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "label == 'Join'")).firstMatch.exists,
+            "Normal-flow join sheet should have no Join button (auto-submits on 4th digit)"
+        )
+
+        // The code field auto-focuses → keyboard appears. With a fixed-height sheet the
+        // risk is the keyboard covering the code boxes; assert the "Room Code" label
+        // (just above the boxes) stays hittable, i.e. the sheet floats above the keyboard.
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3), "Keyboard should appear")
+        let roomCodeLabel = app.staticTexts.matching(NSPredicate(format: "label == 'Room Code'")).firstMatch
+        XCTAssertTrue(roomCodeLabel.isHittable, "Code boxes must not be hidden behind the keyboard")
+
+        sleep(2) // let the sheet settle and the numeric keyboard appear
+        save(screenshot: "08_join_sheet")
     }
 
     @MainActor

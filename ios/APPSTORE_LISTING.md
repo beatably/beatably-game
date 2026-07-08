@@ -2,6 +2,11 @@
 
 Copy-paste fields for App Store Connect. Character limits noted in parentheses.
 
+**Note:** App Store Connect splits these fields across two pages (left sidebar):
+- **Version page** ("iOS App 1.0"): screenshots, promotional text, description, keywords,
+  support/marketing URL, version, copyright, "What's New".
+- **App Information page** (General): subtitle, category, age rating, privacy policy URL.
+
 ---
 
 ## App name (30)
@@ -59,15 +64,22 @@ transient and not broadcast publicly, so this is not "user-generated content" in
 ---
 
 ## Screenshots
-Upload the **6.9" iPhone** set from `ios/screenshots/appstore/6.9/` (1320×2868):
+Preferred: upload the **6.9" set** (`ios/screenshots/appstore/6.9/`, 1320×2868) into the
+**6.9" iPhone** slot. In ASC that slot may be under **"View All Sizes in Media Manager"** if
+the version page defaults to showing the 6.5" box. The 6.9" set is the only required iPhone
+size — ASC auto-scales it down for all smaller devices.
+
+Fallback: if you'd rather use the 6.5" box shown by default, a resized set is at
+`ios/screenshots/appstore/6.5/` (1284×2778) — fits that box exactly.
+
+Order (same for both sets):
 1. `1-landing.png` — brand / hero
 2. `2-place-card.png` — placing a song on the timeline
 3. `3-challenge.png` — the challenge window
 4. `4-won-challenge.png` — winning a challenge
 5. `5-correct.png` — correct-placement reveal
 
-The 6.9" set satisfies Apple's requirement; App Store Connect scales it for smaller devices.
-(iPad screenshots only needed if you enable iPad support — currently iPhone-only is fine.)
+(iPad / Apple Watch screenshots only needed if you enable those platforms — iPhone-only is fine.)
 
 ## App Review notes (internal, for the reviewer)
 ```

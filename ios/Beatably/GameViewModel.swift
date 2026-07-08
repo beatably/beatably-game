@@ -349,7 +349,22 @@ class GameViewModel {
             remotePendingIndex = 1               // Alice tentatively placed after 1987
         }
 
+        // Creator lobby with the settings panel visible (chips + year-range slider).
+        func lobbyCreator() {
+            isCreator = true
+            roomCode = "ABCD"
+            players = [
+                Player(id: challengerId, name: "You", isCreator: true, isReady: true),
+                Player(id: originalId, name: "Alice", isCreator: false, isReady: true),
+            ]
+            gameSettings = GameSettings()
+            gameSettings.difficulty = "advanced"   // also surfaces the Genres row
+            view = .lobby
+        }
+
         switch scenario {
+        case "reconnecting":                 roomCode = "ABCD"; isConnected = false; view = .reconnecting; return
+        case "lobby-creator":                lobbyCreator(); return
         case "observer-preview":             observerPreview()
         case "song-guess":                   songGuess()
         case "challenge-resolved-won":       challengeResolved(challengerCorrect: true,  originalCorrect: false)

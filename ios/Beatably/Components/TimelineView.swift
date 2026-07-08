@@ -104,6 +104,11 @@ struct TimelineView: View {
     var challengeResult: ChallengeResult? = nil
     var startHint: String? = nil
     let onPlace: (Int) -> Void
+    // Tapping the pending "?" node again cancels the placement (same as the Cancel button).
+    // Only wired for the player who owns the placement; observers watching a remote pending
+    // node pass canCancelPending = false so their taps do nothing.
+    var canCancelPending: Bool = false
+    var onCancelPending: () -> Void = {}
 
     // ── Animation state ──────────────────────────────────────────────
     @State private var containerSize: CGSize = .zero
@@ -322,6 +327,8 @@ struct TimelineView: View {
                         // tapped slot to full size as it slides into place.
                         MysteryNode(size: (animPhase == .animating && !gapGrown) ? gapCircleSize : nodeSize,
                                     label: pendingLabel)
+                            .contentShape(Rectangle())
+                            .onTapGesture { if canCancelPending { onCancelPending() } }
                     } else if isChallengWindowMarker(song) || isChallengeMarker(song) {
                         // Placed/challenged card shown as the pink "?" marker, year hidden.
                         MysteryNode(label: yearLabel(for: song))

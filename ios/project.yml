@@ -18,12 +18,16 @@ targets:
       path: Beatably/Info.plist
       properties:
         ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
         UIBackgroundModes:
           - audio
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UILaunchScreen:
           UIColorName: LaunchBackground
+          UIImageName: LaunchLogo
+          UIImageRespectsSafeAreaInsets: true
         CFBundleURLTypes:
           - CFBundleURLName: app.beatably.ios
             CFBundleURLSchemes:

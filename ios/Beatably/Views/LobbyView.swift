@@ -271,9 +271,9 @@ private struct CreatorSettingsPanel: View {
             }
 
             // Year range
-            YearRangeRow(min: $bvm.gameSettings.yearMin, max: $bvm.gameSettings.yearMax)
-                .onChange(of: bvm.gameSettings.yearMin) { bvm.updateSettings() }
-                .onChange(of: bvm.gameSettings.yearMax)  { bvm.updateSettings() }
+            YearRangeRow(min: $bvm.gameSettings.yearMin, max: $bvm.gameSettings.yearMax) {
+                bvm.updateSettings()
+            }
 
             // Genres (advanced only)
             if bvm.gameSettings.difficulty == "advanced" {
@@ -377,9 +377,9 @@ private struct BeatSegmentPicker<T: Hashable>: View {
                     SoundManager.shared.impact(.light)
                 } label: {
                     Text(opt.label)
-                        .font(.system(.caption, design: .rounded).weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 11)
                         .background {
                             if selected {
                                 Capsule().fill(LinearGradient(
@@ -407,6 +407,7 @@ private struct BeatSegmentPicker<T: Hashable>: View {
 private struct YearRangeRow: View {
     @Binding var min: Int
     @Binding var max: Int
+    var onCommit: () -> Void = {}
     private let bounds = 1960...2025
 
     var body: some View {
@@ -420,7 +421,8 @@ private struct YearRangeRow: View {
                     .font(.system(.caption, design: .rounded).weight(.medium))
                     .foregroundStyle(Color.beatText)
             }
-            RangeSlider(low: $min, high: $max, bounds: bounds, step: 5)
+            RangeSlider(low: $min, high: $max, bounds: bounds, step: 5, onCommit: onCommit)
+                .padding(.horizontal, 6)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -435,6 +437,7 @@ private struct RangeSlider: View {
     @Binding var high: Int
     let bounds: ClosedRange<Int>
     let step: Int
+    var onCommit: () -> Void = {}
 
     @State private var draggingThumb: DragThumb? = nil
     private enum DragThumb { case low, high }
@@ -443,17 +446,22 @@ private struct RangeSlider: View {
 
     var body: some View {
         GeometryReader { geo in
+            let inset = thumbSize / 2
             let w = geo.size.width
+            // Usable track spans thumb-center to thumb-center, so thumbs never
+            // overflow the edges of the box.
+            let usable = max(1, w - thumbSize)
             let span = Double(bounds.upperBound - bounds.lowerBound)
             let lowFrac  = CGFloat(Double(low  - bounds.lowerBound) / span)
             let highFrac = CGFloat(Double(high - bounds.lowerBound) / span)
-            let rangeFrac = highFrac - lowFrac
+            let lowX  = inset + lowFrac  * usable
+            let highX = inset + highFrac * usable
 
-            ZStack {
+            ZStack(alignment: .leading) {
                 // Track background
                 Capsule()
                     .fill(Color.beatBorder)
-                    .frame(width: w, height: 4)
+                    .frame(height: 4)
 
                 // Active range fill
                 Capsule()
@@ -461,8 +469,8 @@ private struct RangeSlider: View {
                         colors: [Color.beatTeal, Color.beatGradientPurple],
                         startPoint: .leading, endPoint: .trailing
                     ))
-                    .frame(width: max(0, rangeFrac * w), height: 4)
-                    .offset(x: (lowFrac + rangeFrac / 2 - 0.5) * w)
+                    .frame(width: max(0, highX - lowX), height: 4)
+                    .offset(x: lowX)
 
                 // Low thumb — teal border matching web min-handle
                 Circle()
@@ -470,7 +478,7 @@ private struct RangeSlider: View {
                     .overlay(Circle().strokeBorder(Color.beatTeal, lineWidth: 2))
                     .frame(width: thumbSize, height: thumbSize)
                     .shadow(color: Color.beatTeal.opacity(0.3), radius: 4)
-                    .offset(x: (lowFrac - 0.5) * w)
+                    .offset(x: lowX - inset)
 
                 // High thumb — purple border matching web max-handle
                 Circle()
@@ -478,27 +486,42 @@ private struct RangeSlider: View {
                     .overlay(Circle().strokeBorder(Color.beatGradientPurple, lineWidth: 2))
                     .frame(width: thumbSize, height: thumbSize)
                     .shadow(color: Color.beatGradientPurple.opacity(0.3), radius: 4)
-                    .offset(x: (highFrac - 0.5) * w)
+                    .offset(x: highX - inset)
             }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { v in
-                        let frac = max(0, min(1, v.location.x / w))
+                        let frac = max(0, min(1, Double((v.location.x - inset) / usable)))
                         if draggingThumb == nil {
-                            let dLow  = abs(frac - lowFrac)
-                            let dHigh = abs(frac - highFrac)
+                            let dLow  = abs(frac - Double(lowFrac))
+                            let dHigh = abs(frac - Double(highFrac))
                             draggingThumb = dLow <= dHigh ? .low : .high
                         }
                         let raw = Double(bounds.lowerBound) + frac * span
                         let val = Int((raw / Double(step)).rounded()) * step
                         let clamped = max(bounds.lowerBound, min(bounds.upperBound, val))
                         switch draggingThumb {
-                        case .low:  if clamped + step <= high { low  = clamped }
-                        case .high: if clamped - step >= low  { high = clamped }
+                        case .low:
+                            if clamped + step <= high && clamped != low {
+                                low = clamped
+                                SoundManager.shared.impact(.light)
+                            }
+                        case .high:
+                            if clamped - step >= low && clamped != high {
+                                high = clamped
+                                SoundManager.shared.impact(.light)
+                            }
                         case nil: break
                         }
                     }
-                    .onEnded { _ in draggingThumb = nil }
+                    .onEnded { _ in
+                        draggingThumb = nil
+                        // Emit only once, at drag end — avoids the server echoing
+                        // stale values back mid-drag (which caused thumb flicker).
+                        onCommit()
+                    }
             )
         }
         .frame(height: thumbSize)

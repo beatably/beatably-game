@@ -6,6 +6,8 @@ struct LandingView: View {
     @State private var showJoin = false
     @State private var showHowToPlay = false
     @State private var joinCode = ""
+    // Whether the join sheet must collect a name itself (deep-link path only)
+    @State private var joinSheetNeedsName = false
     @FocusState private var nameFocused: Bool
 
     private var nameIsEmpty: Bool { name.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -14,6 +16,11 @@ struct LandingView: View {
         ZStack {
             // ── Video background ────────────────────────────────────
             VideoBackground(resource: "ghost5")
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+
+            // Dim the video so foreground content stays legible
+            Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
@@ -53,42 +60,51 @@ struct LandingView: View {
 
                 // ── Input + buttons ──────────────────────────────────
                 VStack(spacing: 12) {
+                    // Encouraging heading — everyone starts by entering a name
+                    Text("What should we call you?")
+                        .font(.system(.title3, design: .rounded).bold())
+                        .foregroundStyle(Color.beatText)
+
                     // Name field — brighter placeholder for contrast
-                    TextField("", text: $name, prompt: Text("Your name").foregroundStyle(Color.beatMuted))
+                    TextField("", text: $name, prompt: Text("Your nickname or team name").foregroundStyle(Color.beatMuted))
                         .font(.system(.body, design: .rounded))
                         .accessibilityIdentifier("landing.nameField")
                         .beatInput(focused: nameFocused)
                         .focused($nameFocused)
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(true)
+                        // Make the whole padded box tappable, not just the text baseline
+                        .contentShape(Rectangle())
+                        .onTapGesture { nameFocused = true }
 
-                    // Create — dims visually until name entered
-                    Button {
-                        let trimmed = name.trimmingCharacters(in: .whitespaces)
-                        guard !trimmed.isEmpty else { return }
-                        SoundManager.shared.impact(.medium)
-                        vm.createLobby(name: trimmed)
-                    } label: {
-                        BeatPrimaryLabel(title: "Create Game")
-                    }
-                    .buttonStyle(PressScaleStyle(haptic: .medium))
-                    .opacity(nameIsEmpty || !vm.isConnected ? 0.4 : 1)
-                    .disabled(nameIsEmpty || !vm.isConnected)
-                    .animation(.easeInOut(duration: 0.2), value: nameIsEmpty)
-                    .accessibilityIdentifier("landing.createGameButton")
+                    // Create + Join appear side by side once a name is entered
+                    if !nameIsEmpty {
+                        HStack(spacing: 12) {
+                            Button {
+                                let trimmed = name.trimmingCharacters(in: .whitespaces)
+                                guard !trimmed.isEmpty else { return }
+                                SoundManager.shared.impact(.medium)
+                                vm.createLobby(name: trimmed)
+                            } label: {
+                                BeatPrimaryLabel(title: "Create Game")
+                            }
+                            .buttonStyle(PressScaleStyle(haptic: .medium))
+                            .accessibilityIdentifier("landing.createGameButton")
 
-                    // Join
-                    Button {
-                        SoundManager.shared.impact(.light)
-                        showJoin = true
-                    } label: {
-                        BeatSecondaryLabel(title: "Join Game")
+                            Button {
+                                SoundManager.shared.impact(.light)
+                                joinSheetNeedsName = nameIsEmpty
+                                showJoin = true
+                            } label: {
+                                BeatSecondaryLabel(title: "Join Game")
+                            }
+                            .buttonStyle(PressScaleStyle(haptic: .light))
+                            .accessibilityIdentifier("landing.joinGameButton")
+                        }
+                        .opacity(!vm.isConnected ? 0.55 : 1)
+                        .disabled(!vm.isConnected)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
-                    .buttonStyle(PressScaleStyle(haptic: .light))
-                    .opacity(nameIsEmpty || !vm.isConnected ? 0.4 : 1)
-                    .disabled(nameIsEmpty || !vm.isConnected)
-                    .animation(.easeInOut(duration: 0.2), value: nameIsEmpty)
-                    .accessibilityIdentifier("landing.joinGameButton")
 
                     // How to play button
                     Button {
@@ -102,19 +118,29 @@ struct LandingView: View {
                         .foregroundStyle(Color.beatMuted)
                     }
                     .buttonStyle(.plain)
+                    .padding(.top, 12)
                 }
+                .animation(.easeInOut(duration: 0.25), value: nameIsEmpty)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 48)
             }
         }
-        .onAppear { startConnectedPulse() }
+        // Tap anywhere outside the field to dismiss the keyboard
+        .contentShape(Rectangle())
+        .onTapGesture { nameFocused = false }
+        .onAppear {
+            startConnectedPulse()
+            KeyboardPrewarmer.prewarm()
+        }
         .sheet(isPresented: $showHowToPlay) { HowToPlayView() }
         .accessibilityIdentifier("landing.screen")
         .sheet(isPresented: $showJoin) {
-            JoinSheet(name: $name, code: $joinCode, onJoin: { joinName, code in
+            JoinSheet(name: $name, code: $joinCode, showNameField: joinSheetNeedsName, onJoin: { joinName, code in
                 vm.joinLobby(name: joinName, code: code)
             })
-            .presentationDetents([.medium])
+            // Hug the content — a .medium detent leaves a large dead gap above the keyboard.
+            // Compact when it's just the code (auto-submits); taller when a name is needed.
+            .presentationDetents([.height(joinSheetNeedsName ? 380 : 230)])
         }
         .onAppear { consumePendingJoinCode() }
         .onChange(of: vm.pendingJoinCode) { _, _ in consumePendingJoinCode() }
@@ -138,6 +164,7 @@ struct LandingView: View {
     private func consumePendingJoinCode() {
         if let c = vm.pendingJoinCode {
             joinCode = c
+            joinSheetNeedsName = nameIsEmpty
             showJoin = true
             vm.pendingJoinCode = nil
         }
@@ -149,6 +176,9 @@ struct LandingView: View {
 private struct JoinSheet: View {
     @Binding var name: String
     @Binding var code: String
+    // True only when opened without a name (deep link) — the landing flow
+    // guarantees a name before the Join button appears.
+    let showNameField: Bool
     let onJoin: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
     @FocusState private var nameFocused: Bool
@@ -173,38 +203,46 @@ private struct JoinSheet: View {
                     .foregroundStyle(Color.beatText)
                     .padding(.top, 28)
 
-                TextField("", text: $name, prompt: Text("Your name").foregroundStyle(Color.beatDim))
-                    .font(.system(.body, design: .rounded))
-                    .accessibilityIdentifier("join.nameField")
-                    .beatInput(focused: nameFocused)
-                    .focused($nameFocused)
-                    .textInputAutocapitalization(.words)
-                    .disableAutocorrection(true)
-                    .padding(.horizontal, 24)
+                if showNameField {
+                    TextField("", text: $name, prompt: Text("Your nickname or team name").foregroundStyle(Color.beatDim))
+                        .font(.system(.body, design: .rounded))
+                        .accessibilityIdentifier("join.nameField")
+                        .beatInput(focused: nameFocused)
+                        .focused($nameFocused)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+                        .contentShape(Rectangle())
+                        .onTapGesture { nameFocused = true }
+                        .padding(.horizontal, 24)
+                }
 
                 VStack(spacing: 8) {
                     Text("Room Code")
                         .font(.system(.caption, design: .rounded).weight(.medium))
                         .foregroundStyle(Color.beatMuted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 24)
+                        .frame(maxWidth: .infinity, alignment: .center)
 
                     FourDigitCodeField(code: $code)
                         .padding(.horizontal, 24)
                         .accessibilityIdentifier("join.roomCodeField")
                 }
 
-                Button {
-                    submit()
-                } label: {
-                    BeatPrimaryLabel(title: "Join")
+                // The code field auto-submits on the 4th digit, so the Join button
+                // is only needed for the deep-link case where a name is still required
+                // (and may be entered after the code, which auto-proceed can't detect).
+                if showNameField {
+                    Button {
+                        submit()
+                    } label: {
+                        BeatPrimaryLabel(title: "Join")
+                    }
+                    .buttonStyle(PressScaleStyle())
+                    .disabled(!isReady)
+                    .padding(.horizontal, 24)
+                    .accessibilityIdentifier("join.submitButton")
                 }
-                .buttonStyle(PressScaleStyle())
-                .disabled(!isReady)
-                .padding(.horizontal, 24)
-                .accessibilityIdentifier("join.submitButton")
 
-                Spacer()
+                Spacer(minLength: 0)
             }
         }
         // Auto-proceed once the final digit is entered (name already filled).
@@ -229,13 +267,12 @@ private struct FourDigitCodeField: View {
                 get: { code },
                 set: { raw in
                     code = String(raw
-                        .uppercased()
-                        .filter { $0.isLetter || $0.isNumber }
+                        .filter { $0.isNumber }
                         .prefix(4))
                 }
             ))
             .focused($focused)
-            .textInputAutocapitalization(.characters)
+            .keyboardType(.numberPad)
             .disableAutocorrection(true)
             .opacity(0.001)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -273,6 +310,36 @@ private struct FourDigitCodeField: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
                 focused = true
             }
+        }
+    }
+}
+
+// MARK: - Keyboard prewarming
+
+/// The iOS text-input system loads lazily on the first `becomeFirstResponder`,
+/// which makes the very first tap on a text field feel sluggish. Briefly focusing
+/// an off-screen field at launch warms that subsystem so the first real tap is instant.
+enum KeyboardPrewarmer {
+    private static var didPrewarm = false
+
+    static func prewarm() {
+        guard !didPrewarm else { return }
+        didPrewarm = true
+
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow }) else { return }
+
+        let field = UITextField(frame: .zero)
+        field.alpha = 0
+        window.addSubview(field)
+        field.becomeFirstResponder()
+        // Resign on the next runloop turn — long enough to kick off the input
+        // system load, short enough that the keyboard never visibly appears.
+        DispatchQueue.main.async {
+            field.resignFirstResponder()
+            field.removeFromSuperview()
         }
     }
 }

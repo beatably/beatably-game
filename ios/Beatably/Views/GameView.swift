@@ -55,7 +55,9 @@ struct GameView: View {
                         .frame(minHeight: 110)
                 }
                 .animation(.spring(duration: 0.3), value: vm.gamePhase)
-                .background(Color.beatSurface)
+                // Slightly lighter than beatSurface so the action card stands out from the
+                // near-black starry timeline area (still below beatSurface2 for nested contrast).
+                .background(Color(hex: "19162E"))
             }
 
             // ── Full-screen overlays ────────────────────────────────────────────
@@ -451,6 +453,12 @@ private struct TimelineSection: View {
                     vm.selectPlacement(index: $0)
                     SoundManager.shared.play(.placement)
                     SoundManager.shared.impact(.light)
+                },
+                // Tapping the pink pending node again cancels — mirror the Cancel button.
+                canCancelPending: canPlace,
+                onCancelPending: {
+                    SoundManager.shared.impact(.light)
+                    vm.cancelPlacement()
                 }
             )
             .frame(maxHeight: .infinity)
