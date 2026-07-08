@@ -1029,6 +1029,10 @@ app.post('/api/admin/enrich-apple-music', requireAdmin, async (req, res) => {
       startedAt: new Date().toISOString(), write, storefront, force,
       total: songs.length, isrcFound: 0, matched: 0, matchedByIsrc: 0,
       matchedBySearch: 0, withPreview: 0, unmatched: [], matchedNoPreview: [],
+      errors: [], // surface first few Apple API failures for diagnosis
+    };
+    const noteError = (phase, e) => {
+      if (report.errors.length < 5) report.errors.push(`${phase}: ${e?.message || e}`);
     };
     try {
       // Phase A: fetch missing ISRCs from Spotify (admin-side only), 50/batch
@@ -1071,6 +1075,7 @@ app.post('/api/admin/enrich-apple-music', requireAdmin, async (req, res) => {
           }
         } catch (e) {
           console.error('[AdminEnrich][apple] ISRC resolve batch failed at', i, e?.message);
+          noteError('isrc-resolve', e);
         }
         importProgress.done = Math.min(i + 25, withIsrc.length);
         await sleep(150);
@@ -1082,7 +1087,7 @@ app.post('/api/admin/enrich-apple-music', requireAdmin, async (req, res) => {
         try {
           const hit = await appleMusic.searchSong(s.artist, s.title, storefront);
           if (hit) resolved[s.id] = { ...hit, matchedVia: 'search' };
-        } catch (e) { /* leave unmatched */ }
+        } catch (e) { noteError('search', e); }
         importProgress.done++;
         await sleep(160);
       }
@@ -1130,6 +1135,34 @@ app.get('/api/admin/enrich-apple-music/report', requireAdmin, async (req, res) =
     res.json(JSON.parse(await fsPromises.readFile(file, 'utf8')));
   } catch (e) {
     res.status(404).json({ ok: false, error: 'No report yet — run POST /api/admin/enrich-apple-music first' });
+  }
+});
+
+// Diagnostic: verify Apple Music credentials without running enrichment.
+// Reports config source, whether a token mints, and a known-good ISRC lookup.
+app.get('/api/admin/apple-music-status', requireAdmin, async (req, res) => {
+  const appleMusic = require('./appleMusic');
+  const out = {
+    configured: appleMusic.isConfigured(),
+    keySource: process.env.APPLE_MUSIC_PRIVATE_KEY ? 'inline'
+      : (process.env.APPLE_MUSIC_PRIVATE_KEY_PATH ? `file:${process.env.APPLE_MUSIC_PRIVATE_KEY_PATH}` : 'none'),
+    teamIdSet: !!process.env.APPLE_MUSIC_TEAM_ID,
+    keyIdSet: !!process.env.APPLE_MUSIC_KEY_ID,
+  };
+  if (!out.configured) return res.json({ ok: false, ...out, error: 'not configured' });
+  try {
+    out.tokenMinted = !!appleMusic.getDeveloperToken();
+  } catch (e) {
+    return res.json({ ok: false, ...out, tokenMinted: false, error: `token mint failed: ${e.message}` });
+  }
+  try {
+    // Feel Good Inc. — Gorillaz (GBAYE0500172): should resolve with a preview.
+    const map = await appleMusic.resolveIsrcBatch(['GBAYE0500172'], 'se');
+    const hit = map.get('GBAYE0500172');
+    out.testLookup = hit ? { matched: true, hasPreview: !!hit.applePreviewUrl } : { matched: false };
+    res.json({ ok: !!hit, ...out });
+  } catch (e) {
+    res.json({ ok: false, ...out, error: `Apple API call failed: ${e.message}` });
   }
 });
 

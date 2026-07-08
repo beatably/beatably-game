@@ -23,11 +23,26 @@ function isConfigured() {
     (process.env.APPLE_MUSIC_PRIVATE_KEY || process.env.APPLE_MUSIC_PRIVATE_KEY_PATH));
 }
 
-function privateKey() {
-  if (process.env.APPLE_MUSIC_PRIVATE_KEY) {
-    return process.env.APPLE_MUSIC_PRIVATE_KEY.replace(/\\n/g, '\n');
+// Reconstruct a valid PEM even if newlines were mangled in transit (a common
+// problem when a .p8 is pasted into an env var or a hosting "secret file" —
+// newlines get escaped as literal "\n" or collapsed entirely, which makes
+// OpenSSL fail with "DECODER routines::unsupported").
+function normalizePem(raw) {
+  let k = String(raw).trim().replace(/\\n/g, '\n').replace(/\r/g, '');
+  if (!k.includes('\n')) {
+    const m = k.match(/-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \1-----/);
+    if (m) {
+      const body = m[2].replace(/\s+/g, '').match(/.{1,64}/g).join('\n');
+      k = `-----BEGIN ${m[1]}-----\n${body}\n-----END ${m[1]}-----`;
+    }
   }
-  return fs.readFileSync(process.env.APPLE_MUSIC_PRIVATE_KEY_PATH, 'utf8');
+  return k.endsWith('\n') ? k : k + '\n';
+}
+
+function privateKey() {
+  const raw = process.env.APPLE_MUSIC_PRIVATE_KEY
+    || fs.readFileSync(process.env.APPLE_MUSIC_PRIVATE_KEY_PATH, 'utf8');
+  return normalizePem(raw);
 }
 
 function getDeveloperToken() {
