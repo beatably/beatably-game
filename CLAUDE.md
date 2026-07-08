@@ -1,6 +1,8 @@
 # Beatably — Claude Code Guide
 
-Beatably is a multiplayer music timeline game. Players place songs in chronological order; first to reach the target count wins. React SPA frontend (Netlify) + Node.js/Socket.io backend (Render). Live at https://beatably.app.
+Beatably is a multiplayer music timeline game. Players place songs in chronological order; first to reach the target count wins. React SPA frontend (Netlify) + Node.js/Socket.io backend (Render). Live at https://beatably.app. Native **iOS app** (Swift/SwiftUI, xcodegen) under `ios/` — submitted to the App Store July 2026 (see [ios/APPSTORE_LISTING.md](ios/APPSTORE_LISTING.md)).
+
+> **Biggest recent change:** Spotify's developer policy bans games, so the Spotify **Full Play** (Premium web playback) mode was removed and consumer previews/album art were migrated to **Apple Music** (MusicKit). Spotify now only powers admin-side song sourcing. See "Audio migration" below.
 
 ---
 
@@ -17,13 +19,20 @@ cd frontend && npm install && npm run dev
 Create `backend/.env` before starting:
 ```
 NODE_ENV=development
-SPOTIFY_CLIENT_ID=your_id
+SPOTIFY_CLIENT_ID=your_id           # admin-side song sourcing only (search); no user OAuth
 SPOTIFY_CLIENT_SECRET=your_secret
 FRONTEND_URI=http://127.0.0.1:5173
 ADMIN_PASSWORD=anything
+# Apple Music (MusicKit) — powers consumer preview URLs + album art (see appleMusic.js)
+APPLE_MUSIC_TEAM_ID=your_team_id
+APPLE_MUSIC_KEY_ID=your_musickit_key_id
+APPLE_MUSIC_PRIVATE_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8
 ```
 
-Use `127.0.0.1` not `localhost` — Spotify OAuth requires the exact registered URI.
+**Audio migration (July 2026):** Spotify's developer policy prohibits games, so consumer-facing
+30s previews + album art now come from **Apple Music** (`applePreviewUrl`/`appleAlbumArt` per song,
+via the admin enrichment endpoint). Spotify is **admin-side only** (song search/curation via client
+credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was removed).
 
 ---
 
@@ -35,7 +44,8 @@ Use `127.0.0.1` not `localhost` — Spotify OAuth requires the exact registered 
 | `frontend/src/GameFooter.jsx` | Playback controls, song info, credits, challenge UI (~1,730 lines) |
 | `frontend/src/CurvedTimeline.jsx` | Timeline visualization, tap-based card placement (~1,200 lines) |
 | `backend/index.js` | All HTTP routes + Socket.io game logic (~5,300 lines) |
-| `backend/curatedDb.js` | File-backed song database (reads/writes `cache/curated-songs.json`) |
+| `backend/curatedDb.js` | File-backed song database (reads/writes `cache/curated-songs.json`); serves `applePreviewUrl`/`appleAlbumArt`/`apple_music_url` when present |
+| `backend/appleMusic.js` | Apple Music (MusicKit) client — ES256 dev token + ISRC catalog lookup, for `POST /api/admin/enrich-apple-music` |
 | `backend/config.js` | Feature flags: `CHART_MODE_ENABLE`, `MUSICBRAINZ_ENABLE`, `REMASTER_FILTER_ENABLE` |
 | `frontend/src/config.js` | API URL: dev → `:3001`, prod → `beatably-backend.onrender.com` |
 | `frontend/src/contexts/PreviewModeContext.jsx` | Preview playback context (30s Apple Music clips — the only audio mode) |
@@ -55,7 +65,7 @@ Use `127.0.0.1` not `localhost` — Spotify OAuth requires the exact registered 
 ## Gotchas
 
 - **CurvedTimeline is tap-based**, not drag-and-drop — despite `react-dnd` being in the dependencies
-- **Dead code**: `frontend/src/lib/spotify/PlayerSync.ts` — gated behind `VITE_SPOTIFY_SYNC_V2=true` which is never set; ignore it
+- **Full Play removed (July 2026)**: the Spotify Premium web-playback subsystem (Web Playback SDK, `/me/player` control, device discovery, OAuth `/login`+`/callback`) was deleted. Preview playback is the only audio mode; `PreviewModeContext.isPreviewMode` is always true. Don't reintroduce Spotify user-auth.
 - **Unused packages**: `@radix-ui/react-slider`, `@radix-ui/react-switch`, `lucide-react`
 
 ---

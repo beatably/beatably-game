@@ -1,6 +1,6 @@
 # Beatably
 
-A multiplayer music timeline game. Players take turns placing songs in chronological order on a shared timeline. Real-time Spotify integration for music playback.
+A multiplayer music timeline game. Players take turns placing songs in chronological order on a shared timeline. Songs play as 30-second **Apple Music** previews; a native **iOS app** is on the App Store.
 
 **Live:** https://beatably.app
 
@@ -21,7 +21,7 @@ A multiplayer music timeline game. Players take turns placing songs in chronolog
 
 ## Local Development
 
-**Requirements:** Node 18+, Spotify Developer credentials
+**Requirements:** Node 18+, Spotify Developer credentials (admin-side song sourcing), Apple Music (MusicKit) key (consumer previews/art)
 
 ```bash
 # Backend (port 3001)
@@ -34,14 +34,14 @@ cd frontend && npm install && npm run dev
 Create `backend/.env`:
 ```env
 NODE_ENV=development
-SPOTIFY_CLIENT_ID=your_id
+SPOTIFY_CLIENT_ID=your_id            # admin song search only — no user OAuth
 SPOTIFY_CLIENT_SECRET=your_secret
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/callback
 FRONTEND_URI=http://127.0.0.1:5173
 ADMIN_PASSWORD=anything
+APPLE_MUSIC_TEAM_ID=your_team_id
+APPLE_MUSIC_KEY_ID=your_musickit_key_id
+APPLE_MUSIC_PRIVATE_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8
 ```
-
-Add `http://127.0.0.1:5173/callback` as a Redirect URI in your [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
 
 Visit `http://127.0.0.1:5173`
 
@@ -51,7 +51,8 @@ Visit `http://127.0.0.1:5173`
 
 - **Frontend:** React 19, Vite, Tailwind CSS, react-dnd, socket.io-client
 - **Backend:** Node.js, Express 5, Socket.io 4
-- **Music:** Spotify Web Playback SDK + Web API
+- **Music:** Apple Music (MusicKit) 30s previews + art for players; Spotify Web API for admin-side song sourcing only (Full Play / Spotify user playback removed July 2026)
+- **iOS:** Swift/SwiftUI native app (`ios/`, xcodegen), on the App Store
 - **Hosting:** Netlify (frontend) + Render (backend)
 
 ---
