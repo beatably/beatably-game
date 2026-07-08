@@ -282,6 +282,7 @@ class GameViewModel {
             placementResult = PlacementResult(id: "song-placed", correct: true, year: 1990)
             challengeState = nil
             gamePhase = "song-guess"
+            showSongGuess = true   // present the guess sheet (for seeded screenshots)
         }
 
         // Challenge-window: local player just placed a card (hidden "?") and others may

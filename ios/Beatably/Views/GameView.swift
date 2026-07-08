@@ -62,11 +62,6 @@ struct GameView: View {
             }
 
             // ── Full-screen overlays ────────────────────────────────────────────
-            if let song = songDetail {
-                SongDetailOverlay(song: song) { songDetail = nil }
-                    .zIndex(9)
-            }
-            if vm.showSongGuess                         { SongGuessOverlay() }
             if vm.gamePhase == "game-over"              { GameOverOverlay() }
 
             // Player-left modal (centered popup)
@@ -151,6 +146,21 @@ struct GameView: View {
         }
         .sheet(isPresented: $showHowToPlay) {
             HowToPlayView()
+        }
+        .sheet(item: $songDetail) { song in
+            SongDetailSheet(song: song) { songDetail = nil }
+                .presentationDetents([.height(470)])
+                .presentationBackground(Color.beatBg)
+                .presentationCornerRadius(28)
+        }
+        .sheet(isPresented: Binding(
+            get: { vm.showSongGuess },
+            set: { if !$0 && vm.showSongGuess { vm.skipSongGuess() } }
+        )) {
+            SongGuessSheet { vm.skipSongGuess() }
+                .presentationDetents([.height(440)])
+                .presentationBackground(Color.beatBg)
+                .presentationCornerRadius(28)
         }
     }
 }
@@ -747,8 +757,9 @@ private struct InlineRevealFooter: View {
 
 // MARK: - Song Guess Overlay
 
-private struct SongGuessOverlay: View {
+private struct SongGuessSheet: View {
     @Environment(GameViewModel.self) private var vm
+    let onClose: () -> Void
     @State private var title = ""
     @State private var artist = ""
     @State private var submitted = false
@@ -756,70 +767,56 @@ private struct SongGuessOverlay: View {
     @FocusState private var artistFocused: Bool
 
     var body: some View {
-        ZStack {
-            Color.beatBg.opacity(0.88).ignoresSafeArea()
+        VStack(spacing: 18) {
+            SheetCloseHeader(onClose: onClose)
 
-            VStack(spacing: 20) {
-                VStack(spacing: 6) {
-                    Text("Guess the Song")
-                        .font(.system(.title2, design: .rounded).bold())
-                        .foregroundStyle(Color.beatText)
-                    Text("Both title and artist must be correct for the bonus!")
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(Color.beatMuted)
-                        .multilineTextAlignment(.center)
-                }
-
-                VStack(spacing: 10) {
-                    TextField("", text: $title, prompt: Text("Song title").foregroundStyle(Color.beatDim))
-                        .font(.system(.body, design: .rounded))
-                        .beatInput(focused: titleFocused)
-                        .focused($titleFocused)
-                        .submitLabel(.next)
-                        .onSubmit { artistFocused = true }
-                    TextField("", text: $artist, prompt: Text("Artist").foregroundStyle(Color.beatDim))
-                        .font(.system(.body, design: .rounded))
-                        .beatInput(focused: artistFocused)
-                        .focused($artistFocused)
-                        .submitLabel(.done)
-                        .onSubmit { submitGuess() }
-                }
-
-                HStack(spacing: 12) {
-                    Button {
-                        SoundManager.shared.impact(.light)
-                        submitted = true; vm.skipSongGuess()
-                    } label: {
-                        BeatSecondaryLabel(title: "Skip")
-                    }
-                    .buttonStyle(PressScaleStyle(haptic: .light))
-                    .disabled(submitted)
-
-                    Button { submitGuess() } label: {
-                        BeatPrimaryLabel(title: "Submit Guess", isLoading: submitted)
-                    }
-                    .buttonStyle(PressScaleStyle())
-                    .disabled(submitted || (title.trimmingCharacters(in: .whitespaces).isEmpty && artist.trimmingCharacters(in: .whitespaces).isEmpty))
-                }
+            VStack(spacing: 6) {
+                Text("Guess the Song")
+                    .font(.system(.title2, design: .rounded).bold())
+                    .foregroundStyle(Color.beatText)
+                Text("Both title and artist must be correct for the bonus!")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(Color.beatMuted)
+                    .multilineTextAlignment(.center)
             }
-            .padding(28)
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.beatSurface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [Color.beatPurple.opacity(0.5), Color.beatCyan.opacity(0.2)],
-                                    startPoint: .topLeading, endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(color: Color.beatPurple.opacity(0.3), radius: 24)
-            )
-            .padding(.horizontal, 24)
+
+            VStack(spacing: 10) {
+                TextField("", text: $title, prompt: Text("Song title").foregroundStyle(Color.beatDim))
+                    .font(.system(.body, design: .rounded))
+                    .beatInput(focused: titleFocused)
+                    .focused($titleFocused)
+                    .submitLabel(.next)
+                    .onSubmit { artistFocused = true }
+                TextField("", text: $artist, prompt: Text("Artist").foregroundStyle(Color.beatDim))
+                    .font(.system(.body, design: .rounded))
+                    .beatInput(focused: artistFocused)
+                    .focused($artistFocused)
+                    .submitLabel(.done)
+                    .onSubmit { submitGuess() }
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    SoundManager.shared.impact(.light)
+                    submitted = true; vm.skipSongGuess()
+                } label: {
+                    BeatSecondaryLabel(title: "Skip")
+                }
+                .buttonStyle(PressScaleStyle(haptic: .light))
+                .disabled(submitted)
+
+                Button { submitGuess() } label: {
+                    BeatPrimaryLabel(title: "Submit Guess", isLoading: submitted)
+                }
+                .buttonStyle(PressScaleStyle())
+                .disabled(submitted || (title.trimmingCharacters(in: .whitespaces).isEmpty && artist.trimmingCharacters(in: .whitespaces).isEmpty))
+            }
+
+            Spacer(minLength: 4)
         }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity)
     }
 
     private func submitGuess() {
