@@ -219,13 +219,13 @@ class GameViewModel {
         // Test-only album-art fixtures (iTunes artworkUrl100). Used to verify the
         // album-art timeline nodes render; one card per reveal scenario is left artless
         // to also exercise the gradient/music-note fallback.
-        let artFeelGood = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/1c/0f/81/1c0f818a-e458-dd84-6f1b-ccbdf5fe14d6/825646291045.jpg/100x100bb.jpg"
-        let artDoves    = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/9d/14/10/9d141037-6ad8-4847-6622-bcff54e8584e/886448962830.jpg/100x100bb.jpg"
-        let artLose     = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/08/23/fc/0823fcd9-cb44-695b-32bf-b3bf51d9f800/00606949351229.rgb.jpg/100x100bb.jpg"
-        let artHeyJude  = "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/a6/8b/65/a68b657c-cac6-68e6-3bde-b79d58fbc795/18UMGIM30762.rgb.jpg/100x100bb.jpg"
-        let artU2       = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/9a/48/54/9a485494-b969-aaf4-a916-07452ea69869/06UMGIM72507.rgb.jpg/100x100bb.jpg"
-        let artFallin   = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/bb/4d/55/bb4d552c-04d8-29ba-1b41-6ff8bcd199a5/808132000222.jpg/100x100bb.jpg"
-        let artNothing  = "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/fa/19/3f/fa193fc7-f9cf-c84e-c7ef-77b2fceb3a3e/5054526647565.png/100x100bb.jpg"
+        let artFeelGood = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/1c/0f/81/1c0f818a-e458-dd84-6f1b-ccbdf5fe14d6/825646291045.jpg/640x640bb.jpg"
+        let artDoves    = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/9d/14/10/9d141037-6ad8-4847-6622-bcff54e8584e/886448962830.jpg/640x640bb.jpg"
+        let artLose     = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/08/23/fc/0823fcd9-cb44-695b-32bf-b3bf51d9f800/00606949351229.rgb.jpg/640x640bb.jpg"
+        let artHeyJude  = "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/a6/8b/65/a68b657c-cac6-68e6-3bde-b79d58fbc795/18UMGIM30762.rgb.jpg/640x640bb.jpg"
+        let artU2       = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/9a/48/54/9a485494-b969-aaf4-a916-07452ea69869/06UMGIM72507.rgb.jpg/640x640bb.jpg"
+        let artFallin   = "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/bb/4d/55/bb4d552c-04d8-29ba-1b41-6ff8bcd199a5/808132000222.jpg/640x640bb.jpg"
+        let artNothing  = "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/fa/19/3f/fa193fc7-f9cf-c84e-c7ef-77b2fceb3a3e/5054526647565.png/640x640bb.jpg"
 
         // The challenged card (2005) appears twice: once for each player's placement.
         // Timeline order shows original-before-1984 vs challenger-after-1984 so the two

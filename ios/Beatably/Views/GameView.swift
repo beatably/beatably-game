@@ -124,7 +124,8 @@ struct GameView: View {
         .onAppear {
             // Test hook: auto-open the song detail card for screenshot verification.
             if ProcessInfo.processInfo.arguments.contains("UITEST_SHOW_SONGDETAIL"),
-               songDetail == nil, let s = vm.timeline.first {
+               songDetail == nil,
+               let s = vm.timeline.first(where: { $0.albumArt != nil }) ?? vm.timeline.first {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { songDetail = s }
             }
         }

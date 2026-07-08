@@ -37,17 +37,6 @@ struct BottomCard<Content: View>: View {
                         .shadow(color: glow.opacity(0.165), radius: 32, y: -1)
                         .shadow(color: glow.opacity(0.084), radius: 60, y: -1)
                 }
-                // Subtle top-edge highlight so the card separates from the glow.
-                .overlay(alignment: .top) {
-                    UnevenRoundedRectangle(topLeadingRadius: corner, topTrailingRadius: corner)
-                        .strokeBorder(
-                            LinearGradient(colors: [glow.opacity(0.3), .clear],
-                                           startPoint: .top, endPoint: .bottom),
-                            lineWidth: 1
-                        )
-                        .ignoresSafeArea(edges: .bottom)
-                        .allowsHitTesting(false)
-                }
                 .overlay(alignment: .topTrailing) {
                     Button(action: onClose) {
                         Image(systemName: "xmark")

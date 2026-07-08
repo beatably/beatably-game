@@ -6,10 +6,14 @@ import SwiftUI
 struct SongDetailSheet: View {
     let song: Song
 
-    // Apple artwork URLs bake in a size token (we store 640x640); request a
-    // larger render for the enlarged card so it isn't upscaled/blurry.
+    // Apple artwork URLs end in /{W}x{H}bb.jpg — request a larger render for the
+    // enlarged card so it isn't upscaled/blurry, regardless of the stored size.
     private var highResArt: String? {
-        song.albumArt?.replacingOccurrences(of: "640x640", with: "1200x1200")
+        song.albumArt?.replacingOccurrences(
+            of: #"/\d+x\d+bb\.jpg$"#,
+            with: "/1200x1200bb.jpg",
+            options: .regularExpression
+        )
     }
 
     var body: some View {
