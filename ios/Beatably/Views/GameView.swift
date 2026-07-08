@@ -4,6 +4,7 @@ struct GameView: View {
     @Environment(GameViewModel.self) private var vm
     @State private var showMenu = false
     @State private var showHowToPlay = false
+    @State private var songDetail: Song? = nil   // tapped revealed timeline card
     @State private var showExitConfirm = false
     @State private var showRestartConfirm = false
     @State private var showCoinAnim = false
@@ -30,7 +31,7 @@ struct GameView: View {
                 }
 
                 // ── Timeline — fills all available space ────────────────────────
-                TimelineSection()
+                TimelineSection(onCardTap: { songDetail = $0 })
                     .frame(maxHeight: .infinity)
 
                 // ── Bottom footer — solid surface for readability ───────────────
@@ -61,6 +62,10 @@ struct GameView: View {
             }
 
             // ── Full-screen overlays ────────────────────────────────────────────
+            if let song = songDetail {
+                SongDetailOverlay(song: song) { songDetail = nil }
+                    .zIndex(9)
+            }
             if vm.showSongGuess                         { SongGuessOverlay() }
             if vm.gamePhase == "game-over"              { GameOverOverlay() }
 
@@ -108,6 +113,13 @@ struct GameView: View {
         .coordinateSpace(.named("gameRoot"))
         .overlay(alignment: .top) {
             if !vm.isConnected { ReconnectingBanner() }
+        }
+        .onAppear {
+            // Test hook: auto-open the song detail card for screenshot verification.
+            if ProcessInfo.processInfo.arguments.contains("UITEST_SHOW_SONGDETAIL"),
+               songDetail == nil, let s = vm.timeline.first {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { songDetail = s }
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: vm.isConnected)
         .onChange(of: vm.creditSpendMessage) { _, msg in
@@ -346,6 +358,7 @@ private struct NonCreatorProgressBar: View {
 
 private struct TimelineSection: View {
     @Environment(GameViewModel.self) private var vm
+    let onCardTap: (Song) -> Void
 
     // One-time explainer shown in round one (single starter card visible). Persists across
     // launches via AppStorage; `dismissed` hides it immediately within the session.
@@ -459,6 +472,10 @@ private struct TimelineSection: View {
                 onCancelPending: {
                     SoundManager.shared.impact(.light)
                     vm.cancelPlacement()
+                },
+                onCardTap: { song in
+                    SoundManager.shared.impact(.light)
+                    onCardTap(song)
                 }
             )
             .frame(maxHeight: .infinity)
