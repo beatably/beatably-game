@@ -131,6 +131,10 @@ struct LandingView: View {
         .onAppear {
             startConnectedPulse()
             KeyboardPrewarmer.prewarm()
+            // Test hook: auto-present How to Play for screenshot verification.
+            if ProcessInfo.processInfo.arguments.contains("UITEST_SHOW_HOWTOPLAY") {
+                showHowToPlay = true
+            }
         }
         .sheet(isPresented: $showHowToPlay) { HowToPlayView() }
         .accessibilityIdentifier("landing.screen")

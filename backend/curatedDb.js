@@ -558,8 +558,10 @@ function selectForGame(criteria = {}) {
   let pool = _songs.slice();
 
   // CRITICAL: Filter out songs without preview URLs ONLY if in preview mode
+  // (Apple Music previews take precedence; scraped Spotify previewUrl is legacy fallback)
   if (previewMode) {
-    pool = pool.filter((s) => s.previewUrl && s.previewUrl.trim() !== '');
+    pool = pool.filter((s) => (s.applePreviewUrl && s.applePreviewUrl.trim() !== '') ||
+      (s.previewUrl && s.previewUrl.trim() !== ''));
     console.log(`[CuratedDB] Preview mode: Filtered to ${pool.length} songs with preview URLs`);
   }
 
@@ -653,9 +655,10 @@ function selectForGame(criteria = {}) {
     year: s.year,
     uri: s.spotifyUri, // must be spotify:track:...
     spotifyUri: s.spotifyUri, // Keep both for compatibility
-    preview_url: s.previewUrl || null,
+    preview_url: s.applePreviewUrl || s.previewUrl || null,
+    preview_source: s.applePreviewUrl ? 'apple' : (s.previewUrl ? 'spotify' : null),
     external_url: null,
-    album_art: s.albumArt || null,
+    album_art: s.appleAlbumArt || s.albumArt || null,
     market: (Array.isArray(s.markets) && s.markets.length ? s.markets[0] : (s.geography || null)),
     genre: s.genre || 'curated',
     popularity: s.popularity || null,

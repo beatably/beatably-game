@@ -34,10 +34,40 @@ struct HowToPlayView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.beatBorder, lineWidth: 1))
                     }
+
+                    // Apple Music attribution — previews and album art come from the
+                    // Apple Music catalog (MusicKit); shown as the content source for
+                    // App Review and per MusicKit attribution guidance.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Music", systemImage: "music.note.list")
+                            .font(.system(.headline, design: .rounded).weight(.semibold))
+                            .foregroundStyle(Color.beatTeal)
+                        Text("Song previews and album artwork are provided by Apple Music.")
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(Color.beatText)
+                        Link(destination: URL(string: "https://music.apple.com")!) {
+                            HStack(spacing: 5) {
+                                Text("Listen on")
+                                    .foregroundStyle(Color.beatText.opacity(0.6))
+                                Text("Apple Music")
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color(red: 0.980, green: 0.243, blue: 0.337))
+                            }
+                            .font(.system(.subheadline, design: .rounded))
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.beatSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.beatBorder, lineWidth: 1))
                 }
                 .padding(16)
                 .padding(.top, 8)
             }
+            .defaultScrollAnchor(
+                ProcessInfo.processInfo.arguments.contains("UITEST_SHOW_HOWTOPLAY") ? .bottom : .top
+            )
         }
         .navigationTitle("How to Play")
         .navigationBarTitleDisplayMode(.inline)

@@ -1054,6 +1054,159 @@ app.post('/api/admin/enrich-batch', requireAdmin, async (req, res) => {
 });
 
 /**
+ * Admin - Apple Music enrichment
+ * Attaches isrc + appleSongId/applePreviewUrl/appleAlbumArt to curated songs so
+ * consumer playback can use Apple previews instead of scraped Spotify ones.
+ * Dry-run by default — pass { write: true } to persist (auto-backup first).
+ * Body: { write?: bool, storefront?: string ('se'), limit?: number, force?: bool }
+ * Progress via GET /api/admin/import/progress; report at
+ * GET /api/admin/enrich-apple-music/report (written to CACHE_DIR).
+ */
+app.post('/api/admin/enrich-apple-music', requireAdmin, async (req, res) => {
+  const fsPromises = require('fs').promises;
+  const appleMusic = require('./appleMusic');
+  if (!appleMusic.isConfigured()) {
+    return res.status(503).json({ ok: false, error: 'APPLE_MUSIC_TEAM_ID / APPLE_MUSIC_KEY_ID / APPLE_MUSIC_PRIVATE_KEY(_PATH) not configured' });
+  }
+  if (importProgress && importProgress.active) {
+    return res.status(409).json({ ok: false, error: 'Another import/enrich job is already running' });
+  }
+  const write = req.body?.write === true;
+  const force = req.body?.force === true;
+  const storefront = String(req.body?.storefront || 'se').toLowerCase();
+  const limit = Number.isFinite(Number(req.body?.limit)) && Number(req.body.limit) > 0 ? Number(req.body.limit) : null;
+
+  let songs = curatedDb.list({ limit: 999999 }).items.filter(s => s.spotifyUri);
+  if (!force) songs = songs.filter(s => !s.applePreviewUrl);
+  if (limit) songs = songs.slice(0, limit);
+
+  // Auto-backup before any write run
+  let backupFile = null;
+  if (write && curatedDb.DB_FILE) {
+    try {
+      const timestamp = new Date().toISOString().replace(/:/g, '-');
+      backupFile = path.join(curatedDb.CACHE_DIR, `curated-songs.backup-${timestamp}.json`);
+      await fsPromises.copyFile(curatedDb.DB_FILE, backupFile);
+      console.log(`[AdminEnrich][apple] Backup saved: ${backupFile}`);
+      pruneCuratedBackups();
+    } catch (backupErr) {
+      console.warn('[AdminEnrich][apple] Backup failed (continuing anyway):', backupErr.message);
+    }
+  }
+
+  importProgress = { active: true, task: 'enrich-apple', done: 0, total: songs.length, matched: 0, write, storefront };
+  res.json({ ok: true, total: songs.length, write, storefront, backupFile });
+
+  (async () => {
+    const report = {
+      startedAt: new Date().toISOString(), write, storefront, force,
+      total: songs.length, isrcFound: 0, matched: 0, matchedByIsrc: 0,
+      matchedBySearch: 0, withPreview: 0, unmatched: [], matchedNoPreview: [],
+    };
+    try {
+      // Phase A: fetch missing ISRCs from Spotify (admin-side only), 50/batch
+      const needIsrc = songs.filter(s => !s.isrc);
+      const isrcBySongId = {};
+      if (needIsrc.length) {
+        const token = await getClientToken();
+        for (let i = 0; i < needIsrc.length; i += 50) {
+          const batch = needIsrc.slice(i, i + 50);
+          const ids = batch.map(s => s.spotifyUri.replace('spotify:track:', '')).join(',');
+          try {
+            const resp = await spotifyGet(
+              `https://api.spotify.com/v1/tracks?ids=${ids}`,
+              { headers: { Authorization: `Bearer ${token}` } },
+              'apple-enrich-isrc'
+            );
+            const tracks = resp.data?.tracks || [];
+            for (let j = 0; j < batch.length; j++) {
+              const isrc = tracks[j]?.external_ids?.isrc || null;
+              if (isrc) isrcBySongId[batch[j].id] = isrc;
+            }
+          } catch (e) {
+            console.error('[AdminEnrich][apple] ISRC batch failed at', i, e?.message);
+          }
+        }
+      }
+      const isrcOf = (s) => s.isrc || isrcBySongId[s.id] || null;
+      report.isrcFound = songs.filter(s => isrcOf(s)).length;
+
+      // Phase B: resolve on Apple Music by ISRC, 25/batch
+      const resolved = {}; // song.id -> { appleSongId, applePreviewUrl, appleAlbumArt }
+      const withIsrc = songs.filter(s => isrcOf(s));
+      for (let i = 0; i < withIsrc.length; i += 25) {
+        const batch = withIsrc.slice(i, i + 25);
+        try {
+          const map = await appleMusic.resolveIsrcBatch(batch.map(s => isrcOf(s)), storefront);
+          for (const s of batch) {
+            const hit = map.get(isrcOf(s));
+            if (hit) { resolved[s.id] = { ...hit, matchedVia: 'isrc' }; }
+          }
+        } catch (e) {
+          console.error('[AdminEnrich][apple] ISRC resolve batch failed at', i, e?.message);
+        }
+        importProgress.done = Math.min(i + 25, withIsrc.length);
+        await sleep(150);
+      }
+
+      // Phase C: search fallback for the rest
+      const misses = songs.filter(s => !resolved[s.id]);
+      for (const s of misses) {
+        try {
+          const hit = await appleMusic.searchSong(s.artist, s.title, storefront);
+          if (hit) resolved[s.id] = { ...hit, matchedVia: 'search' };
+        } catch (e) { /* leave unmatched */ }
+        importProgress.done++;
+        await sleep(160);
+      }
+
+      // Phase D: report + optional write
+      for (const s of songs) {
+        const hit = resolved[s.id];
+        if (!hit) {
+          report.unmatched.push({ id: s.id, artist: s.artist, title: s.title, year: s.year, geography: s.geography });
+          continue;
+        }
+        report.matched++;
+        if (hit.matchedVia === 'isrc') report.matchedByIsrc++; else report.matchedBySearch++;
+        if (hit.applePreviewUrl) report.withPreview++;
+        else report.matchedNoPreview.push({ id: s.id, artist: s.artist, title: s.title });
+        if (write) {
+          curatedDb.update(s.id, {
+            isrc: isrcOf(s),
+            appleSongId: hit.appleSongId,
+            applePreviewUrl: hit.applePreviewUrl,
+            appleAlbumArt: hit.appleAlbumArt,
+            appleEnrichedAt: new Date().toISOString(),
+          });
+        }
+      }
+      importProgress.matched = report.matched;
+      report.finishedAt = new Date().toISOString();
+      await fsPromises.writeFile(
+        path.join(curatedDb.CACHE_DIR, 'apple-enrich-report.json'),
+        JSON.stringify(report, null, 2)
+      );
+      console.log(`[AdminEnrich][apple] Done (write=${write}): matched ${report.matched}/${report.total}, previews ${report.withPreview}`);
+    } catch (e) {
+      console.error('[AdminEnrich][apple] job failed:', e?.message);
+    } finally {
+      importProgress = null;
+    }
+  })();
+});
+
+app.get('/api/admin/enrich-apple-music/report', requireAdmin, async (req, res) => {
+  const fsPromises = require('fs').promises;
+  try {
+    const file = path.join(curatedDb.CACHE_DIR, 'apple-enrich-report.json');
+    res.json(JSON.parse(await fsPromises.readFile(file, 'utf8')));
+  } catch (e) {
+    res.status(404).json({ ok: false, error: 'No report yet — run POST /api/admin/enrich-apple-music first' });
+  }
+});
+
+/**
  * Admin - List DB Backups
  * Returns available curated-songs backup files on the persistent disk.
  */
