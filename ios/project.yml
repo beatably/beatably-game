@@ -36,9 +36,26 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.beatably.ios
         SWIFT_VERSION: 5.9
+        # MARKETING_VERSION (CFBundleShortVersionString) is the user-facing version —
+        # bump it manually for each public release (1.0 -> 1.1 -> 2.0).
         MARKETING_VERSION: "1.0"
+        # CURRENT_PROJECT_VERSION is a fallback; the real build number
+        # (CFBundleVersion) is stamped from the git commit count at build time
+        # by the "Set build number from git" phase below.
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
+    postCompileScripts:
+      - name: "Set build number from git"
+        basedOnDependencyAnalysis: false
+        script: |
+          # Auto-stamp CFBundleVersion with the git commit count so every upload
+          # gets a unique, strictly-increasing build number with no manual bumping.
+          build_number=$(git -C "$SRCROOT" rev-list --count HEAD 2>/dev/null || echo 0)
+          plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          if [ "$build_number" -gt 0 ] && [ -f "$plist" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build_number" "$plist"
+            echo "Set CFBundleVersion to $build_number"
+          fi
     dependencies:
       - package: SocketIO
         product: SocketIO

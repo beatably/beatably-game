@@ -57,9 +57,12 @@ transient and not broadcast publicly, so this is not "user-generated content" in
 `© 2026 Timothy Bjelkstam`
 
 ## Version info (first release)
-- Version: `1.0`
-- Build: `1`
+- Version: `1.0` — set via `MARKETING_VERSION` in `project.yml`; bump manually per public release.
+- Build: auto-stamped from the git commit count at build time (currently `254`); no manual bumping.
 - "What's New": `Initial release.`
+
+The in-app version is shown at the bottom of the "How to Play" screen, read live from the
+bundle (`CFBundleShortVersionString` + `CFBundleVersion`).
 
 ---
 

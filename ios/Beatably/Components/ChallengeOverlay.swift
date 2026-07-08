@@ -195,6 +195,10 @@ struct ChallengeResolvedOverlay: View {
         .onAppear {
             SoundManager.shared.play(.correct)
             SoundManager.shared.notification(.success)
+            // A correct song guess earns the placer a bonus credit — fly a coin into their card.
+            if vm.lastSongGuess?.correct == true {
+                vm.creditAwardTrigger += 1
+            }
         }
     }
 }

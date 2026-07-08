@@ -9,6 +9,8 @@ struct GameView: View {
     @State private var showRestartConfirm = false
     @State private var showCoinAnim = false
     @State private var coinAnimId = UUID()
+    @State private var showCoinAwardAnim = false
+    @State private var coinAwardId = UUID()
     @State private var playerCoinOrigins: [String: CGPoint] = [:]
 
     var body: some View {
@@ -91,6 +93,15 @@ struct GameView: View {
                     .zIndex(9)
             }
 
+            // Coin award animation — flies in and lands on the guesser's coin stack in the header
+            if showCoinAwardAnim {
+                let origin = playerCoinOrigins[vm.currentPlayerId ?? ""] ?? CGPoint(x: 80, y: 60)
+                CoinAwardAnimation()
+                    .id(coinAwardId)
+                    .position(x: origin.x, y: origin.y)
+                    .zIndex(9)
+            }
+
             // Transient notifications
             if let note = vm.creditSpendMessage {
                 EventNotificationCard(
@@ -136,6 +147,11 @@ struct GameView: View {
             coinAnimId = UUID()
             showCoinAnim = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) { showCoinAnim = false }
+        }
+        .onChange(of: vm.creditAwardTrigger) { _, _ in
+            coinAwardId = UUID()
+            showCoinAwardAnim = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) { showCoinAwardAnim = false }
         }
         .confirmationDialog("Menu", isPresented: $showMenu, titleVisibility: .hidden) {
             if vm.isCreator {
@@ -265,6 +281,13 @@ private struct ScoreHeader: View {
             guard msg != nil else { return }
             bouncingId = vm.currentPlayerId
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { bouncingId = nil }
+        }
+        .onChange(of: vm.creditAwardTrigger) { _, _ in
+            // Delay the bounce until the flying coin visually lands on the card.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) {
+                bouncingId = vm.currentPlayerId
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { bouncingId = nil }
+            }
         }
     }
 }
@@ -744,6 +767,7 @@ private struct InlineRevealFooter: View {
             if vm.lastSongGuess?.correct == true {
                 SoundManager.shared.play(.casino)
                 SoundManager.shared.notification(.success)
+                vm.creditAwardTrigger += 1
             } else if result.correct {
                 SoundManager.shared.play(.correct)
                 SoundManager.shared.notification(.success)
@@ -1043,6 +1067,34 @@ struct CoinPaymentAnimation: View {
                 // Phase 2: accelerates straight up, fades near top
                 withAnimation(.easeIn(duration: 0.42).delay(0.08)) {
                     offsetY = -340
+                    opacity = 0
+                }
+            }
+            .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Coin award animation (reverse of the payment: flies in and lands on the card)
+
+struct CoinAwardAnimation: View {
+    @State private var offsetY: CGFloat = -340
+    @State private var scale: CGFloat = 1.7
+    @State private var opacity: Double = 0
+
+    var body: some View {
+        CoinView(size: 26)
+            .scaleEffect(scale)
+            .offset(y: offsetY)
+            .opacity(opacity)
+            .onAppear {
+                // Phase 1: flies down from the top into the stack, fading in
+                withAnimation(.easeOut(duration: 0.42)) {
+                    offsetY = 0
+                    opacity = 1
+                }
+                // Phase 2: lands — shrinks and fades into the coin stack
+                withAnimation(.easeIn(duration: 0.18).delay(0.42)) {
+                    scale = 0.7
                     opacity = 0
                 }
             }

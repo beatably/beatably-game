@@ -120,6 +120,8 @@ class GameViewModel {
     // Transient notifications
     var playerLeftMessage: String? = nil
     var creditSpendMessage: String? = nil
+    // Bumped when a correct song guess is revealed, to fire the coin-award animation.
+    var creditAwardTrigger = 0
     var placeErrorMessage: String? = nil
 
     // A join code carried in from a deep link (beatably://join?code=XXXX),
