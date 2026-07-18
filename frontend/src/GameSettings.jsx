@@ -1,6 +1,56 @@
 import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+
+// iOS-parity settings primitives (LobbyView.swift BeatSegmentPicker / SettingRow).
+function SettingCard({ label, children }) {
+  return (
+    <div
+      className="p-3.5"
+      style={{ backgroundColor: '#141128', borderRadius: 10, border: '1px solid hsl(var(--border))' }}
+    >
+      {label && (
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">{label}</div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function Segmented({ options, value, onChange }) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map((opt) => {
+        const selected = opt.value === value;
+        return (
+          <button
+            key={String(opt.value)}
+            onClick={() => onChange(opt.value)}
+            onTouchEnd={(e) => e.currentTarget.blur()}
+            className="px-4 py-2.5 rounded-full text-sm font-semibold transition-all no-focus-outline"
+            style={{
+              background: selected ? 'linear-gradient(90deg, #08AF9A, #7D3BED)' : '#1E1B34',
+              color: selected ? '#fff' : '#8888AA',
+              border: `1px solid ${selected ? '#08AF9A' : 'hsl(var(--border))'}`,
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function GuestRow({ label, value }) {
+  return (
+    <div
+      className="flex items-center justify-between px-3.5 py-2.5 text-sm"
+      style={{ backgroundColor: '#141128', borderRadius: 10, border: '1px solid hsl(var(--border))' }}
+    >
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground font-medium">{value}</span>
+    </div>
+  );
+}
 
 const DECADES_NODES = [
   { year: 1960, label: '1960' },
@@ -145,7 +195,7 @@ function DecadesTimeline({ min, max, onChange }) {
   );
 }
 
-function GameSettings({ settings, onUpdate }) {
+function GameSettings({ settings, onUpdate, readOnly = false }) {
   const [localSettings, setLocalSettings] = useState(settings || {
     difficulty: "easy",
     winCondition: 10,
@@ -236,154 +286,107 @@ function GameSettings({ settings, onUpdate }) {
   ];
 
   const isAdvanced = localSettings.difficulty === 'advanced';
+  const yearRange = localSettings.musicPreferences.yearRange;
 
-  return (
-    <>
-    <div className="space-y-6" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 30px)" }}>
-      {/* Difficulty */}
-      <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Difficulty</Label>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { value: 'easy', label: 'Easy' },
-            { value: 'advanced', label: 'Advanced' }
-          ].map(({ value, label }) => (
-            <Button
-              key={value}
-              variant={localSettings.difficulty === value ? "default" : "ghost"}
-              size="sm"
-              className="h-10 touch-button setting-button border border-border"
-              onClick={() => handleChange('difficulty', value)}
-            >
-              <span className="font-semibold">{label}</span>
-            </Button>
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground text-center pt-1">
-          {localSettings.difficulty === 'easy'
-            ? <><strong>Easy mode</strong> pulls from popular chart hits — great for casual play and mixed groups where everyone can join in.</>
-            : <><strong>Advanced</strong> unlocks the full song catalogue across all genres, including deeper cuts.</>}
-        </p>
+  const currentMarkets = localSettings.musicPreferences.markets || [];
+  const marketMode = (() => {
+    if (currentMarkets.length === 1 && currentMarkets.includes('SE')) return 'se';
+    if (currentMarkets.includes('SE') && (currentMarkets.includes('international') || currentMarkets.includes('INTL'))) return 'mix';
+    return 'international';
+  })();
+  const marketLabel = { international: 'International', mix: 'Mix', se: 'Swedish' }[marketMode];
+  const applyMarket = (mode) => {
+    const markets = mode === 'se' ? ['SE'] : mode === 'mix' ? ['SE', 'international'] : ['international'];
+    handleMusicPreferenceChange('markets', markets);
+  };
+
+  // ── Read-only view for guests (iOS GuestSettingsPanel) ──
+  if (readOnly) {
+    return (
+      <div className="space-y-2.5">
+        <GuestRow label="Hits to Win" value={String(localSettings.winCondition ?? 10)} />
+        <GuestRow label="Market" value={marketLabel} />
+        <GuestRow label="Difficulty" value={isAdvanced ? 'Advanced' : 'Easy'} />
+        <GuestRow label="Years" value={`${yearRange.min} – ${yearRange.max}`} />
+        {isAdvanced && localSettings.musicPreferences.genres.length > 0 && (
+          <GuestRow
+            label="Genres"
+            value={localSettings.musicPreferences.genres
+              .map((g) => (availableGenres.find((a) => a.id === g)?.label || g))
+              .join(', ')}
+          />
+        )}
       </div>
+    );
+  }
 
-      {/* Music Selection - visible in both modes */}
-      {(() => {
-        const currentMarkets = localSettings.musicPreferences.markets || [];
-        const activeMusicMode = (() => {
-          if (currentMarkets.length === 1 && currentMarkets.includes('SE')) return 'se';
-          if (currentMarkets.includes('SE') && (currentMarkets.includes('international') || currentMarkets.includes('INTL'))) return 'intl-se';
-          return 'international';
-        })();
-        const musicDescriptions = {
-          international: <><strong>Internationally</strong> charting hits — songs that made Billboard Hot 100, UK charts, and other global charts.</>,
-          'intl-se': <>A <strong>blend</strong> of international chart hits and Swedish chart favourites.</>,
-          se: <><strong>Swedish artists only</strong> — songs by acts originating from Sweden, from pop exports to homegrown classics.</>,
-        };
-        return (
-          <div className="space-y-3">
-            <Label className="text-xl font-semibold text-foreground">Music Selection</Label>
-            <div className="px-8 grid grid-cols-3 gap-4">
-              {[
-                { code: 'international', name: 'International', img: '/img/intl.svg' },
-                { code: 'intl-se', name: 'Mix', img: '/img/mix.svg' },
-                { code: 'se', name: 'Swedish Only', img: '/img/se.svg' }
-              ].map(mode => {
-                const isActive = mode.code === activeMusicMode;
-                return (
-                  <button
-                    key={mode.code}
-                    style={{ aspectRatio: '4/3' }}
-                    className="relative overflow-hidden rounded-md touch-button setting-button w-full"
-                    onClick={() => {
-                      let newMarkets;
-                      if (mode.code === 'se') newMarkets = ['SE'];
-                      else if (mode.code === 'international') newMarkets = ['international'];
-                      else if (mode.code === 'intl-se') newMarkets = ['SE', 'international'];
-                      handleMusicPreferenceChange('markets', newMarkets);
-                    }}
-                  >
-                    <img src={mode.img} alt={mode.name} className={`absolute inset-0 w-full h-full object-cover transition-opacity ${isActive ? 'opacity-100' : 'opacity-20'}`} />
-                    {isActive && (
-                      <span className="absolute inset-0 rounded-md pointer-events-none" style={{
-                        background: 'linear-gradient(90deg, #08AF9A, #7D3BED)',
-                        padding: '3px',
-                        WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                        WebkitMaskComposite: 'xor',
-                        maskComposite: 'exclude'
-                      }} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground text-center pt-1">
-              {musicDescriptions[activeMusicMode]}
-            </p>
-          </div>
-        );
-      })()}
+  // ── Editable view for the host (iOS CreatorSettingsPanel) ──
+  return (
+    <div className="space-y-2.5" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }}>
+      <SettingCard label="Hits to Win">
+        <Segmented
+          options={[{ label: '8', value: 8 }, { label: '10', value: 10 }, { label: '12', value: 12 }]}
+          value={localSettings.winCondition ?? 10}
+          onChange={(v) => handleChange('winCondition', v)}
+        />
+      </SettingCard>
 
-      {/* Decades */}
-      <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Decades</Label>
+      <SettingCard label="Market">
+        <Segmented
+          options={[
+            { label: 'International', value: 'international' },
+            { label: 'Mix', value: 'mix' },
+            { label: 'Swedish', value: 'se' },
+          ]}
+          value={marketMode}
+          onChange={applyMarket}
+        />
+      </SettingCard>
+
+      <SettingCard label="Difficulty">
+        <Segmented
+          options={[{ label: 'Easy', value: 'easy' }, { label: 'Advanced', value: 'advanced' }]}
+          value={localSettings.difficulty}
+          onChange={(v) => handleChange('difficulty', v)}
+        />
+      </SettingCard>
+
+      <SettingCard label={`Year Range · ${yearRange.min} – ${yearRange.max}`}>
         <div className="pt-[10px]">
           <DecadesTimeline
-            min={localSettings.musicPreferences.yearRange.min}
-            max={localSettings.musicPreferences.yearRange.max}
+            min={yearRange.min}
+            max={yearRange.max}
             onChange={(min, max) => handleMusicPreferenceChange('yearRange', { min, max })}
           />
         </div>
-        <p className="text-xs text-muted-foreground text-center pt-1">
-          Drag the handles to set which era of songs to include
-        </p>
-      </div>
+      </SettingCard>
 
-      {/* Genre Selection - Advanced mode only */}
       {isAdvanced && (
-        <div className="space-y-3">
-          <Label className="text-xl font-semibold text-foreground">Music Genres</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {availableGenres.map(({ id, label, emoji }) => (
-              <Button
-                key={id}
-                variant={localSettings.musicPreferences.genres.includes(id) ? "default" : "ghost"}
-                className={`h-auto py-2 text-sm justify-start touch-button setting-button border border-border ${
-                  !localSettings.musicPreferences.genres.includes(id) ? 'focus:ring-0 focus:bg-transparent' : ''
-                }`}
-                onClick={() => handleGenreToggle(id)}
-              >
-                <span className="text-2xl mr-2">{emoji}</span>
-                {label}
-              </Button>
-            ))}
+        <SettingCard label="Genres">
+          <div className="flex gap-1.5 flex-wrap">
+            {availableGenres.map(({ id, label }) => {
+              const sel = localSettings.musicPreferences.genres.includes(id);
+              return (
+                <button
+                  key={id}
+                  onClick={() => handleGenreToggle(id)}
+                  onTouchEnd={(e) => e.currentTarget.blur()}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium transition-all no-focus-outline"
+                  style={{
+                    background: sel ? 'linear-gradient(90deg, #08AF9A, #7D3BED)' : '#1E1B34',
+                    color: sel ? '#fff' : '#8888AA',
+                    border: `1px solid ${sel ? '#08AF9A' : 'hsl(var(--border))'}`,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </SettingCard>
       )}
 
-      {/* Hits to Win - always last before Reset */}
-      <div className="space-y-3">
-        <Label className="text-xl font-semibold text-foreground">Hits to Win</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {[8, 10, 12].map(count => (
-            <Button
-              key={count}
-              variant={(localSettings.winCondition ?? 10) === count ? "default" : "ghost"}
-              size="sm"
-              className="h-10 touch-button border border-border"
-              onClick={() => {
-                const updated = { ...localSettings, winCondition: count };
-                setLocalSettings(updated);
-                onUpdate(updated);
-              }}
-            >
-              {count} hits
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Reset to Defaults (inline text action) */}
-      <div className="flex justify-center pt-6">
+      <div className="flex justify-center pt-2">
         <button
           onClick={(e) => {
             e.preventDefault();
@@ -400,28 +403,12 @@ function GameSettings({ settings, onUpdate }) {
             onUpdate(defaultSettings);
           }}
           aria-label="Reset settings to defaults"
-          className="text-foreground bg-transparent underline font-semibold text-sm p-2 -m-2 hover:text-foreground/80 focus:outline-none"
+          className="text-muted-foreground bg-transparent underline font-semibold text-sm p-2 -m-2 hover:text-foreground focus:outline-none"
         >
-          <svg
-            className="w-4 h-4 text-muted-foreground mr-2 inline"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path d="M21 12a9 9 0 1 1-3-6.708" />
-            <path d="M21 3v6h-6" />
-          </svg>
-          Reset
+          Reset to defaults
         </button>
       </div>
-
     </div>
-    </>
   );
 }
 

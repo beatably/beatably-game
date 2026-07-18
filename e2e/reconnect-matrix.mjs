@@ -56,7 +56,7 @@ async function main() {
     await L.shot(g.guest, 's2-songguess');
     const st = await L.getState(g.guest);
     check('s2', 'resumes song-guess with placement highlight', st.phase === 'song-guess' && st.hasPreview, JSON.stringify({ phase: st.phase, hasPreview: st.hasPreview }));
-    const ui = await g.guest.page.getByText('Do you want to guess the song').isVisible().catch(() => false);
+    const ui = await g.guest.page.getByText('Guess the Song').isVisible().catch(() => false);
     check('s2', 'song-guess Skip UI renders', ui);
     await L.emit(g.guest, 'skip_song_guess', { code: g.code });
     const ok = await L.waitState(g.guest, "s.phase==='challenge-window'").then(() => true).catch(() => false);

@@ -1,4 +1,5 @@
-// Sound utility functions for the game
+// Sound utility functions for the game.
+// Sound set + volumes ported from iOS (ios/Beatably/Audio/SoundManager.swift).
 
 /**
  * When true, all sound effect playback is suppressed (e.g. creator with music playing)
@@ -10,13 +11,6 @@ export function setSuppressSoundEffects(suppress) {
 }
 
 /**
- * Fallback HTMLAudio elements (used when Web Audio is unavailable)
- */
-let clickAudio = null;
-let correctGuessAudio = null;
-let incorrectGuessAudio = null;
-
-/**
  * Web Audio state (preferred for low-latency SFX)
  */
 let audioContext = null;
@@ -25,10 +19,20 @@ let webAudioInitAttempted = false;
 const audioBufferCache = new Map();
 const bufferLoadPromises = new Map();
 
+/**
+ * Fallback HTMLAudio elements (used when Web Audio is unavailable)
+ */
+const htmlAudioCache = new Map();
+
 const SOUND_CONFIG = {
-  click: { url: '/sounds/drop_card_3.mp3', volume: 0.4 },
-  correct: { url: '/sounds/correct_guess.mp3', volume: 0.5 },
-  incorrect: { url: '/sounds/incorrect_guess.mp3', volume: 0.5 },
+  place: { url: '/sounds/place.mp3', volume: 0.45 }, // card placed on timeline
+  correct: { url: '/sounds/correct.mp3', volume: 0.5 }, // correct placement / challenge win
+  challenge: { url: '/sounds/challenge.mp3', volume: 0.55 }, // challenge initiated
+  credit: { url: '/sounds/credit.mp3', volume: 0.6 }, // another player spends a credit
+  bonus: { url: '/sounds/bonus.mp3', volume: 0.6 }, // you spent a credit
+  casino: { url: '/sounds/casino.mp3', volume: 0.6 }, // someone guessed the song (coin award)
+  win: { url: '/sounds/win.mp3', volume: 0.6 }, // you won the game
+  lose: { url: '/sounds/lose.mp3', volume: 0.5 }, // wrong placement / you lost
 };
 
 function ensureAudioContext() {
@@ -124,142 +128,61 @@ function playWebAudioBuffer(key, volume) {
   }
 }
 
-/**
- * Initialize fallback HTMLAudio element
- */
-function initializeAudio() {
-  if (!clickAudio) {
+function getHtmlAudio(key) {
+  const config = SOUND_CONFIG[key];
+  if (!config) return null;
+  if (!htmlAudioCache.has(key)) {
     try {
-      clickAudio = new Audio(SOUND_CONFIG.click.url);
-      clickAudio.volume = SOUND_CONFIG.click.volume;
-      clickAudio.preload = 'auto';
+      const audio = new Audio(config.url);
+      audio.volume = config.volume;
+      audio.preload = 'auto';
+      htmlAudioCache.set(key, audio);
     } catch (error) {
-      console.warn('Audio not supported:', error);
+      console.warn(`Audio not supported (${key}):`, error);
+      return null;
     }
+  }
+  return htmlAudioCache.get(key);
+}
+
+/**
+ * Play a game sound by key (see SOUND_CONFIG).
+ */
+export function playSound(key) {
+  if (suppressSoundEffects) return;
+  const config = SOUND_CONFIG[key];
+  if (!config) {
+    console.warn(`Unknown sound key: ${key}`);
+    return;
+  }
+  try {
+    // Prefer low-latency Web Audio if ready
+    if (webAudioSupported && playWebAudioBuffer(key, config.volume)) {
+      return;
+    }
+
+    // Fallback to HTMLAudio
+    const audio = getHtmlAudio(key);
+    if (audio) {
+      audio.currentTime = 0;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.warn(`Could not play sound (${key}):`, error);
+        });
+      }
+    }
+  } catch (error) {
+    // Silently fail if audio doesn't work - don't break the game
+    console.warn(`Could not play sound (${key}):`, error);
   }
 }
 
 /**
- * Initialize fallback HTMLAudio element for correct guess
- */
-function initializeCorrectGuessAudio() {
-  if (!correctGuessAudio) {
-    try {
-      correctGuessAudio = new Audio(SOUND_CONFIG.correct.url);
-      correctGuessAudio.volume = SOUND_CONFIG.correct.volume;
-      correctGuessAudio.preload = 'auto';
-    } catch (error) {
-      console.warn('Correct guess audio not supported:', error);
-    }
-  }
-}
-
-/**
- * Initialize fallback HTMLAudio element for incorrect guess
- */
-function initializeIncorrectGuessAudio() {
-  if (!incorrectGuessAudio) {
-    try {
-      incorrectGuessAudio = new Audio(SOUND_CONFIG.incorrect.url);
-      incorrectGuessAudio.volume = SOUND_CONFIG.incorrect.volume;
-      incorrectGuessAudio.preload = 'auto';
-    } catch (error) {
-      console.warn('Incorrect guess audio not supported:', error);
-    }
-  }
-}
-
-/**
- * Play a click sound when a card is dropped
+ * Legacy alias: card placement tap.
  */
 export function playClickSound() {
-  if (suppressSoundEffects) return;
-  try {
-    // Prefer low-latency Web Audio if ready
-    if (webAudioSupported && playWebAudioBuffer('click', SOUND_CONFIG.click.volume)) {
-      return;
-    }
-
-    // Fallback to HTMLAudio
-    if (!clickAudio) {
-      initializeAudio();
-    }
-    if (clickAudio) {
-      clickAudio.currentTime = 0;
-      const playPromise = clickAudio.play();
-
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.warn('Could not play click sound:', error);
-        });
-      }
-    }
-  } catch (error) {
-    // Silently fail if audio doesn't work - don't break the game
-    console.warn('Could not play click sound:', error);
-  }
-}
-
-/**
- * Play a correct guess sound
- */
-export function playCorrectGuessSound() {
-  if (suppressSoundEffects) return;
-  try {
-    // Prefer low-latency Web Audio if ready
-    if (webAudioSupported && playWebAudioBuffer('correct', SOUND_CONFIG.correct.volume)) {
-      return;
-    }
-
-    // Fallback to HTMLAudio
-    if (!correctGuessAudio) {
-      initializeCorrectGuessAudio();
-    }
-    if (correctGuessAudio) {
-      correctGuessAudio.currentTime = 0;
-      const playPromise = correctGuessAudio.play();
-
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.warn('Could not play correct guess sound:', error);
-        });
-      }
-    }
-  } catch (error) {
-    // Silently fail if audio doesn't work - don't break the game
-    console.warn('Could not play correct guess sound:', error);
-  }
-}
-
-/**
- * Play an incorrect guess sound
- */
-export function playIncorrectGuessSound() {
-  if (suppressSoundEffects) return;
-  try {
-    // Prefer low-latency Web Audio if ready
-    if (webAudioSupported && playWebAudioBuffer('incorrect', SOUND_CONFIG.incorrect.volume)) {
-      return;
-    }
-
-    // Fallback to HTMLAudio
-    if (!incorrectGuessAudio) {
-      initializeIncorrectGuessAudio();
-    }
-    if (incorrectGuessAudio) {
-      incorrectGuessAudio.currentTime = 0;
-      const playPromise = incorrectGuessAudio.play();
-
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.warn('Could not play incorrect guess sound:', error);
-        });
-      }
-    }
-  } catch (error) {
-    // Silently fail if audio doesn't work - don't break the game
-    console.warn('Could not play incorrect guess sound:', error);
-  }
+  playSound('place');
 }
 
 /**
@@ -271,12 +194,9 @@ export function preloadAudio() {
   unlockAudioContext();
 
   // Preload Web Audio buffers for low-latency playback
-  loadBuffer('click', SOUND_CONFIG.click.url);
-  loadBuffer('correct', SOUND_CONFIG.correct.url);
-  loadBuffer('incorrect', SOUND_CONFIG.incorrect.url);
-
-  // Initialize HTMLAudio fallback as well
-  initializeAudio();
-  initializeCorrectGuessAudio();
-  initializeIncorrectGuessAudio();
+  for (const [key, config] of Object.entries(SOUND_CONFIG)) {
+    loadBuffer(key, config.url);
+    // Initialize HTMLAudio fallback as well
+    getHtmlAudio(key);
+  }
 }

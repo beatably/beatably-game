@@ -41,8 +41,9 @@ credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was re
 | File | Role |
 |---|---|
 | `frontend/src/App.jsx` | Master orchestrator (~2,800 lines): all socket events, auth flow, view routing, game logic handlers |
-| `frontend/src/GameFooter.jsx` | Playback controls, song info, credits, challenge UI (~1,730 lines) |
-| `frontend/src/CurvedTimeline.jsx` | Timeline visualization, tap-based card placement (~1,200 lines) |
+| `frontend/src/GameFooter.jsx` | Playback controls, song info, credits, phase sections (challenge UI lives in `ChallengeSheet.jsx`) |
+| `frontend/src/components/timeline/` | Timeline (iOS-parity rebuild, July 2026): layout engine, album-art nodes, spring placement animation, tap-based placement |
+| `frontend/src/components/design/` | Shared design primitives: SpaceBackground, BottomCard, CoinView, CoinFlightLayer, EventNotificationCard |
 | `backend/index.js` | All HTTP routes + Socket.io game logic (~5,300 lines) |
 | `backend/curatedDb.js` | File-backed song database (reads/writes `cache/curated-songs.json`); serves `applePreviewUrl`/`appleAlbumArt`/`apple_music_url` when present |
 | `backend/appleMusic.js` | Apple Music (MusicKit) client — ES256 dev token + ISRC catalog lookup, for `POST /api/admin/enrich-apple-music` |
@@ -64,7 +65,7 @@ credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was re
 
 ## Gotchas
 
-- **CurvedTimeline is tap-based**, not drag-and-drop — despite `react-dnd` being in the dependencies
+- **Timeline is tap-based** (`components/timeline/Timeline.jsx`); `react-dnd` and the old `CurvedTimeline.jsx` were removed in the July 2026 web↔iOS parity pass. The iOS app (`ios/Beatably/Components/TimelineView.swift`) is the visual source of truth.
 - **Full Play removed (July 2026)**: the Spotify Premium web-playback subsystem (Web Playback SDK, `/me/player` control, device discovery, OAuth `/login`+`/callback`) was deleted. Preview playback is the only audio mode; `PreviewModeContext.isPreviewMode` is always true. Don't reintroduce Spotify user-auth.
 - **Unused packages**: `@radix-ui/react-slider`, `@radix-ui/react-switch`, `lucide-react`
 

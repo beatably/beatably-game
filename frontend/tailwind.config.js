@@ -8,16 +8,9 @@ module.exports = {
   theme: {
   	extend: {
   		fontFamily: {
-  			chewy: [
-  				'Chewy',
-  				'system-ui'
-  			],
-  			'encode-sans': [
-  				'Encode Sans',
-  				'sans-serif'
-  			],
   			sans: [
-  				'Encode Sans',
+  				'Nunito',
+  				'system-ui',
   				'sans-serif'
   			]
   		},
@@ -60,6 +53,20 @@ module.exports = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
+  			surface: {
+  				DEFAULT: '#141128',
+  				2: '#1E1B34'
+  			},
+  			'footer-panel': '#19162E',
+  			'gap-circle': {
+  				DEFAULT: '#3A3B58',
+  				border: '#5A5B7A'
+  			},
+  			coin: {
+  				light: '#F5C842',
+  				dark: '#C8930A',
+  				border: '#E8B834'
+  			},
   			chart: {
   				'1': 'hsl(var(--chart-1))',
   				'2': 'hsl(var(--chart-2))',

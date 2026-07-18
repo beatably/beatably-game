@@ -33,8 +33,19 @@ const SessionRestore = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-card container-card border border-border p-6 max-w-sm w-full">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 overflow-hidden bg-black">
+      {/* Ghost video backdrop + scrim (iOS ReconnectingView) */}
+      <video
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/videos/ghost5.mp4"
+        poster="/img/first_frame.jpg"
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+      <div className="absolute inset-0 bg-black" style={{ opacity: 0.4 }} />
+      <div className="relative bg-surface container-card border border-border p-6 max-w-sm w-full">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -2,16 +2,25 @@
 
 A turn-based multiplayer music game. Players take turns placing songs on their personal chronological timeline. Correctly placed songs build your score. Guess the artist/title to earn credits; spend credits to skip hard songs or challenge other players' placements. First to reach the target song count wins.
 
+> **⚠️ Updated July 2026 — music provider migration.** Spotify's developer policy prohibits games,
+> so **Spotify Full Play (Premium web playback) was removed entirely** (Web Playback SDK,
+> `/me/player` control, Connect device discovery, OAuth `/login`+`/callback`). Consumer-facing
+> **30s previews + album art now come from Apple Music** (MusicKit), stored per-song as
+> `applePreviewUrl`/`appleAlbumArt` via `POST /api/admin/enrich-apple-music`. **Spotify remains
+> admin-side only** (song search/curation via client-credentials). Preview playback is now the
+> single audio mode. Sections below that describe Spotify auth / Full Play / `SpotifyPlayer.jsx`
+> are historical unless noted.
+
 ---
 
 ## Tech Stack
 
 | Layer | Tech |
 |---|---|
-| Frontend | React 19 + Vite, Tailwind CSS, react-dnd |
+| Frontend | React 19 + Vite, Tailwind CSS |
 | Backend | Node.js + Express 5, Socket.io 4 |
 | Real-time | Socket.io (WebSockets) |
-| Music | Spotify Web Playback SDK + Spotify Web API |
+| Music | Apple Music (MusicKit) 30s previews + art for players; Spotify Web API for admin-side sourcing only |
 | Hosting | Netlify (frontend), Render (backend) |
 
 ---
@@ -60,12 +69,12 @@ Within the `game` view, state progresses through these phases per turn:
 |---|---|
 | `App.jsx` | Socket management, auth flow, view routing, all game logic handlers |
 | `GameFooter.jsx` | Playback controls, song info display, challenge/credit UI (~1,730 lines) |
-| `CurvedTimeline.jsx` | Timeline visualization with drag-and-drop card placement (~1,200 lines) |
+| `components/timeline/` | Timeline visualization (iOS-parity rebuild July 2026): layout engine, album-art nodes, spring placement animation, tap-based placement |
 | `GameSettings.jsx` | Settings panel: difficulty, year range, genres, device selection |
-| `SpotifyPlayer.jsx` | Spotify Web Playback SDK initialization and player events |
+| ~~`SpotifyPlayer.jsx`~~ | Removed July 2026 (Full Play / Web Playback SDK deleted) |
 | `PlayerHeader.jsx` | Player name, score, turn indicator |
 | `TimelineBoard.jsx` | Game board rendering |
-| `DeviceSwitchModal.jsx` | Spotify Connect device switcher |
+| ~~`DeviceSwitchModal.jsx`~~ | Removed July 2026 (Spotify Connect device switching deleted) |
 | `WinnerView.jsx` | End-of-game screen |
 | `SongGuessModal.jsx` | Song title/artist guessing interface |
 | `SessionRestore.jsx` | Re-join after page refresh |
@@ -85,17 +94,16 @@ Within the `game` view, state progresses through these phases per turn:
 | `debugLogger.js` | Intercept console logs and send to backend (enable via localStorage flag) |
 | `castUtils.js` | Chromecast/AirPlay casting utilities |
 
-### Audio Modes
+### Audio (preview-only)
 
-**Preview Mode** (default — no Spotify account needed)
-- Plays 30-second Spotify preview URLs
+**Preview playback** is the only audio mode (no account needed):
+- Plays 30-second **Apple Music** preview URLs (`applePreviewUrl`; legacy scraped Spotify
+  `previewUrl` is a fallback for any un-enriched song)
 - Uses a `<video>` element for AirPlay compatibility on iOS/Safari
-- Managed by `PreviewModeContext.jsx`
+- Managed by `PreviewModeContext.jsx` — `isPreviewMode` is always true
 
-**Full Play Mode** (requires Spotify Premium)
-- Uses the Spotify Web Playback SDK
-- Initialized in `SpotifyPlayer.jsx`
-- Full track playback via device transfer
+**Full Play Mode was removed (July 2026)** — the Spotify Web Playback SDK, `SpotifyPlayer.jsx`,
+device switching, and Spotify user-auth are all gone. Do not reintroduce Spotify user OAuth.
 
 ### State Management
 
@@ -108,8 +116,6 @@ Within the `game` view, state progresses through these phases per turn:
 ```json
 react, react-dom              19.x  — Core
 socket.io-client              4.8   — Real-time
-react-dnd, react-dnd-html5-backend  16  — Drag and drop
-canvas-confetti               1.9   — Winner celebration
 @radix-ui/react-label, /slot  —     — Accessible UI primitives
 class-variance-authority       —     — Button variant composition
 clsx, tailwind-merge           —     — Class utilities
@@ -234,10 +240,13 @@ The database was built from Billboard Hot 100 history + genre-based Spotify sear
 ### HTTP API Routes
 
 **Auth**
-- `GET /login` — Spotify OAuth redirect
-- `GET /callback` — OAuth callback, returns token to frontend
+- ~~`GET /login` / `GET /callback`~~ — Spotify user OAuth, **removed July 2026** (no user auth).
+  Admin sourcing uses Spotify client-credentials internally.
 
 **Songs / Game**
+- `POST /api/admin/enrich-apple-music` — enrich curated songs with Apple Music preview URLs +
+  album art (ISRC lookup); dry-run by default, `{write:true}` persists (auto-backup). Report at
+  `GET /api/admin/enrich-apple-music/report`; config check at `GET /api/admin/apple-music-status`.
 - `POST /api/curated/select` — Select songs for a session
 - `POST /api/fetch-songs` — Fetch songs with filters (year, genre, difficulty)
 
