@@ -3,30 +3,12 @@ import { createPortal } from "react-dom";
 import beatablyLogo from "./assets/beatably_logo.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-
-const CoinIcon = ({ className = "" }) => (
-  <span className={`inline-block w-3 h-3 align-middle ${className}`}>
-    <svg viewBox="0 0 20 20" fill="gold" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="10" cy="10" r="9" stroke="#BBB" strokeWidth="1" fill="#FFEB3B" />
-      <circle cx="10" cy="10" r="5" fill="#FFD700" />
-    </svg>
-  </span>
-);
+import { OverlappingCoins } from "@/components/design/CoinView";
 
 function TokenStack({ count }) {
-  // Show up to 5 tokens, overlap if more than 1
   return (
-    <span className="flex items-center relative h-5 ml-1 md:ml-2">
-      {[...Array(count)].map((_, i) => (
-        <span
-          key={i}
-          className="absolute"
-          style={{ left: `${i * 7}px`, zIndex: count - i }}
-        >
-          <CoinIcon className="w-3 h-3" />
-        </span>
-      ))}
-      <span style={{ width: `${count > 0 ? 5 * (count - 1) + 20 : 0}px`, display: "inline-block" }}></span>
+    <span className="flex items-center h-5 ml-1 md:ml-2">
+      <OverlappingCoins count={count} size={13} />
     </span>
   );
 }
@@ -91,16 +73,16 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
   };
 
   return (
-    <header className="w-full bg-card flex items-center justify-between p-2 md:px-2 md:py-1">
+    <header className="w-full flex items-center justify-between p-2 md:px-2 md:py-1">
       <div className="absolute left-16 top-5">
         <img className="w-0" src={beatablyLogo} alt="Beatably Logo"></img>
       </div>
-      
+
       {/* Menu button - aligned with header content */}
       {players.length > 0 && (
         <div className="flex items-center">
-          <button 
-            onClick={() => setMenuOpen(!menuOpen)} 
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
             className="bg-input text-foreground p-2 rounded hover:bg-card flex items-center justify-center"
             aria-label="Menu"
           >
@@ -110,22 +92,26 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
           </button>
         </div>
       )}
-      
-      <div className={`flex ${
-        players.length === 4 ? 'gap-2' : 
-        players.length === 3 ? 'gap-4' : 
-        'gap-6'
-      } text-[10px] md:text-xs`}>
+
+      {/* Score cards (iOS ScoreHeader): quarter-width cards, horizontal scroll,
+          active = magenta tint + gradient border + dual glow */}
+      <div className="flex gap-2 overflow-x-auto text-[10px] md:text-xs" style={{ scrollbarWidth: 'none' }}>
         {players.map((p) => (
           <div
             key={p.id}
-            className={`flex flex-col rounded-xl items-center px-1.5 py-1 md:px-2 md:py-1 ${
-              players.length === 4 ? 'min-w-[60px] max-w-[80px] flex-shrink' : 'min-w-[70px] md:min-w-[80px]'
-            } justify-center relative ${
-              p.persistentId === currentPlayerId 
-                ? "gradient-border-magenta neon-glow-magenta" 
-                : "bg-card/50 border-2 border-border"
+            data-player-card={p.persistentId}
+            className={`flex flex-col rounded-xl items-center px-1.5 py-1 md:px-2 md:py-1 flex-shrink-0 justify-center relative ${
+              p.persistentId === currentPlayerId
+                ? "gradient-border-magenta"
+                : "bg-surface-2/85 border border-border"
             }`}
+            style={{
+              width: players.length >= 3 ? 'calc((100vw - 96px) / 4)' : undefined,
+              minWidth: players.length >= 3 ? 64 : 80,
+              ...(p.persistentId === currentPlayerId
+                ? { boxShadow: '0 0 8px rgba(255, 20, 147, 0.6), 0 0 18px rgba(255, 20, 147, 0.3)' }
+                : {}),
+            }}
           >
             <span className={`font-bold text-foreground truncate ${
               players.length === 4 ? 'max-w-[60px]' : 'max-w-[70px] md:max-w-[60px]'

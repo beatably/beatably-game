@@ -87,7 +87,7 @@ async function main() {
   await B.page.evaluate((c) => window.__beatably.socket.emit('place_card', { code: c, index: 0 }), code);
   await B.page.waitForFunction(() => window.__beatably?.phase === 'song-guess', null, { timeout: 10000 });
   check('B (active player) placed a card -> song-guess', true);
-  const beforeUI = await B.page.getByText('Do you want to guess the song').isVisible().catch(() => false);
+  const beforeUI = await B.page.getByText('Guess the Song').isVisible().catch(() => false);
   check('song-guess UI visible BEFORE reconnect', beforeUI);
   await B.page.screenshot({ path: path.join(SHOTS, '1-B-songguess-before.png'), fullPage: true });
 
@@ -115,7 +115,7 @@ async function main() {
   }));
   log(`B state after reconnect: ${JSON.stringify(state)}`);
 
-  const afterUI = await bPage2.getByText('Do you want to guess the song').isVisible().catch(() => false);
+  const afterUI = await bPage2.getByText('Guess the Song').isVisible().catch(() => false);
   check('SYMPTOM 2 — song-guess UI (Skip) renders after reconnect', afterUI);
   check('SYMPTOM 1 — tentative placement present in timeline after reconnect', state.hasPreviewCard,
     `lastPlaced=${JSON.stringify(state.lastPlaced)}`);

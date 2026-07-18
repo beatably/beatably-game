@@ -59,6 +59,7 @@ export async function getState(player) {
       myPersistentId,
       isMyTurn: !!(myPersistentId && b.currentPlayerId === myPersistentId),
       hasPreview: (b.timeline || []).some((c) => c && c.preview),
+      remotePreviewIndex: b.remotePreviewIndex ?? null,
       challenge: b.challenge || null,
       players: (b.players || []).map((p) => ({ name: p.name, tokens: p.tokens, score: p.score })),
     };
@@ -76,6 +77,7 @@ export async function waitState(player, predicate, timeout = 15000) {
         myPersistentId: me ? me.persistentId : null,
         isMyTurn: !!(me && b.currentPlayerId === me.persistentId),
         hasPreview: (b.timeline || []).some((c) => c && c.preview),
+        remotePreviewIndex: b.remotePreviewIndex ?? null,
       };
       // eslint-disable-next-line no-new-func
       return new Function('s', `return (${predStr});`)(s);

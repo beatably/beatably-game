@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import BottomCard from './components/design/BottomCard';
 
 function SongGuessModal({ isOpen, onClose, onGuessSong, onSkipSongGuess }) {
   const [songTitle, setSongTitle] = useState('');
@@ -71,11 +72,9 @@ function SongGuessModal({ isOpen, onClose, onGuessSong, onSkipSongGuess }) {
     handleSubmit();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card container-card border border-border p-6 max-w-sm w-full">
+    <BottomCard open={isOpen} onClose={onClose}>
+      <div className="px-6 pt-6 pb-4 max-w-sm mx-auto w-full">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-foreground mb-2">Guess the Song</h2>
           <p className="text-sm text-muted-foreground">
@@ -100,7 +99,7 @@ function SongGuessModal({ isOpen, onClose, onGuessSong, onSkipSongGuess }) {
               spellCheck="false"
             />
           </div>
-          
+
           <div>
             <input
               type="text"
@@ -135,12 +134,8 @@ function SongGuessModal({ isOpen, onClose, onGuessSong, onSkipSongGuess }) {
             </button>
           </div>
         </form>
-
-        <div className="mt-4 text-xs text-muted-foreground text-center">
-          Press Escape to skip • Ctrl+Enter to submit
-        </div>
       </div>
-    </div>
+    </BottomCard>
   );
 }
 

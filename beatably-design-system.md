@@ -2,7 +2,7 @@
 
 This document is the single source of truth for Beatably's web and mobile UI/UX decisions. It captures system-level design guidelines, color decisions, interaction patterns, component specifications, and exact implementation values derived from the live codebase.
 
-> **Note:** This design system reflects the *current web implementation* as of June 2026. The iOS app follows the same design language; see the MEMORY file for iOS-specific notes.
+> **Note:** Updated July 2026 after the **web↔iOS parity project**: the iOS app is the visual source of truth and the web now mirrors it — Nunito typography, album-art timeline nodes on a neon tube path with spring placement animation, full-screen animated SpaceBackground, BottomCard slide-up sheets, challenge slide-up panels, coin flight animations, the 8-sound iOS effect set, and live placement preview. Key web implementations live in `frontend/src/components/design/` and `frontend/src/components/timeline/`. Sections written before July 2026 may describe superseded details — the components win.
 
 ---
 
@@ -165,8 +165,9 @@ background: linear-gradient(90deg, #08AF9A, #7D3BED); /* same teal→purple */
 
 ## 4) Typography
 
-- **Branding/Headings**: `Chewy` (class: `chewy-regular`) — font-weight 400, used on game screen titles (e.g. "Waiting Room" at `text-5xl font-bold chewy-regular`)
-- **UI body**: `Encode Sans` (weights 100–900 available; classes: `encode-sans-thin` through `encode-sans-black`) — set as the default `sans` font in Tailwind
+- **Single family**: `Nunito` (Google Fonts, weights 400–900) — the web approximation of iOS's SF Rounded, set as the default `sans` font in Tailwind. Chewy and Encode Sans were removed in the July 2026 parity pass.
+- Legacy helper classes (`chewy-regular`, `encode-sans-*`) still exist in `index.css` but now map to Nunito weights (`chewy-regular` → Nunito 900).
+- Score numbers and playback timers use `tabular-nums`; timeline node labels are 13px weight-900 white with a purple glow shadow (iOS NodeLabel).
 
 ### Type scale in use
 | Context | Tailwind | px equiv |
@@ -566,68 +567,29 @@ PWA standalone mode removes global body padding; each view component adds its ow
 
 ---
 
-## 18) iOS Translation Readiness
+## 18) Cross-Platform Parity (July 2026)
 
-### Color tokens (BeatableColors.swift)
-| Token | Hex | Usage |
+The former "iOS Translation Readiness" checklist is complete — the direction reversed: iOS was redesigned first and the web was brought to parity. The shared visual spec now lives in code:
+
+| Element | iOS source of truth | Web implementation |
 |---|---|---|
-| `beatBg` | `#0C0A1A` | Background (hsl 245,60%,8%) |
-| `beatSurface` | `#141128` | Card surface |
-| `beatSurface2` | `#1E1B34` | Input / chip bg |
-| `beatBorder` | `#2D2A45` | Borders |
-| `beatTeal` | `#08AF9A` | Gradient start, focus ring, play button |
-| `beatGradientPurple` | `#7D3BED` | Gradient end |
-| `beatGreen` | `#22C55E` | Correct / win indicators only |
-| `beatPurple` | `#9945FF` | Neon purple accent, year pill fill |
-| `beatCyan` | `#00CED1` | Neon cyan |
-| `beatMagenta` | `#FF1493` | Active player border, challenge, error |
+| Color tokens | `Design/BeatableColors.swift` | `index.css` `:root` + `tailwind.config.js` (`surface`, `surface-2`, `footer-panel`, `gap-circle`, `coin`) |
+| Space background | `Components/SpaceBackground.swift` | `components/design/SpaceBackground.jsx` (3 blurred orbs + 25 seeded drifting stars, full-screen behind the game view) |
+| Timeline | `Components/TimelineView.swift` + `TimelineLayout.swift` | `components/timeline/*` — fixed 4-row scale layout, neon tube path (magenta glow w30/blur12/0.18 + 4px purple→magenta→cyan core), 40px album-art nodes, magenta "?" MysteryNode with double ripple, 24px gap circles, spring placement animation (`usePlacementAnimation.js`, spring 0.35/bounce 0.6 + 105px overshoot) |
+| Bottom sheets | `Components/BottomCard.swift` | `components/design/BottomCard.jsx` (top-corner 28, rising purple glow, white/8 edge, separate backdrop fade) — used by SongGuessModal + SongDetailSheet |
+| Phase footer (challenge window / resolved / reveal / song-guess-wait) | `GameView.swift` `PhaseActionsFooter` | rendered **inline in the footer** in `GameFooter.jsx` — NOT floating panels (iOS `ChallengeWindowPanel`/`ChallengeResolvedOverlay` structs are dead code). `ChallengeSheet.jsx` only provides `ResolvedIcon` + `SheetButton`. Song-guess fields (`SongGuessModal` BottomCard) auto-open on your turn |
+| Song detail | `Components/SongDetailSheet.swift`, opened via `TimelineView` `onCardTap` | tap a timeline ArtNode → `SongDetailSheet.jsx` (hi-res art, teal year, official Apple Music PNG badge at `public/img/listen-on-apple-music.png`). Footer song info is display-only |
+| Lobby settings | `LobbyView.swift` Creator/GuestSettingsPanel | `GameSettings.jsx` card layout + `readOnly` prop; always shown in `WaitingRoom.jsx` (editable host / read-only guest). No game-start modal |
+| Score header | `GameView.swift` ScoreHeader | `PlayerHeader.jsx` (quarter-width cards, active = magenta gradient border + dual glow @0.6 r8 / @0.3 r18, inactive `surface-2/85`) |
+| Coins | `GameView.swift` CoinView/OverlappingCoins + flight animations | `components/design/CoinView.jsx` + `CoinFlightLayer.jsx` (payment: pop 1.7 + fly up 340px; award: fly down + land + card bounce at +0.42s) |
+| Notifications | `GameView.swift` EventNotificationCard | `components/design/EventNotificationCard.jsx` (bottom slide-up, colored glowing icon, colored/35 border) |
+| Sounds | `Audio/SoundManager.swift` | `utils/soundUtils.js` + `utils/useGameSounds.js` — 8 sounds (place .45, correct .5, challenge .55, credit .6, bonus .6, casino .6, win .6, lose .5) |
+| Live placement preview | backend relay (`preview_placement`/`placement_preview`) | emitted from `App.handlePendingDrop`, rendered as a MysteryNode for observers via `remotePreviewIndex` |
+| Game over | `GameView.swift` GameOverOverlay | `WinnerView.jsx` (radial purple backdrop, trophy spring-in + ±5° rock, magenta glow, surface-2 scores card, #1 row teal/10) |
 
-### Primary CTA (BeatPrimaryLabel)
-`LinearGradient(colors: [beatTeal, beatGradientPurple], startPoint: .leading, endPoint: .trailing)` — always gradient, never flat colour. The `accentColor` parameter controls neon glow only.
+**iOS-native bits that intentionally have no web equivalent**: haptics (`UIImpactFeedbackGenerator`), AVAudioSession handling, keyboard prewarming, `beatably://` deep links.
 
-### Game background
-`SpaceBackground` covers the **entire** game view (header + timeline + footer region) — not just the timeline area. Footer uses `Color.beatSurface` overlay for readability. Header uses `Color.beatBg.opacity(0.65)` overlay to stay readable while showing stars.
-
-### Score header — active player card
-Gradient border (magenta→purple), not solid magenta. Two shadow layers for neon glow:
-```swift
-.overlay(RoundedRectangle(cornerRadius: 10).stroke(
-    LinearGradient(colors: [beatMagenta, beatPurple], startPoint: .topLeading, endPoint: .bottomTrailing),
-    lineWidth: 2
-))
-.shadow(color: beatMagenta.opacity(0.6), radius: 8)
-.shadow(color: beatMagenta.opacity(0.3), radius: 18)
-```
-
-### Credit coins display
-Use custom `CoinView` (gold gradient circle, not 🪙 emoji). Stack coins with **negative spacing** (`HStack(spacing: -5)`) or a ZStack offset so they overlap like the web. Max 5 shown.
-
-### Timeline path (S-curve)
-- **Glow layer**: `strokeWidth 20`, purple solid, `blur(radius: 4)`, `opacity(0.15)` — very subtle
-- **Solid layer**: `strokeWidth 2`, 3-stop gradient stops: `beatPurple (0%) → beatMagenta (50%) → beatCyan (100%)`
-
-### Timeline node states (iOS)
-| State | Fill | Border | Shadow |
-|---|---|---|---|
-| Default gap | `#4A4B6A` (dark slate) | `#6B6B8A` 1.5pt | Black 0.3 opacity, y+2 |
-| Selected gap (pending) | `beatMagenta→beatPurple` gradient | none | magenta neon + ripple rings |
-| Disabled gap (challenge) | `beatMagenta.opacity(0.4)` | magenta 2pt solid | magenta 0.5 opacity |
-| Year pill (normal) | `beatPurple→#5A2BA8` gradient | none | purple glow |
-| Year pill (correct) | same fill | `beatGreen` 3pt stroke | green neon glow + ripple rings |
-| Year pill (wrong) | same fill | `#EF4444` 3pt stroke | red neon glow + ripple rings |
-| Year pill (challenge-window marker) | transparent | `beatMagenta` 1.5pt | magenta glow |
-
-**Ripple ring animation** (on selected gap + correct/wrong reveal): two rings scale from 1→2.8 and fade opacity 0.75→0, durations 3.33s and 5s (0.67s delay between).
-
-**Labels above year pills** (player name / "You"): positioned as separate ZStack element at `position.y - 22` to avoid shifting the pill center.
-
-**Position hints**: "← before" always on first gap, "after →" always on last gap (same grey text below the gap circle, not just during challenge).
-
-### ChallengeResolvedOverlay
-Renders as a **bottom slide-up panel** (not full-screen), so the timeline remains visible behind it. Same pattern as `ChallengeWindowPanel`.
-
-### 4-digit join code input (LandingView)
-Four individual `TextField` views in an `HStack`. Auto-advance focus on each digit; backspace returns focus to previous field. First field auto-focused on sheet present. Font: `system(size: 28, weight: .bold, design: .monospaced)`.
+**Shared motion values**: press scale 0.95 @120ms; sheets/phase `cubic-bezier(0.34, 1.3, 0.64, 1)` @350ms; ripples ease-out 2.2–2.5s infinite; pulses ease-in-out 1.4s; view fade 250ms.
 
 ---
 

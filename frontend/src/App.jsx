@@ -10,15 +10,16 @@ import SongGuessNotification from "./SongGuessNotification";
 import CreditSpendNotification from "./CreditSpendNotification";
 import SessionRestore from "./SessionRestore";
 import HowToPlayView from "./HowToPlayView";
-import GameStartModal from "./GameStartModal";
+import SpaceBackground from "./components/design/SpaceBackground";
+import SongDetailSheet from "./SongDetailSheet";
+import CoinFlightLayer from "./components/design/CoinFlightLayer";
 import sessionManager from "./utils/sessionManager";
 import debugLogger from './utils/debugLogger';
 import viewportManager from "./utils/viewportUtils";
-import { preloadAudio, setSuppressSoundEffects } from "./utils/soundUtils";
+import { preloadAudio, setSuppressSoundEffects, playSound } from "./utils/soundUtils";
+import useGameSounds from "./utils/useGameSounds";
 import './App.css';
 import WinnerView from "./WinnerView";
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { API_BASE_URL, SOCKET_URL } from './config';
 import { usePreviewMode } from './contexts/PreviewModeContext';
 
@@ -33,7 +34,8 @@ function App() {
   const [view, setView] = useState('landing');
   const [showSessionRestore, setShowSessionRestore] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
-  const [showGameStartModal, setShowGameStartModal] = useState(false);
+  // Tapped revealed timeline card → song detail sheet (iOS onCardTap)
+  const [songDetailCard, setSongDetailCard] = useState(null);
 
   // Socket.IO connection
   // socketRef declared earlier to satisfy hook ordering for upper effects
@@ -54,7 +56,7 @@ function App() {
   const [feedback, setFeedback] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastPlaced, setLastPlaced] = useState(null);
-  const [removingId, setRemovingId] = useState(null);
+  const [, setRemovingId] = useState(null);
   const [challenge, setChallenge] = useState(null);
 const [, setChallengeResponseGiven] = useState(false);
   // Add a state variable to track the game round
@@ -129,9 +131,6 @@ const [, setChallengeResponseGiven] = useState(false);
   const [winner, setWinner] = useState(null);
   const [showWinnerView, setShowWinnerView] = useState(false);
   
-  // Drag state for UI adjustments
-  const [isDragging, setIsDragging] = useState(false);
-
   // Pending drop confirmation state
   const [pendingDropIndex, setPendingDropIndex] = useState(null);
   const [placeCardError, setPlaceCardError] = useState(null);
@@ -145,6 +144,15 @@ const [, setChallengeResponseGiven] = useState(false);
   // Player left game notification state
   const [playerLeftNotification, setPlayerLeftNotification] = useState(null);
 
+  // Coin flight animation (payment on credit spend, award on song-guess bonus)
+  const [coinFlight, setCoinFlight] = useState(null);
+
+  // Live placement preview from the acting player (observers only)
+  const [remotePreviewIndex, setRemotePreviewIndex] = useState(null);
+
+  // My persistent id (players list keyed by current socket id)
+  const myPersistentIdTop = players?.find(p => p.id === socketRef.current?.id)?.persistentId;
+
   // Long-lived socket handlers are registered once (in a useEffect with []),
   // so any state they read directly is captured at mount and goes stale.
   // Mirror the values those handlers need into a ref that we refresh after
@@ -152,14 +160,29 @@ const [, setChallengeResponseGiven] = useState(false);
   const latestRef = useRef({});
   useEffect(() => {
     latestRef.current = {
-      showWinnerView, winner, currentPlayerId, isCreator, roomCode,
+      showWinnerView, winner, currentPlayerId, isCreator, roomCode, phase,
+      myPersistentId: myPersistentIdTop,
     };
     // Dev-only testing hook (stripped from production builds): exposes the live
     // socket + key state so the e2e harness can drive game progression
     // deterministically and read room state. See e2e/.
     if (import.meta.env.DEV && typeof window !== 'undefined') {
-      window.__beatably = { ...latestRef.current, view, phase, timeline, players, challenge, socket: socketRef.current };
+      window.__beatably = { ...latestRef.current, view, phase, timeline, players, challenge, remotePreviewIndex, socket: socketRef.current };
     }
+  });
+
+  // Game sound triggers (iOS SoundManager parity)
+  useGameSounds({
+    phase,
+    lastPlaced,
+    challenge,
+    lastSongGuess,
+    showWinnerView,
+    winner,
+    myPersistentId: myPersistentIdTop,
+    mySocketId: socketRef.current?.id,
+    onCoinAward: (persistentId) =>
+      setCoinFlight({ type: 'award', persistentId, id: Date.now() }),
   });
 
   // Initialize viewport manager for mobile Safari optimizations
@@ -689,7 +712,6 @@ const [, setChallengeResponseGiven] = useState(false);
         setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
         // Reset game round to 1 when a new game starts
         setGameRound(1);
-        setShowGameStartModal(true);
       });
 
   // Listen for game updates (real-time sync, per player)
@@ -766,6 +788,10 @@ const [, setChallengeResponseGiven] = useState(false);
         setTimeline(game.timeline || []);
         setDeck(game.deck || []);
         setPhase(game.phase);
+        // Any phase change invalidates a live placement preview
+        if (game.phase !== latestRef.current.phase) {
+          setRemotePreviewIndex(null);
+        }
         setFeedback(game.feedback);
         // Only show feedback during reveal phase, not during challenge-window
         setShowFeedback(!!game.feedback && game.phase === 'reveal');
@@ -869,13 +895,27 @@ const [, setChallengeResponseGiven] = useState(false);
         const eventId = Date.now();
         setCreditSpendEvent({ ...data, eventId });
 
+        // Sound: 'bonus' when I spent it, 'credit' when another player did (iOS parity)
+        const isSelf = data?.spenderPersistentId &&
+          data.spenderPersistentId === latestRef.current.myPersistentId;
+        playSound(isSelf ? 'bonus' : 'credit');
+
         // Trigger top-row pulse on the spender's token stack
         // Use persistentId key to avoid stale player list closures in socket listeners.
         if (data?.spenderPersistentId) {
           setTokenAnimations({ [data.spenderPersistentId]: true });
           // Keep tokenAnimations transient so PlayerHeader doesn't re-trigger on every render
           setTimeout(() => setTokenAnimations({}), 1200);
+
+          // Coin payment flight from the spender's score card (iOS CoinPaymentAnimation)
+          setCoinFlight({ type: 'payment', persistentId: data.spenderPersistentId, id: eventId });
         }
+      });
+
+      // Live placement preview: the acting player's tentative gap selection,
+      // relayed by the backend to everyone else in the room.
+      socketRef.current.on("placement_preview", ({ index }) => {
+        setRemotePreviewIndex(index == null || index < 0 ? null : index);
       });
 
       // Listen for challenge results
@@ -909,7 +949,9 @@ const [, setChallengeResponseGiven] = useState(false);
 
     // Reset progress UI state for all players - no auto-play
     setIsPlayingMusic(false);
-    
+    // A fresh song invalidates any live placement preview
+    setRemotePreviewIndex(null);
+
     console.log("[App] New song loaded - auto-play disabled. User must press play manually.");
   });
 
@@ -1439,8 +1481,13 @@ const [, setChallengeResponseGiven] = useState(false);
     // Allow pending drop for both player-turn and challenge phases
     if (phase !== 'player-turn' && phase !== 'challenge') return;
     if (!isMyTurnCheck) return;
-    
+
     setPendingDropIndex(index);
+
+    // Live placement preview: let everyone else watch the tentative selection
+    if (roomCode && socketRef.current?.connected) {
+      socketRef.current.emit("preview_placement", { code: roomCode, index });
+    }
   };
 
   // Handler for confirming a pending drop
@@ -1468,6 +1515,7 @@ const [, setChallengeResponseGiven] = useState(false);
         console.log("[App] place_card emitted successfully to room:", roomCode);
       }
       setPendingDropIndex(null); // Clear pending drop after confirmation
+      socketRef.current.emit("preview_placement", { code: roomCode, index: null });
     } catch (error) {
       console.error("[App] Error emitting place_card:", error);
     }
@@ -1477,6 +1525,9 @@ const [, setChallengeResponseGiven] = useState(false);
   const handleCancelDrop = () => {
     console.log("[App] handleCancelDrop called");
     setPendingDropIndex(null);
+    if (roomCode && socketRef.current?.connected) {
+      socketRef.current.emit("preview_placement", { code: roomCode, index: null });
+    }
   };
 
   // Handler to continue after feedback (any player can trigger)
@@ -1527,19 +1578,6 @@ const [, setChallengeResponseGiven] = useState(false);
   const handleSkipSongGuess = () => {
     if (!socketRef.current || !roomCode) return;
     socketRef.current.emit("skip_song_guess", { code: roomCode });
-  };
-
-  // Challenge card placement handler
-  const handleChallengePlaceCard = (index) => {
-    if (!socketRef.current || !roomCode) return;
-    if (phase !== 'challenge') return;
-    
-    // PERSISTENT ID FIX: Use persistent ID comparison for challenge validation
-    const myPlayer = players?.find(p => p.id === socketRef.current?.id);
-    const myPersistentId = myPlayer?.persistentId;
-    if (challenge?.challengerPersistentId !== myPersistentId) return;
-    
-    socketRef.current.emit("challenge_place_card", { code: roomCode, index });
   };
 
   // Continue after challenge resolution handler
@@ -1918,8 +1956,9 @@ const [, setChallengeResponseGiven] = useState(false);
     });
     
     return (
-      <DndProvider backend={HTML5Backend}>
-        <div className="mobile-fullscreen mobile-safe-area bg-background text-white flex flex-col h-full">
+        <div className="mobile-fullscreen mobile-safe-area view-fade-in text-white relative">
+          <SpaceBackground />
+          <div className="relative z-10 flex flex-col h-full">
           <PlayerHeader
             players={players}
             currentPlayerId={currentPlayerId}
@@ -1930,30 +1969,20 @@ const [, setChallengeResponseGiven] = useState(false);
             onShowHowToPlay={() => setShowHowToPlay(true)}
           />
           {showHowToPlay && <HowToPlayView onClose={() => setShowHowToPlay(false)} context="game" />}
-          {showGameStartModal && (
-            <GameStartModal
-              settings={gameSettings}
-              players={players}
-              onDismiss={() => setShowGameStartModal(false)}
-            />
-          )}
-          <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 z-10 bg-background overflow-hidden min-h-0">
+          <div className="flex-1 flex flex-col items-center justify-center p-1 md:p-2 z-10 overflow-hidden min-h-0">
             <TimelineBoard
               timeline={timeline || []}
               currentCard={currentCard}
               feedback={feedback}
               showFeedback={showFeedback}
               lastPlaced={lastPlaced}
-              removingId={removingId}
               phase={phase}
               isMyTurn={isMyTurn}
-              gameRound={gameRound}
               challenge={challenge}
-              onChallengePlaceCard={handleChallengePlaceCard}
-              isPlayingMusic={isPlayingMusic}
-              onDragStateChange={setIsDragging}
               pendingDropIndex={pendingDropIndex}
+              remotePreviewIndex={isMyTurn ? null : remotePreviewIndex}
               onPendingDrop={handlePendingDrop}
+              onCardTap={(card) => setSongDetailCard(card)}
               currentPlayerName={timelineOwnerName}
               roomCode={roomCode}
               myPersistentId={myPersistentId}
@@ -1987,7 +2016,6 @@ const [, setChallengeResponseGiven] = useState(false);
             isCreator={isCreator}
             socketRef={socketRef}
             roomCode={roomCode}
-            isDragging={isDragging}
             pendingDropIndex={pendingDropIndex}
             onConfirmDrop={handleConfirmDrop}
             onCancelDrop={handleCancelDrop}
@@ -2013,16 +2041,26 @@ const [, setChallengeResponseGiven] = useState(false);
             onClose={() => setCreditSpendEvent(null)}
           />
 
+          {/* Song detail sheet — opened by tapping a revealed timeline card (iOS onCardTap) */}
+          <SongDetailSheet
+            open={!!songDetailCard}
+            card={songDetailCard}
+            onClose={() => setSongDetailCard(null)}
+          />
+
+          {/* Coin flight animations (credit spend / song-guess award) */}
+          <CoinFlightLayer flight={coinFlight} onDone={() => setCoinFlight(null)} />
+
           {/* Player Left Game Notification Modal */}
           {playerLeftNotification && (
             <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
-              <div className="fixed inset-0 bg-black bg-opacity-60" />
-              <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+              <div className="fixed inset-0 bg-black" style={{ opacity: 0.55 }} />
+              <div className="relative bg-surface border border-border shadow-xl w-full max-w-sm p-6 text-center" style={{ borderRadius: 22 }}>
                 <div className="mb-3">
-                  <svg className="mx-auto mb-3" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" className="text-red-500" stroke="currentColor" />
-                    <line x1="15" y1="9" x2="9" y2="15" className="text-red-500" stroke="currentColor" strokeWidth="2" />
-                    <line x1="9" y1="9" x2="15" y2="15" className="text-red-500" stroke="currentColor" strokeWidth="2" />
+                  <svg className="mx-auto mb-3" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#FF1493" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 6px rgba(255, 20, 147, 0.6))' }}>
+                    <circle cx="9" cy="8" r="4" />
+                    <path d="M2 21v-1a7 7 0 0 1 12.5-4.3" />
+                    <path d="M17 14l5 5m0-5l-5 5" />
                   </svg>
                   <h3 className="text-lg font-semibold text-foreground mb-2">Game Ended</h3>
                   <p className="text-sm text-muted-foreground">
@@ -2059,8 +2097,8 @@ const [, setChallengeResponseGiven] = useState(false);
               </div>
             </div>
           )}
+          </div>
         </div>
-      </DndProvider>
     );
   }
   return null;

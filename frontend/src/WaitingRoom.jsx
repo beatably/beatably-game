@@ -16,12 +16,10 @@ function WaitingRoom({
   externalLoadingStage,
   isLoadingExternally
 }) {
-  const [showSettings, setShowSettings] = useState(false);
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [loadingStage, setLoadingStage] = useState(0); // 0: idle, 1: fetching, 2: filtering, 3: preparing, 4: done
   const [guestSeesLoading, setGuestSeesLoading] = useState(false); // guests should also see loading while host starts
   const [isLeaving, setIsLeaving] = useState(false);
-  const settingsButtonRef = useRef(null);
   const leaveButtonRef = useRef(null);
   const startGameButtonRef = useRef(null);
   const isCreator = currentPlayer?.isCreator;
@@ -90,7 +88,7 @@ function WaitingRoom({
 
   return (
     <div
-      className="waiting-room-container flex flex-col items-center text-foreground px-6"
+      className="waiting-room-container view-fade-in flex flex-col items-center text-foreground px-6"
       style={{
         backgroundColor: "hsl(var(--background))",
         // Fixed height creates a real scroll container (min-height grows with content and never scrolls)
@@ -181,51 +179,20 @@ function WaitingRoom({
           </CardContent>
         </Card>
 
-        {/* Settings Panel */}
-        {isCreator && showSettings && (
-          <Card className="bg-card border-border mobile-shadow container-card">
-            <CardContent className="p-4">
-              <GameSettings
-                settings={settings}
-                onUpdate={onUpdateSettings}
-              />
-            </CardContent>
-          </Card>
-        )}
+        {/* Settings Panel — always visible; editable for host, read-only for guests (iOS lobby) */}
+        <Card className="bg-card border-border mobile-shadow container-card">
+          <CardContent className="p-4">
+            <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Settings</div>
+            <GameSettings
+              settings={settings}
+              onUpdate={onUpdateSettings}
+              readOnly={!isCreator}
+            />
+          </CardContent>
+        </Card>
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          {isCreator && (
-            <Button
-              ref={settingsButtonRef}
-              variant="outline"
-              className="w-full h-12 font-semibold touch-button no-focus-outline"
-              onClick={() => {
-                setShowSettings((s) => !s);
-                // Immediately blur after click to prevent focus ring
-                if (settingsButtonRef.current) {
-                  setTimeout(() => {
-                    settingsButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (settingsButtonRef.current) {
-                  settingsButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (settingsButtonRef.current) {
-                  settingsButtonRef.current.blur();
-                }
-              }}
-            >
-              {showSettings ? "Hide Settings" : "Game Settings"}
-            </Button>
-          )}
-
           <Button
             ref={leaveButtonRef}
             variant="outline"

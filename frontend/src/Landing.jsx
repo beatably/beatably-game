@@ -148,7 +148,7 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
 
   return (
     <div
-      className="flex flex-col items-center justify-between relative text-foreground px-6 landing-container"
+      className="view-fade-in flex flex-col items-center justify-between relative text-foreground px-6 landing-container"
       style={{
         backgroundColor: "#000000",
         // Use single height declaration to avoid conflicts
