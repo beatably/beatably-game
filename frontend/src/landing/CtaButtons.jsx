@@ -2,9 +2,9 @@ import React from 'react';
 
 export const PLAY_URL = 'https://play.beatably.app';
 
-// TODO: replace with the real App Store URL once the app is approved.
-// Format: https://apps.apple.com/app/beatably/id<APP_ID>
-export const APP_STORE_URL = 'https://apps.apple.com/app/beatably/idPLACEHOLDER';
+// No country code → Apple routes each visitor to their local App Store
+// storefront (the game has SE + international regions).
+export const APP_STORE_URL = 'https://apps.apple.com/app/beatably/id6788660791';
 
 function PlayGlyph() {
   return (
