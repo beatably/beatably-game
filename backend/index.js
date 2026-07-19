@@ -379,7 +379,8 @@ const ALLOWED_FRONTEND_ORIGINS = (
         process.env.FRONTEND_URI,
         'https://beatably-frontend.netlify.app',
         'https://beatably.app',
-        'https://www.beatably.app'
+        'https://www.beatably.app',
+        'https://play.beatably.app'
       ]
     : ['http://127.0.0.1:5173', 'http://localhost:5173']
 ).filter(Boolean);
@@ -2885,10 +2886,11 @@ const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
       ? [
-          process.env.FRONTEND_URI, 
+          process.env.FRONTEND_URI,
           'https://beatably-frontend.netlify.app',
           'https://beatably.app',
-          'https://www.beatably.app'
+          'https://www.beatably.app',
+          'https://play.beatably.app'
         ].filter(Boolean) // Remove any undefined values
       : ['http://127.0.0.1:5173', 'http://localhost:5173'],
     credentials: true,

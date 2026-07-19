@@ -14,4 +14,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        // Game SPA (play.beatably.app)
+        main: path.resolve(__dirname, 'index.html'),
+        // Marketing landing page (beatably.app) — see netlify.toml host routing
+        landing: path.resolve(__dirname, 'landing.html'),
+      },
+    },
+  },
 })

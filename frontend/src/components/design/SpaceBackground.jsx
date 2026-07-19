@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 
 // Port of iOS SpaceBackground (ios/Beatably/Components/SpaceBackground.swift):
 // beatBg base + 3 blurred color orbs + 25 drifting stars on a 5x5 jittered grid.
@@ -52,15 +52,15 @@ const ORBS = [
   },
 ];
 
-function generateStars() {
+function generateStars(rows = 5) {
   const rand = mulberry32(42);
   const stars = [];
-  for (let row = 0; row < 5; row++) {
+  for (let row = 0; row < rows; row++) {
     for (let col = 0; col < 5; col++) {
       const i = row * 5 + col;
-      // 5x5 jittered grid: cell center ± up to 60% of cell size
+      // rows x 5 jittered grid: cell center ± up to 60% of cell size
       const x = ((col + 0.5) / 5 + (rand() - 0.5) * 0.12) * 100;
-      const y = ((row + 0.5) / 5 + (rand() - 0.5) * 0.12) * 100;
+      const y = ((row + 0.5) / rows + (rand() - 0.5) * 0.12) * 100;
       const radius = 0.8 + rand() * 1.6; // 0.8–2.4px
       const duration = 7 + rand() * 7; // 7–14s
       const delay = -rand() * duration; // desync
@@ -81,8 +81,43 @@ function generateStars() {
   return stars;
 }
 
-function SpaceBackground() {
-  const stars = useMemo(generateStars, []);
+// `parallax` (optional, landing page only): { orbs, stars } scroll factors.
+// When set, the orb and star layers translate at different depths on scroll
+// (rAF-throttled, transform-only, disabled for prefers-reduced-motion). The
+// star grid gets extra rows on a 150%-tall layer so the field stays covered
+// as it shifts. Without the prop the render is identical to the game's.
+function SpaceBackground({ parallax = null }) {
+  const hasParallax = parallax != null;
+  const orbFactor = hasParallax ? parallax.orbs || 0 : 0;
+  const starFactor = hasParallax ? parallax.stars || 0 : 0;
+  const stars = useMemo(() => generateStars(hasParallax ? 7 : 5), [hasParallax]);
+  const orbLayerRef = useRef(null);
+  const starLayerRef = useRef(null);
+
+  useEffect(() => {
+    if (!hasParallax) return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY || 0;
+        if (orbLayerRef.current) {
+          orbLayerRef.current.style.transform = `translate3d(0, ${-y * orbFactor}px, 0)`;
+        }
+        if (starLayerRef.current) {
+          starLayerRef.current.style.transform = `translate3d(0, ${-y * starFactor}px, 0)`;
+        }
+      });
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [hasParallax, orbFactor, starFactor]);
 
   return (
     <div
@@ -98,37 +133,52 @@ function SpaceBackground() {
           75% { transform: translate(calc(var(--drift-x) * 0.7), calc(var(--drift-y) * 0.5)); opacity: 0.6; }
         }
       `}</style>
-      {ORBS.map((orb, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: orb.width,
-            height: orb.height,
-            left: orb.left,
-            top: orb.top,
-            transform: "translate(-50%, -50%)",
-            backgroundColor: orb.color,
-            filter: `blur(${orb.blur}px)`,
-          }}
-        />
-      ))}
-      {stars.map((star, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            left: `${star.x}%`,
-            top: `${star.y}%`,
-            width: `${star.radius * 2}px`,
-            height: `${star.radius * 2}px`,
-            backgroundColor: star.color,
-            "--drift-x": `${star.driftX}px`,
-            "--drift-y": `${star.driftY}px`,
-            animation: `space-star-drift ${star.duration}s ease-in-out ${star.delay}s infinite`,
-          }}
-        />
-      ))}
+      <div
+        ref={orbLayerRef}
+        className="absolute inset-0"
+        style={parallax ? { willChange: "transform" } : undefined}
+      >
+        {ORBS.map((orb, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: orb.width,
+              height: orb.height,
+              left: orb.left,
+              top: orb.top,
+              transform: "translate(-50%, -50%)",
+              backgroundColor: orb.color,
+              filter: `blur(${orb.blur}px)`,
+            }}
+          />
+        ))}
+      </div>
+      <div
+        ref={starLayerRef}
+        className="absolute left-0 right-0 top-0"
+        style={{
+          height: parallax ? "150%" : "100%",
+          willChange: parallax ? "transform" : undefined,
+        }}
+      >
+        {stars.map((star, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.radius * 2}px`,
+              height: `${star.radius * 2}px`,
+              backgroundColor: star.color,
+              "--drift-x": `${star.driftX}px`,
+              "--drift-y": `${star.driftY}px`,
+              animation: `space-star-drift ${star.duration}s ease-in-out ${star.delay}s infinite`,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
