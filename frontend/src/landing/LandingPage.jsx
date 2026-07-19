@@ -93,7 +93,7 @@ function CtaBand() {
           <CtaButtons className="justify-center" />
         </div>
         <p data-reveal className="mt-4 text-xs sm:text-sm text-foreground/55">
-          Free in the browser · No account — pick a name and play
+          Free on iOS and web · No account — pick a name and play
         </p>
       </div>
     </section>

@@ -127,7 +127,7 @@ function HeroCinematic() {
               <CtaButtons className="mt-8" />
             </div>
             <p data-hero-stagger className="mt-3.5 text-xs sm:text-sm text-foreground/55">
-              Free in the browser · No account — pick a name and play
+              Free on iOS and web · No account — pick a name and play
             </p>
           </div>
         </div>

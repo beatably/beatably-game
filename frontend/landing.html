@@ -4,8 +4,9 @@
     <meta charset="UTF-8" />
     <title>Beatably — The Music Timeline Party Game</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="Hear a song, guess when it dropped, and build your timeline. Challenge your friends' picks and steal their cards. First to fill their timeline wins. Play free in your browser or get the iOS app.">
+    <meta name="description" content="Beatably is the free multiplayer music timeline party game. Hear a song, guess when it dropped, and build your timeline. Challenge your friends' picks and steal their cards. First to fill their timeline wins. Free on iOS and in your browser — no account needed.">
     <link rel="canonical" href="https://beatably.app/">
+    <meta name="robots" content="index, follow, max-image-preview:large">
 
     <link rel="icon" type="image/png" href="/img/icon-192.png">
     <link rel="apple-touch-icon" href="/img/icon-192.png">
@@ -38,6 +39,47 @@
     <link rel="preload" as="image" href="/img/landing/art/wonderwall.jpg">
     <link rel="preload" as="image" href="/img/landing/art/hey-ya.jpg">
     <link rel="preload" as="image" href="/img/landing/art/rolling-in-the-deep.jpg">
+
+    <!-- Structured data: helps search engines and LLMs understand what Beatably
+         is, that it's a free game, and where to get it (web + App Store). -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "Beatably",
+          "description": "Beatably is the free multiplayer music timeline party game. Hear a song, guess when it dropped, place it in order on your timeline, and steal the cards your friends get wrong. First to fill their timeline wins.",
+          "applicationCategory": "GameApplication",
+          "operatingSystem": "iOS, Web",
+          "url": "https://beatably.app/",
+          "installUrl": "https://apps.apple.com/app/beatably/id6788660791",
+          "image": "https://beatably.app/img/landing/og-image.png",
+          "inLanguage": "en",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "publisher": { "@id": "https://beatably.app/#org" }
+        },
+        {
+          "@type": "WebSite",
+          "name": "Beatably",
+          "url": "https://beatably.app/",
+          "inLanguage": "en",
+          "publisher": { "@id": "https://beatably.app/#org" }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://beatably.app/#org",
+          "name": "Beatably",
+          "url": "https://beatably.app/",
+          "logo": "https://beatably.app/img/icon-192.png"
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="landing-root"></div>

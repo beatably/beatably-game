@@ -1,0 +1,21 @@
+# Beatably
+
+> Beatably is a free multiplayer music timeline party game. Players hear a song, guess when it was released, and place it in chronological order on their personal timeline. The first player to fill their timeline wins. It is free to play in the browser and as a free iOS app, with no account required.
+
+## How it plays
+- A 30-second song preview plays. Nobody is shown the release year.
+- Place the mystery song on your timeline — before, between, or after the cards you have already earned.
+- Get the chronological order right and you keep the card. Get it wrong and it is discarded.
+- After placing, name the artist and title correctly to earn a bonus coin.
+- Spend coins to skip a track you don't know, or to challenge a rival's placement.
+- When you challenge, you re-place the same song yourself; if you are right where they were wrong, you steal the card for your own timeline.
+- First player to reach the target timeline length (e.g. 10 cards) wins.
+
+## Where to play
+- Play free in the browser: https://play.beatably.app
+- Download the free iOS app: https://apps.apple.com/app/beatably/id6788660791
+
+## Notes
+- No account or sign-up is required — pick a name and play.
+- Song previews and album artwork are provided by Apple Music.
+- Privacy policy: https://beatably.app/privacy.html
