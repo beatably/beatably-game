@@ -8,13 +8,42 @@
   # Node version
   NODE_VERSION = "18"
 
-# Serve admin panel static page
+# ── Host routing ──────────────────────────────────────────────────────
+# beatably.app (and www) serve the marketing landing page (landing.html);
+# the game SPA lives at play.beatably.app — add play.beatably.app as a
+# domain alias on this Netlify site and point its DNS at Netlify.
+# Rules are evaluated top-down; rules without force=true never shadow
+# real files, so /img/*, /assets/*, /privacy.html etc. keep working on
+# every host.
+
+# Canonicalize www → apex for the marketing site
+[[redirects]]
+  from = "https://www.beatably.app/*"
+  to = "https://beatably.app/:splat"
+  status = 301
+  force = true
+
+# Marketing landing page at the apex root
+[[redirects]]
+  from = "https://beatably.app/"
+  to = "/landing.html"
+  status = 200
+  force = true
+
+# Any non-file path on the marketing host goes home (keeps the game's SPA
+# fallback below from serving the game at beatably.app/<anything>)
+[[redirects]]
+  from = "https://beatably.app/*"
+  to = "https://beatably.app/"
+  status = 301
+
+# Serve admin panel static page (play.beatably.app/admin)
 [[redirects]]
   from = "/admin"
   to = "/admin.html"
   status = 200
 
-# Redirect all routes to index.html for React Router
+# SPA fallback for the game (play.beatably.app and the netlify subdomain)
 [[redirects]]
   from = "/*"
   to = "/index.html"

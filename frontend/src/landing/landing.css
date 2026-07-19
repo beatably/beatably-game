@@ -1,0 +1,172 @@
+/* Landing-page styles. This file is only bundled by the landing entry
+   (src/landing/main.jsx) and loads after index.css, so it may safely target
+   html/body and undo game-only global rules under the .landing-page scope.
+   Scroll behavior is driven by Lenis + GSAP (see fx.js); everything here is
+   presentation + small self-contained loops. */
+
+/* The game disables text selection globally (index.css `* { user-select: none }`).
+   A marketing page must let visitors select and copy text. */
+.landing-page,
+.landing-page * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.landing-page a,
+.landing-page button,
+.landing-page img,
+.landing-page video {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Neutralize the leftover Vite-default link colors from index.css. */
+.landing-page a {
+  color: inherit;
+  font-weight: inherit;
+}
+.landing-page a:hover {
+  color: inherit;
+}
+
+/* The game strips focus rings for touch feel; keyboard users on a public
+   page need them back. */
+.landing-page a:focus-visible,
+.landing-page button:focus-visible {
+  outline: 2px solid hsl(var(--ring)) !important;
+  outline-offset: 3px;
+}
+
+/* ── Display type ──────────────────────────────────────────────────── */
+.landing-display {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.98;
+  font-size: clamp(3.1rem, 9.5vw, 6.75rem);
+}
+.landing-h2 {
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  line-height: 1.04;
+  font-size: clamp(2.1rem, 5vw, 3.9rem);
+}
+.landing-statement {
+  font-weight: 900;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+  font-size: clamp(1.9rem, 5.4vw, 4.2rem);
+}
+
+/* Neon gradient text (same stops as the timeline path gradient). */
+.landing-gradient-text {
+  background: linear-gradient(90deg, #9945ff 0%, #ff1493 55%, #00ced1 110%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Giant editorial section numbers behind the beat visuals. */
+.landing-giant-number {
+  position: absolute;
+  z-index: 0;
+  font-weight: 900;
+  line-height: 1;
+  font-size: clamp(7rem, 20vw, 15rem);
+  letter-spacing: -0.04em;
+  opacity: 0.08;
+  pointer-events: none;
+  user-select: none !important;
+}
+
+/* ── Hero scroll cue ───────────────────────────────────────────────── */
+@keyframes landing-cue-drop {
+  0%, 100% { transform: translateY(0); opacity: 0.85; }
+  50% { transform: translateY(9px); opacity: 0.35; }
+}
+.landing-scroll-cue {
+  animation: landing-cue-drop 1.8s ease-in-out infinite;
+}
+
+/* ── Animated equalizer bars ("a song is playing") ─────────────────── */
+.landing-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  flex: none;
+}
+.landing-eq i {
+  width: 3px;
+  height: 100%;
+  border-radius: 1.5px;
+  transform-origin: bottom;
+  animation: landing-eq-bounce 0.9s ease-in-out infinite;
+}
+.landing-eq i:nth-child(1) { background: #9945ff; animation-delay: -0.2s; }
+.landing-eq i:nth-child(2) { background: #00ced1; animation-delay: -0.5s; }
+.landing-eq i:nth-child(3) { background: #ff1493; animation-delay: -0.8s; }
+.landing-eq i:nth-child(4) { background: #ffffff; animation-delay: -0.35s; }
+.landing-eq--xl {
+  gap: 5px;
+  height: 40px;
+}
+.landing-eq--xl i {
+  width: 7px;
+  border-radius: 3.5px;
+}
+@keyframes landing-eq-bounce {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+/* Big radiating rings behind the LISTEN mystery node. */
+@keyframes landing-radiate {
+  0% { transform: scale(0.55); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.landing-radiate-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(255, 20, 147, 0.55);
+  animation: landing-radiate 3.2s ease-out infinite;
+}
+
+/* Pop when a mystery card flips over to album art (matches beat-card-bounce feel). */
+@keyframes landing-reveal-pop {
+  0% { transform: scale(0.82); }
+  55% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.landing-reveal-pop {
+  animation: landing-reveal-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Demo board crossfade between loop scenarios. */
+.landing-demo {
+  transition: opacity 0.25s ease-in-out;
+}
+.landing-demo.is-fading {
+  opacity: 0;
+}
+
+/* Dashed empty slot in the steal vignette. */
+.landing-empty-slot {
+  width: 40px;
+  height: 40px;
+  border-radius: 16px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Reduced motion: freeze the CSS loops; the GSAP/Lenis layer checks the same
+   media query in JS (fx.js) and renders end states instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-page *,
+  .landing-page *::before,
+  .landing-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .landing-eq i {
+    transform: scaleY(0.6);
+  }
+}
