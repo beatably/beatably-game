@@ -3,6 +3,7 @@ import SpaceBackground from '@/components/design/SpaceBackground';
 import HeroCinematic from './HeroCinematic';
 import Statement from './Statement';
 import { ListenSection, PlaceSection, EarnSection, StealSection } from './BeatSections';
+import PhoneShowcase from './PhoneShowcase';
 import TryItDemo from './TryItDemo';
 import CtaButtons from './CtaButtons';
 import { PLAY_URL } from './CtaButtons';
@@ -41,9 +42,10 @@ function TryIt() {
         Your turn.
       </h2>
       <p data-reveal className="mt-4 text-base sm:text-lg text-foreground/75">
-        Umbrella — Rihanna. When did it drop? Place it on the timeline.
+        A real track's playing. You know the song — but do you know the year? Tap
+        the gap where it belongs.
       </p>
-      <div data-reveal className="mt-10 sm:scale-105 lg:scale-110 origin-top">
+      <div data-reveal className="mt-10">
         <TryItDemo />
       </div>
     </section>
@@ -68,6 +70,16 @@ function CtaBand() {
       className="relative px-6 py-24 sm:py-40 text-center overflow-hidden"
       aria-labelledby="cta-heading"
     >
+      {/* Distinct darker band so the finale reads as its own zone, fading into
+          the cosmic background at the edges rather than a hard box. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(180deg, transparent 0%, #06040e 16%, #06040e 84%, transparent 100%)',
+        }}
+      />
       {/* Local glow so the finale feels lit, not boxed */}
       <div
         aria-hidden="true"
@@ -75,7 +87,7 @@ function CtaBand() {
         style={{
           width: '90vw',
           height: '60vh',
-          background: 'rgba(153, 69, 255, 0.10)',
+          background: 'rgba(153, 69, 255, 0.12)',
           filter: 'blur(90px)',
         }}
       />
@@ -133,6 +145,7 @@ function LandingPage() {
           <PlaceSection />
           <EarnSection />
           <StealSection />
+          <PhoneShowcase />
           <TryIt />
           <CtaBand />
         </main>

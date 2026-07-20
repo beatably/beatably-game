@@ -15,7 +15,10 @@ export const NODE_LABEL_OFFSET = 33;
 // Returns { items, segments, scale, offsetX, offsetY }
 //   items: { type: 'year', card, cardIndex, x, y } | { type: 'gap', index, x, y }
 //   segments: { type: 'move'|'line', x, y } | { type: 'curve', x, y, c1x, c1y, c2x, c2y }
-export function calculateLayout(cards, containerSize, overrideOffsetY = null) {
+// `minMargin` lets a caller (e.g. the landing-page demo on a narrow phone)
+// reclaim horizontal room by shrinking the board's side margin. Defaults to
+// MIN_MARGIN so the game's own callers are unaffected.
+export function calculateLayout(cards, containerSize, overrideOffsetY = null, minMargin = MIN_MARGIN) {
   const total = cards.length;
 
   // ── Step 1: raw positions ────────────────────────────────────
@@ -38,8 +41,8 @@ export function calculateLayout(cards, containerSize, overrideOffsetY = null) {
   // ── Step 3: scale + offset (fixed 4-row reference box) ───────
   const fixedRawW = 3 * NORMAL_SPACING; // 300
   const fixedRawH = 3 * ROW_HEIGHT; // 240
-  const availW = Math.max(containerSize.width - 2 * MIN_MARGIN, 1);
-  const availH = Math.max(containerSize.height - 2 * MIN_MARGIN, 1);
+  const availW = Math.max(containerSize.width - 2 * minMargin, 1);
+  const availH = Math.max(containerSize.height - 2 * minMargin, 1);
   const scaleX = fixedRawW > availW ? availW / fixedRawW : 1;
   const scaleY = fixedRawH > availH ? availH / fixedRawH : 1;
   const scale = Math.min(scaleX, scaleY, 1);

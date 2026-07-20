@@ -23,10 +23,10 @@ export const prefersReducedMotion = () =>
 
 // Center the actual content rows vertically (the game pins its board to a
 // fixed 4-row reference box; a demo vignette wants the cards centered).
-function centeredOffsetY(cardCount, size) {
+function centeredOffsetY(cardCount, size, minMargin) {
   const rows = Math.max(1, Math.ceil(cardCount / 3));
-  const availW = Math.max(size.width - 2 * MIN_MARGIN, 1);
-  const availH = Math.max(size.height - 2 * MIN_MARGIN, 1);
+  const availW = Math.max(size.width - 2 * minMargin, 1);
+  const availH = Math.max(size.height - 2 * minMargin, 1);
   const scale = Math.min(availW / (3 * NORMAL_SPACING), availH / (3 * ROW_HEIGHT), 1);
   const contentH = (rows - 1) * ROW_HEIGHT * scale;
   return size.height / 2 + contentH / 2;
@@ -80,6 +80,7 @@ function DemoTimeline({
   highlightGap = null, // gap index to pulse (attention hint)
   revealPopId = null, // card id that just flipped art-side-up
   height = null, // px number, or null to size via className (e.g. h-[270px])
+  minMargin = MIN_MARGIN, // shrink to reclaim width on narrow screens
   className = '',
 }) {
   const containerRef = useRef(null);
@@ -104,8 +105,8 @@ function DemoTimeline({
 
   const layout = useMemo(() => {
     if (!size) return null;
-    return calculateLayout(cards, size, centeredOffsetY(cards.length, size));
-  }, [cards, size]);
+    return calculateLayout(cards, size, centeredOffsetY(cards.length, size, minMargin), minMargin);
+  }, [cards, size, minMargin]);
 
   // ── Placement transition ─────────────────────────────────────
   const prevRef = useRef(null); // { ids, layout, size }
