@@ -102,7 +102,7 @@ function PhoneShowcase() {
             alt="Download Beatably on the App Store"
             width={192}
             height={64}
-            className="h-16 w-auto"
+            className="h-10 w-auto"
           />
         </a>
       </div>
