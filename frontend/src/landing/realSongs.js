@@ -2,9 +2,11 @@
 // referenced LIVE from the Apple Music / iTunes CDN (never downloaded or bundled),
 // and each links to its Apple Music page — the sanctioned "in connection with
 // music playback" use. Years are the game's curated-correct values.
+// Each has a stable `id` (used for React keys + the placement animation).
 
 export const REAL_SONGS = [
   {
+    "id": "a-ha-take-on-me",
     "title": "Take on Me",
     "artist": "a-ha",
     "year": 1985,
@@ -13,6 +15,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1531519317"
   },
   {
+    "id": "oasis-wonderwall",
     "title": "Wonderwall",
     "artist": "Oasis",
     "year": 1995,
@@ -21,6 +24,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1517449902"
   },
   {
+    "id": "britney-spears-baby-one-more-time",
     "title": "...Baby One More Time",
     "artist": "Britney Spears",
     "year": 1999,
@@ -29,6 +33,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/264026169"
   },
   {
+    "id": "outkast-hey-ya",
     "title": "Hey Ya!",
     "artist": "Outkast",
     "year": 2003,
@@ -37,6 +42,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1743043414"
   },
   {
+    "id": "rihanna-umbrella",
     "title": "Umbrella",
     "artist": "Rihanna",
     "year": 2008,
@@ -45,6 +51,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1441154437"
   },
   {
+    "id": "adele-rolling-in-the-deep",
     "title": "Rolling in the Deep",
     "artist": "Adele",
     "year": 2011,
@@ -53,6 +60,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1859564538"
   },
   {
+    "id": "the-weeknd-blinding-lights",
     "title": "Blinding Lights",
     "artist": "The Weeknd",
     "year": 2020,
@@ -61,6 +69,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1550875220"
   },
   {
+    "id": "billie-eilish-bad-guy",
     "title": "bad guy",
     "artist": "Billie Eilish",
     "year": 2019,
@@ -69,6 +78,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1593526649"
   },
   {
+    "id": "the-white-stripes-seven-nation-army",
     "title": "Seven Nation Army",
     "artist": "The White Stripes",
     "year": 2003,
@@ -77,6 +87,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1534388718"
   },
   {
+    "id": "the-killers-mr-brightside",
     "title": "Mr. Brightside",
     "artist": "The Killers",
     "year": 2004,
@@ -85,6 +96,7 @@ export const REAL_SONGS = [
     "appleUrl": "https://music.apple.com/us/song/1805634317"
   },
   {
+    "id": "lady-gaga-poker-face",
     "title": "Poker Face",
     "artist": "Lady Gaga",
     "year": 2008,

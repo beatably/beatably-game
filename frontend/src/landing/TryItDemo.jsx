@@ -96,7 +96,7 @@ function AppleMusicLink({ href, className = '' }) {
       className={`inline-flex press-scale ${className}`}
       aria-label="Listen on Apple Music"
     >
-      <img src="/img/listen-on-apple-music.png" alt="Listen on Apple Music" className="h-[52px] w-auto" />
+      <img src="/img/listen-on-apple-music.png" alt="Listen on Apple Music" className="h-[36px] w-auto" />
     </a>
   );
 }
@@ -196,8 +196,33 @@ function TryItDemo() {
         className="h-[280px] sm:h-[320px]"
       />
 
-      {/* Now-playing chip sits just under the board */}
-      <div className="flex justify-center -mt-1">
+      {/* Verdict / prompt — between the timeline and the control box */}
+      <div aria-live="polite" className="text-center min-h-[3.75rem] flex flex-col justify-center px-2">
+        {phase === 'idle' && !result && (
+          <p className="text-xs text-foreground/55">Hit play, then tap the gap where it belongs</p>
+        )}
+        {result === 'correct' && (
+          <div className="view-fade-in">
+            <p className="font-extrabold text-lg" style={{ color: '#22C55E' }}>
+              Nailed it — {mystery.title} dropped in {mystery.year}.
+            </p>
+            <p className="text-sm text-foreground/70 mt-0.5">You'd be dangerous at game night.</p>
+          </div>
+        )}
+        {result === 'wrong' && (
+          <div className="view-fade-in">
+            <p className="font-extrabold text-lg" style={{ color: '#FF1493' }}>
+              Not quite — {mystery.title} is {mystery.year}.
+            </p>
+            <p className="text-sm text-foreground/70 mt-0.5">
+              A slot off. In a real game, a rival could challenge that card and steal it.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Now-playing control box */}
+      <div className="flex justify-center mt-1">
         <div className="beat-card px-3.5 py-2.5 flex items-center gap-3 max-w-[20rem] w-full">
           <PlayButton playing={playing} onClick={togglePlay} />
           <div className="leading-tight text-left min-w-0 flex-1">
@@ -214,54 +239,26 @@ function TryItDemo() {
         </div>
       </div>
 
-      <p className="text-center text-xs text-foreground/55 mt-2 min-h-[1rem]">
-        {phase === 'idle' ? 'Hit play, then tap the gap where it belongs' : ''}
-      </p>
+      {result && (
+        <div className="view-fade-in mt-5 flex items-center justify-center gap-5">
+          <a
+            href={PLAY_URL}
+            className="bg-primary h-11 px-6 rounded-md text-base font-extrabold inline-flex items-center justify-center press-scale"
+          >
+            Start a real game
+          </a>
+          <button
+            type="button"
+            onClick={reset}
+            className="text-sm font-bold text-foreground/60 hover:text-foreground underline underline-offset-2 bg-transparent border-0"
+          >
+            Try another
+          </button>
+        </div>
+      )}
 
-      <div aria-live="polite" className="min-h-[7.5rem] text-center">
-        {result === 'correct' && (
-          <div className="view-fade-in">
-            <p className="font-extrabold text-lg" style={{ color: '#22C55E' }}>
-              Nailed it — {mystery.title} dropped in {mystery.year}.
-            </p>
-            <p className="text-sm text-foreground/70 mt-1">You'd be dangerous at game night.</p>
-          </div>
-        )}
-        {result === 'wrong' && (
-          <div className="view-fade-in">
-            <p className="font-extrabold text-lg" style={{ color: '#FF1493' }}>
-              Not quite — {mystery.title} is {mystery.year}.
-            </p>
-            <p className="text-sm text-foreground/70 mt-1">
-              A slot off. In a real game, a rival could challenge that card and steal it.
-            </p>
-          </div>
-        )}
-        {result && (
-          <div className="view-fade-in mt-4 flex flex-col items-center gap-4">
-            <div className="flex items-center justify-center gap-5">
-              <a
-                href={PLAY_URL}
-                className="bg-primary h-11 px-6 rounded-md text-base font-extrabold inline-flex items-center justify-center press-scale"
-              >
-                Start a real game
-              </a>
-              <button
-                type="button"
-                onClick={reset}
-                className="text-sm font-bold text-foreground/60 hover:text-foreground underline underline-offset-2 bg-transparent border-0"
-              >
-                Try another
-              </button>
-            </div>
-            <AppleMusicLink href={mystery.appleUrl} />
-          </div>
-        )}
-        {!result && (
-          <div className="mt-3 flex justify-center">
-            <AppleMusicLink href={mystery.appleUrl} />
-          </div>
-        )}
+      <div className="mt-9 flex justify-center">
+        <AppleMusicLink href={mystery.appleUrl} />
       </div>
     </div>
   );
