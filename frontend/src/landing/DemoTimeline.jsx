@@ -21,14 +21,16 @@ export const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Center the actual content rows vertically (the game pins its board to a
-// fixed 4-row reference box; a demo vignette wants the cards centered).
-function centeredOffsetY(cardCount, size, minMargin) {
-  const rows = Math.max(1, Math.ceil(cardCount / 3));
+// Anchor the BOTTOM row at a fixed vertical position, independent of how many
+// cards/rows currently exist. Using a fixed `referenceRows` reserves room above
+// for the second row, so when a placement wraps the timeline onto a new row the
+// original nodes keep their vertical level and only the new row grows upward
+// (no whole-board vertical shift). referenceRows=2 matches the demos' max.
+function bottomAnchoredOffsetY(size, minMargin, referenceRows = 2) {
   const availW = Math.max(size.width - 2 * minMargin, 1);
   const availH = Math.max(size.height - 2 * minMargin, 1);
   const scale = Math.min(availW / (3 * NORMAL_SPACING), availH / (3 * ROW_HEIGHT), 1);
-  const contentH = (rows - 1) * ROW_HEIGHT * scale;
+  const contentH = (referenceRows - 1) * ROW_HEIGHT * scale;
   return size.height / 2 + contentH / 2;
 }
 
@@ -105,7 +107,7 @@ function DemoTimeline({
 
   const layout = useMemo(() => {
     if (!size) return null;
-    return calculateLayout(cards, size, centeredOffsetY(cards.length, size, minMargin), minMargin);
+    return calculateLayout(cards, size, bottomAnchoredOffsetY(size, minMargin), minMargin);
   }, [cards, size, minMargin]);
 
   // ── Placement transition ─────────────────────────────────────
