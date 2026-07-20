@@ -70,14 +70,14 @@ function CtaBand() {
       className="relative px-6 py-24 sm:py-40 text-center overflow-hidden"
       aria-labelledby="cta-heading"
     >
-      {/* Distinct darker band so the finale reads as its own zone, fading into
-          the cosmic background at the edges rather than a hard box. */}
+      {/* Distinct near-black band so the finale clearly reads as its own zone,
+          fading into the cosmic background at the edges rather than a hard box. */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'linear-gradient(180deg, transparent 0%, #06040e 16%, #06040e 84%, transparent 100%)',
+            'linear-gradient(180deg, transparent 0%, rgba(2,1,7,0.9) 10%, #020106 26%, #020106 100%)',
         }}
       />
       {/* Local glow so the finale feels lit, not boxed */}
@@ -114,8 +114,8 @@ function CtaBand() {
 
 function Footer() {
   return (
-    <footer className="max-w-6xl mx-auto px-6 pb-10 pt-4">
-      <div className="border-t border-border/60 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50">
+    <footer className="max-w-6xl mx-auto px-6 pb-10 pt-4" style={{ background: '#020106' }}>
+      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50">
         <p>© 2026 Beatably</p>
         <nav className="flex items-center gap-5" aria-label="Footer">
           <a href="/privacy.html" className="hover:text-foreground transition-colors">

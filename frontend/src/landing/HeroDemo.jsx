@@ -118,16 +118,17 @@ function HeroDemo() {
   return (
     <div ref={rootRef} className="relative" aria-label="Gameplay demo: a mystery song is placed on a music timeline and revealed">
       <div className={`landing-demo ${step.phase === 'fade' ? 'is-fading' : ''}`}>
-        <div className="flex justify-center">
-          <NowPlayingChip revealed={revealed} song={song} />
-        </div>
         <DemoTimeline
           cards={cards}
           showGaps={step.phase === 'listen'}
           highlightGap={step.phase === 'listen' && !reduced ? insertAt : null}
           revealPopId={revealed ? song.id : null}
-          className="h-[270px] lg:h-[340px]"
+          minMargin={14}
+          className="h-[300px] lg:h-[360px]"
         />
+        <div className="flex justify-center -mt-1">
+          <NowPlayingChip revealed={revealed} song={song} />
+        </div>
       </div>
     </div>
   );

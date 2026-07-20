@@ -131,6 +131,39 @@
   animation: landing-radiate 3.2s ease-out infinite;
 }
 
+/* Guess-the-Song typing fields: placeholder while empty + a typing caret. */
+.landing-field-val:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(255, 255, 255, 0.32);
+}
+.landing-type-caret {
+  display: inline-block;
+  width: 2px;
+  height: 17px;
+  margin-left: 1px;
+  background: #08af9a;
+  vertical-align: middle;
+  visibility: hidden; /* GSAP autoAlpha reveals the active field's caret */
+  animation: landing-caret-blink 0.9s step-end infinite;
+}
+@keyframes landing-caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* "Play me" attention pulse behind the Your-turn play button (idle only). */
+.landing-play-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: rgba(8, 175, 154, 0.55);
+  animation: landing-play-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes landing-play-ping {
+  0% { transform: scale(1); opacity: 0.6; }
+  70%, 100% { transform: scale(1.9); opacity: 0; }
+}
+
 /* Pop when a mystery card flips over to album art (matches beat-card-bounce feel). */
 @keyframes landing-reveal-pop {
   0% { transform: scale(0.82); }

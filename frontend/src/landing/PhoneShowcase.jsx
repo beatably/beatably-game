@@ -2,31 +2,26 @@ import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import { gsap, prefersReducedMotion, revealOnEnter } from './fx';
 import { APP_STORE_URL } from './CtaButtons';
 
-// Real iOS app shown inside a phone frame. These are actual App Store
+// Real iOS app shown inside phone frames. These are actual App Store
 // screenshots ("displaying your app's functionality"), so the real album art
-// they contain is fine to show. One phone on mobile, two overlapping on desktop.
+// they contain is fine to show. One phone on mobile, a clean horizontal fan of
+// three on desktop.
 
 function Phone({ src, alt, priority = false, className = '', style, ...rest }) {
   return (
-    <div className={`relative ${className}`} style={style} {...rest}>
+    <div className={className} style={style} {...rest}>
       <div
         style={{
-          borderRadius: 40,
+          borderRadius: 38,
           background: '#08060f',
-          padding: 7,
+          padding: 6,
           border: '1px solid rgba(255,255,255,0.14)',
           boxShadow: priority
             ? '0 30px 80px rgba(0,0,0,0.55), 0 0 60px rgba(153,69,255,0.18)'
-            : '0 20px 50px rgba(0,0,0,0.5)',
+            : '0 18px 44px rgba(0,0,0,0.5)',
         }}
       >
-        <img
-          src={src}
-          alt={alt}
-          loading="lazy"
-          className="block w-full"
-          style={{ borderRadius: 33 }}
-        />
+        <img src={src} alt={alt} loading="lazy" className="block w-full" style={{ borderRadius: 32 }} />
       </div>
     </div>
   );
@@ -40,30 +35,17 @@ function PhoneShowcase() {
     if (reduced) return undefined;
     const ctx = gsap.context(() => {
       revealOnEnter(ref.current, '[data-reveal]');
-      // Phones rise + settle as the section enters.
-      gsap.from('[data-phone-front]', {
-        y: 60,
+      gsap.from('[data-phone]', {
+        y: 54,
         opacity: 0,
-        duration: 1,
+        duration: 0.9,
         ease: 'power3.out',
-        scrollTrigger: { trigger: ref.current, start: 'top 68%', once: true },
+        stagger: 0.1,
+        scrollTrigger: { trigger: ref.current, start: 'top 70%', once: true },
       });
-      gsap.from('[data-phone-back]', {
-        y: 30,
-        opacity: 0,
-        duration: 1,
-        delay: 0.12,
-        ease: 'power3.out',
-        scrollTrigger: { trigger: ref.current, start: 'top 68%', once: true },
-      });
-      // Gentle two-depth drift on scroll.
-      gsap.to('[data-phone-back]', {
-        yPercent: -8,
-        ease: 'none',
-        scrollTrigger: { trigger: ref.current, start: 'top bottom', end: 'bottom top', scrub: true },
-      });
-      gsap.to('[data-phone-front]', {
-        yPercent: 4,
+      // Subtle, uniform drift on the whole cluster (stays cohesive).
+      gsap.to('[data-phone-stage]', {
+        yPercent: -6,
         ease: 'none',
         scrollTrigger: { trigger: ref.current, start: 'top bottom', end: 'bottom top', scrub: true },
       });
@@ -74,57 +56,53 @@ function PhoneShowcase() {
   return (
     <section ref={ref} className="max-w-6xl mx-auto px-6 py-20 sm:py-28 text-center" aria-labelledby="app-heading">
       <p data-reveal className="text-xs sm:text-sm font-black tracking-[0.24em] uppercase text-foreground/55">
-        The real thing
+        Everyone gets a phone
       </p>
       <h2 id="app-heading" data-reveal className="landing-h2 mt-3">
-        Even better on your phone
+        Play from your own phone
       </h2>
-      <p data-reveal className="mt-4 text-base sm:text-lg text-foreground/75 max-w-md mx-auto">
-        Every timeline, reveal, and 30-second preview — polished for iOS and built
-        for passing the phone around the room.
+      <p data-reveal className="mt-4 text-base sm:text-lg text-foreground/75 max-w-xl mx-auto">
+        Each player joins on their own phone — free in the browser or the iOS app.
+        The host runs the music and can send it to a speaker over AirPlay or
+        Bluetooth, so the whole room hears every track.
       </p>
 
-      {/* Fixed-width centered stage so the absolutely-positioned back phones
-          stay inside it and never widen the page. */}
-      <div className="relative mx-auto mt-14" style={{ width: 560, maxWidth: '100%', minHeight: 400 }}>
-        {/* Back phone left (desktop only) */}
+      <div data-phone-stage className="mt-16 flex items-end justify-center">
+        {/* Left (desktop only) */}
         <Phone
-          src="/img/landing/ios-place.jpg"
-          alt="Beatably on iOS — placing a song on the timeline"
-          data-phone-back
-          className="hidden lg:block absolute"
-          style={{ width: 208, left: 14, top: 40, transform: 'rotate(-7deg)', zIndex: 1 }}
-        />
-        {/* Back phone right (desktop only) */}
-        <Phone
+          data-phone
           src="/img/landing/ios-challenge.jpg"
           alt="Beatably on iOS — challenging a rival's placement"
-          data-phone-back
-          className="hidden lg:block absolute"
-          style={{ width: 208, right: 14, top: 40, transform: 'rotate(7deg)', zIndex: 1 }}
+          className="hidden lg:block relative"
+          style={{ width: 208, transform: 'rotate(-5deg)', marginRight: -28, marginBottom: 22, zIndex: 0 }}
         />
-        {/* Front phone (centered) */}
-        <div
-          data-phone-front
-          className="relative mx-auto"
-          style={{ zIndex: 2, width: 250, maxWidth: '76vw' }}
-        >
-          <Phone
-            src="/img/landing/ios-correct.jpg"
-            alt="Beatably on iOS — a correct guess revealed on the timeline"
-            priority
-          />
-        </div>
+        {/* Center (always) */}
+        <Phone
+          data-phone
+          src="/img/landing/ios-reveal.jpg"
+          alt="Beatably on iOS — a correct guess revealed on the timeline"
+          priority
+          className="relative"
+          style={{ width: 262, maxWidth: '74vw', zIndex: 2 }}
+        />
+        {/* Right (desktop only) */}
+        <Phone
+          data-phone
+          src="/img/landing/ios-guess.jpg"
+          alt="Beatably on iOS — guessing the song for a bonus"
+          className="hidden lg:block relative"
+          style={{ width: 208, transform: 'rotate(5deg)', marginLeft: -28, marginBottom: 22, zIndex: 0 }}
+        />
       </div>
 
-      <div data-reveal className="mt-14 flex justify-center">
+      <div data-reveal className="mt-16 flex justify-center">
         <a href={APP_STORE_URL} className="press-scale inline-flex">
           <img
             src="/img/landing/appstore-badge.svg"
             alt="Download Beatably on the App Store"
-            width={168}
-            height={56}
-            className="h-14 w-auto"
+            width={192}
+            height={64}
+            className="h-16 w-auto"
           />
         </a>
       </div>

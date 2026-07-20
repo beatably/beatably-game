@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import MysteryNode from '@/components/timeline/MysteryNode';
 import ArtNode from '@/components/timeline/ArtNode';
-import CoinView, { OverlappingCoins } from '@/components/design/CoinView';
+import CoinView from '@/components/design/CoinView';
 import { gsap, prefersReducedMotion, revealOnEnter } from './fx';
 import HeroDemo, { EqBars } from './HeroDemo';
 import { SONGS } from './demoSongs';
@@ -142,103 +142,120 @@ export function PlaceSection() {
 
 /* ── 03 · EARN ───────────────────────────────────────────────────── */
 
+// Animated "Guess the Song" sheet (mirrors the in-game bonus dialog): the
+// title + artist type themselves in, Submit pulses, then it resolves to a
+// correct check + bonus coin. Loops.
 function EarnVisual() {
   const ref = useRef(null);
+  const titleRef = useRef(null);
+  const artistRef = useRef(null);
   const reduced = useMemo(prefersReducedMotion, []);
-  const song = SONGS.babyOneMoreTime;
+  const TITLE = 'Take on Me';
+  const ARTIST = 'a-ha';
 
   useLayoutEffect(() => {
-    if (reduced) return undefined;
+    const setText = (el, t) => {
+      if (el) el.textContent = t;
+    };
+    if (reduced) {
+      setText(titleRef.current, TITLE);
+      setText(artistRef.current, ARTIST);
+      return undefined;
+    }
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         repeat: -1,
-        repeatDelay: 2.1,
-        scrollTrigger: {
-          trigger: ref.current,
-          start: 'top 78%',
-          toggleActions: 'play pause resume pause',
-        },
+        repeatDelay: 1.4,
+        scrollTrigger: { trigger: ref.current, start: 'top 78%', toggleActions: 'play pause resume pause' },
       });
-      tl.set('[data-coin-fly]', { opacity: 0, x: 0, y: 0, scale: 1 })
-        .to('[data-guess-card]', { scale: 1.04, duration: 0.18, ease: 'power2.out' })
-        .to('[data-guess-card]', { scale: 1, duration: 0.3, ease: 'power2.in' }, '<0.14')
-        .to('[data-coin-fly]', { opacity: 1, duration: 0.12 }, 0.12)
+      tl.call(() => {
+        setText(titleRef.current, '');
+        setText(artistRef.current, '');
+      })
+        .set('[data-caret="1"]', { autoAlpha: 1 })
+        .set('[data-caret="2"]', { autoAlpha: 0 })
+        .set('[data-guess-success]', { opacity: 0, y: 8 })
+        .set('[data-guess-submit]', { opacity: 1 })
         .to(
-          '[data-coin-fly]',
-          { x: 86, y: -108, scale: 1.5, duration: 0.7, ease: 'power2.out' },
-          0.16
+          { n: 0 },
+          {
+            n: TITLE.length,
+            duration: 0.85,
+            ease: 'none',
+            onUpdate() {
+              setText(titleRef.current, TITLE.slice(0, Math.round(this.targets()[0].n)));
+            },
+          },
+          0.3
         )
-        .to('[data-coin-fly]', { opacity: 0, scale: 0.8, duration: 0.18 }, '>-0.05')
+        .set('[data-caret="1"]', { autoAlpha: 0 }, '>0.15')
+        .set('[data-caret="2"]', { autoAlpha: 1 }, '<')
         .to(
-          '[data-coin-stack]',
-          { scale: 1.14, duration: 0.42, ease: 'elastic.out(1.4, 0.5)' },
-          '>-0.1'
+          { n: 0 },
+          {
+            n: ARTIST.length,
+            duration: 0.5,
+            ease: 'none',
+            onUpdate() {
+              setText(artistRef.current, ARTIST.slice(0, Math.round(this.targets()[0].n)));
+            },
+          },
+          '>0.1'
         )
-        .to('[data-coin-stack]', { scale: 1, duration: 0.25, ease: 'power2.out' });
+        .set('[data-caret="2"]', { autoAlpha: 0 }, '>0.15')
+        .to('[data-guess-submit]', { scale: 0.96, duration: 0.12 }, '>0.25')
+        .to('[data-guess-submit]', { scale: 1, duration: 0.14 })
+        .to('[data-guess-submit]', { opacity: 0, duration: 0.22 }, '>0.05')
+        .to('[data-guess-success]', { opacity: 1, y: 0, duration: 0.42, ease: 'back.out(2)' }, '<')
+        .to({}, { duration: 1.9 });
     }, ref);
     return () => ctx.revert();
   }, [reduced]);
 
+  const field = (valRef, placeholder, caret) => (
+    <div className="rounded-md bg-input border border-border px-3 h-11 flex items-center text-sm">
+      <span ref={valRef} className="landing-field-val text-foreground whitespace-pre" data-placeholder={placeholder} />
+      <span data-caret={caret} className="landing-type-caret" aria-hidden="true" />
+    </div>
+  );
+
   return (
     <div ref={ref} className="relative h-[300px] flex items-center justify-center">
-      <div className="relative">
-        {/* Your coin purse */}
-        <div
-          data-coin-stack
-          className="beat-card absolute -top-24 right-0 px-4 py-2.5 flex items-center gap-2.5"
-        >
-          <span className="text-xs font-extrabold text-foreground/70">You</span>
-          <OverlappingCoins count={3} size={18} />
-        </div>
-
-        {/* The flying bonus coin */}
-        <div
-          data-coin-fly
-          className="absolute left-1/2 top-1/2 flex items-center gap-1"
-          style={{ opacity: 0, zIndex: 2 }}
-          aria-hidden="true"
-        >
-          <CoinView size={20} />
-          <span className="text-sm font-black" style={{ color: '#F5C842' }}>
-            +1
-          </span>
-        </div>
-
-        {/* The correct guess */}
-        <div data-guess-card className="beat-card px-4 py-3 flex items-center gap-3">
-          <img
-            src={song.art}
-            alt=""
-            width={36}
-            height={36}
-            className="rounded-md flex-none"
-            style={{ border: '1px solid rgba(255,255,255,0.25)' }}
-          />
-          <div className="leading-tight text-left">
-            <div className="text-sm font-extrabold">{song.title}</div>
-            <div className="text-xs text-foreground/60">{song.artist}</div>
+      <div className="beat-card w-[300px] max-w-full p-5 text-left">
+        <div className="text-center">
+          <div className="text-base font-black">Guess the Song</div>
+          <div className="text-[11px] text-foreground/55 mt-0.5">
+            Both title and artist for the bonus
           </div>
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 22 22"
-            fill="none"
-            className="flex-none ml-1"
+        </div>
+        <div className="mt-4 space-y-2.5">
+          {field(titleRef, 'Song title', '1')}
+          {field(artistRef, 'Artist', '2')}
+        </div>
+        <div className="relative mt-4 h-11">
+          <div
+            data-guess-submit
+            className="absolute inset-0 bg-primary rounded-md flex items-center justify-center text-sm font-extrabold"
+          >
+            Submit Guess
+          </div>
+          <div
+            data-guess-success
+            className="absolute inset-0 flex items-center justify-center gap-2 text-sm font-extrabold"
+            style={{ color: '#22C55E' }}
             aria-hidden="true"
           >
-            <circle cx="11" cy="11" r="10" fill="#22C55E" opacity="0.18" />
-            <path
-              d="m6.5 11.5 3 3 6-6.5"
-              stroke="#22C55E"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+            <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="11" r="10" fill="#22C55E" opacity="0.2" />
+              <path d="m6.5 11.5 3 3 6-6.5" stroke="#22C55E" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Correct!
+            <span className="inline-flex items-center gap-1 ml-1">
+              <CoinView size={16} />
+              <span style={{ color: '#F5C842' }}>+1</span>
+            </span>
+          </div>
         </div>
-        <p className="mt-3 text-center text-xs font-bold text-foreground/50">
-          Artist + title, nailed
-        </p>
       </div>
     </div>
   );

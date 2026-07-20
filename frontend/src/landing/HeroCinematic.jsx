@@ -83,9 +83,9 @@ function HeroCinematic() {
           <img
             src={beatablyLogo}
             alt="Beatably"
-            className="h-8 sm:h-10 w-auto"
-            width={156}
-            height={40}
+            className="h-16 sm:h-20 w-auto"
+            width={312}
+            height={80}
             data-hero-stagger
           />
           <a
