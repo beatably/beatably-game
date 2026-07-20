@@ -1,30 +1,28 @@
-// Fictional songs for the ILLUSTRATIVE demos (sections 02 Place, 03 Earn,
-// 04 Challenge). Artist/title/artwork are all invented — the covers are
-// original generated art in /img/landing/covers — so nothing here uses real
-// Apple Music artwork or metadata. Years are chosen so the demo choreography
-// (insert positions, steal ordering) reads correctly. Real songs with real
-// playback live only in the interactive "Your turn" section (see realSongs.js).
+// Songs for the ILLUSTRATIVE demos (sections 02 Place, 03 Earn, 04 Challenge).
+// Titles/artists/years are REAL — those are facts, not copyrightable, so naming
+// a track and its release year is fine. The ALBUM ART is NOT the real cover:
+// each `art` is original, generated, era/genre-evocative artwork (see
+// /img/landing/covers), so no label-owned artwork is used here.
 //
-// Object keys are internal handles kept stable so the demo components don't
-// need to change; they do NOT refer to real tracks.
+// Real songs with real Apple Music artwork + playback live only in the
+// interactive "Your turn" section (see realSongs.js).
 
-const cover = (n) => `/img/landing/covers/cover-${n}.png`;
-const song = (id, title, artist, year, coverN) => ({
+const song = (id, title, artist, year) => ({
   id,
   title,
   artist,
   year,
-  art: cover(coverN),
+  art: `/img/landing/covers/${id}.jpg`,
 });
 
 export const SONGS = {
-  takeOnMe: song('demo-a', 'Slow Rivers', 'Velvet Hours', 1985, '01'),
-  likeAPrayer: song('demo-b', 'Paper Cathedral', 'Vela', 1989, '10'),
-  wonderwall: song('demo-c', 'Cassette Summer', 'The Static Hours', 1995, '03'),
-  babyOneMoreTime: song('demo-d', 'Sugar Static', 'Polar Youth', 1999, '04'),
-  heyYa: song('demo-e', 'Boombox Gospel', 'Two-Tone Kings', 2003, '05'),
-  mrBrightside: song('demo-f', 'Fever Lights', 'Midnight Arcade', 2004, '06'),
-  umbrella: song('demo-g', 'Cloudburst', 'Marisol Rae', 2008, '07'),
-  rollingInTheDeep: song('demo-h', 'Undertow', 'Ash & Ember', 2011, '08'),
-  blindingLights: song('demo-i', 'Chrome Horizon', 'VHS Dreams', 2020, '09'),
+  takeOnMe: song('take-on-me', 'Take on Me', 'a-ha', 1985),
+  likeAPrayer: song('like-a-prayer', 'Like a Prayer', 'Madonna', 1989),
+  wonderwall: song('wonderwall', 'Wonderwall', 'Oasis', 1995),
+  babyOneMoreTime: song('baby-one-more-time', '...Baby One More Time', 'Britney Spears', 1999),
+  heyYa: song('hey-ya', 'Hey Ya!', 'OutKast', 2003),
+  mrBrightside: song('mr-brightside', 'Mr. Brightside', 'The Killers', 2004),
+  umbrella: song('umbrella', 'Umbrella', 'Rihanna', 2008),
+  rollingInTheDeep: song('rolling-in-the-deep', 'Rolling in the Deep', 'Adele', 2011),
+  blindingLights: song('blinding-lights', 'Blinding Lights', 'The Weeknd', 2020),
 };
