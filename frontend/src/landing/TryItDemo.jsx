@@ -197,7 +197,7 @@ function TryItDemo() {
       />
 
       {/* Verdict / prompt — between the timeline and the control box */}
-      <div aria-live="polite" className="text-center min-h-[3.75rem] flex flex-col justify-center pt-2 px-2">
+      <div aria-live="polite" className="text-center min-h-[3.75rem] flex flex-col justify-center pb-6 px-2">
         {phase === 'idle' && !result && (
           <p className="text-xs text-foreground/55">Hit play, then tap the gap where it belongs</p>
         )}
@@ -240,7 +240,7 @@ function TryItDemo() {
       </div>
 
       {result && (
-        <div className="view-fade-in mt-5 flex items-center justify-center gap-5">
+        <div className="view-fade-in mt-6 flex items-center justify-center gap-5">
           <a
             href={PLAY_URL}
             className="bg-primary h-11 px-6 rounded-md text-base font-extrabold inline-flex items-center justify-center press-scale"
