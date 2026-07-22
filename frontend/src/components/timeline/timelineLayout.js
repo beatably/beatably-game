@@ -18,7 +18,7 @@ export const NODE_LABEL_OFFSET = 33;
 // `minMargin` lets a caller (e.g. the landing-page demo on a narrow phone)
 // reclaim horizontal room by shrinking the board's side margin. Defaults to
 // MIN_MARGIN so the game's own callers are unaffected.
-export function calculateLayout(cards, containerSize, overrideOffsetY = null, minMargin = MIN_MARGIN) {
+export function calculateLayout(cards, containerSize, overrideOffsetY = null, minMargin = MIN_MARGIN, scrollMode = false) {
   const total = cards.length;
 
   // ── Step 1: raw positions ────────────────────────────────────
@@ -38,9 +38,15 @@ export function calculateLayout(cards, containerSize, overrideOffsetY = null, mi
   const maxX = (xs.length ? Math.max(...xs) : 0) + NORMAL_SPACING / 2;
   const rawW = maxX - minX;
 
-  // ── Step 3: scale + offset (fixed 4-row reference box) ───────
+  // ── Step 3: scale + offset ───────────────────────────────────
+  // Scale comes from a fixed reference box. In scroll mode (solo) the box is
+  // always 4 rows, so nodes never shrink as the streak grows — extra rows extend
+  // the content and the container scrolls. Otherwise the box grows to fit all
+  // rows (multiplayer tops out at 12 cards / 4 rows, so it's unchanged there).
+  const rowCount = Math.max(1, Math.ceil(total / 3));
+  const scaleRefRows = scrollMode ? 4 : Math.max(4, rowCount);
   const fixedRawW = 3 * NORMAL_SPACING; // 300
-  const fixedRawH = 3 * ROW_HEIGHT; // 240
+  const fixedRawH = (scaleRefRows - 1) * ROW_HEIGHT; // 240 when 4 rows
   const availW = Math.max(containerSize.width - 2 * minMargin, 1);
   const availH = Math.max(containerSize.height - 2 * minMargin, 1);
   const scaleX = fixedRawW > availW ? availW / fixedRawW : 1;
@@ -49,11 +55,24 @@ export function calculateLayout(cards, containerSize, overrideOffsetY = null, mi
 
   const scaledW = rawW * scale;
   const offsetX = containerSize.width / 2 - scaledW / 2 - minX * scale;
-  const fixedMinY = -3 * ROW_HEIGHT; // -240
-  const offsetY =
-    overrideOffsetY != null
-      ? overrideOffsetY
-      : containerSize.height / 2 - (fixedRawH * scale) / 2 - fixedMinY * scale;
+
+  // Vertical placement: BOTTOM-anchor. The oldest row (raw y = 0) sits `vpad`
+  // above the bottom of the board and rows grow upward. This replaces vertical
+  // centering, which shifted the whole board whenever the footer resized (album
+  // art appears during reveal). The caller passes a stabilized height so a
+  // resizing footer doesn't move the anchor. Solo overflow scrolls; everything
+  // else (multiplayer + short solo) anchors to the container bottom.
+  const vpad = NODE_SIZE * scale + 44; // room for node radius + year label
+  const scaledContentH = (rowCount - 1) * ROW_HEIGHT * scale;
+  let offsetY;
+  let contentHeight;
+  if (scrollMode && scaledContentH + 2 * vpad > containerSize.height) {
+    contentHeight = scaledContentH + 2 * vpad;
+    offsetY = overrideOffsetY != null ? overrideOffsetY : contentHeight - vpad;
+  } else {
+    contentHeight = containerSize.height;
+    offsetY = overrideOffsetY != null ? overrideOffsetY : containerSize.height - vpad;
+  }
 
   const toScreen = (x, y) => ({ x: x * scale + offsetX, y: y * scale + offsetY });
   const years = rawYears.map((r) => ({ pos: toScreen(r.x, r.y), sectionIndex: r.sectionIndex }));
@@ -109,7 +128,7 @@ export function calculateLayout(cards, containerSize, overrideOffsetY = null, mi
       x: containerSize.width / 2,
       y: containerSize.height / 2,
     });
-    return { items, segments, scale, offsetX, offsetY };
+    return { items, segments, scale, offsetX, offsetY, contentHeight };
   }
 
   const first = years[0];
@@ -154,7 +173,7 @@ export function calculateLayout(cards, containerSize, overrideOffsetY = null, mi
     y: last.pos.y,
   });
 
-  return { items, segments, scale, offsetX, offsetY };
+  return { items, segments, scale, offsetX, offsetY, contentHeight };
 }
 
 export function buildPathD(segments) {

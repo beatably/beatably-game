@@ -31,6 +31,7 @@ struct GamePlayer: Identifiable {
     let name: String
     var score: Int
     var credits: Int
+    var correctGuesses: Int = 0
 }
 
 struct PlacementResult {
@@ -73,6 +74,32 @@ struct GameSettings {
     var yearMin: Int = 1960
     var yearMax: Int = 2025
     var genres: [String] = ["pop", "rock", "hip-hop", "electronic", "indie"]
+    var gameMode: String = "multiplayer"   // "solo" for single-player survival
+}
+
+// Solo game-over payload (mirrors backend finalizeSoloGame): the run's score,
+// global rank, and stats shown on the solo scoreboard.
+struct SoloResult {
+    let score: Int
+    let rank: Int?
+    let creditsRemaining: Int
+    let correctGuesses: Int
+    let timeline: [SoloRecapSong]   // chronological, for the recap strip
+    let top10: [SoloLeaderEntry]
+}
+
+struct SoloRecapSong: Identifiable {
+    let id = UUID()
+    let title: String
+    let artist: String
+    let year: Int
+    let albumArt: String?
+}
+
+struct SoloLeaderEntry: Identifiable {
+    let id = UUID()
+    let name: String
+    let score: Int
 }
 
 @Observable
@@ -96,8 +123,27 @@ class GameViewModel {
     var gamePlayers: [GamePlayer] = []
     var placementResult: PlacementResult? = nil
     var gameWinner: GameWinner? = nil
+    var soloResult: SoloResult? = nil
+    // Set when the solo run-ending "See Your Score" is tapped; keeps a full-screen
+    // cover up during the brief transition to the scoreboard.
+    var soloAwaitingScore = false
     var myPersistentId: String = ""
     var challengeState: ChallengeState? = nil
+
+    // True for the whole session once a solo game is created; drives the solo
+    // header, timeline scroll, reveal copy, and scoreboard.
+    var isSolo: Bool { gameSettings.gameMode == "solo" }
+    // First-song guard so solo autoplay only kicks in from round 2 onward (the
+    // initial user gesture must unlock audio; iOS blocks autoplay before it).
+    @ObservationIgnored var hasAutoPlayedSolo = false
+
+    // Stable timeline layout height. The timeline area shrinks when the footer
+    // grows during reveal; to keep the bottom-anchored board from shifting we
+    // track the MAX observed area height (the player-turn state) here — in the VM
+    // so it survives SwiftUI recreating the timeline view on phase changes.
+    // Reset on leaving so a new session/orientation re-measures.
+    @ObservationIgnored var maxTimelineAreaHeight: CGFloat = 0
+    @ObservationIgnored var timelineAreaWidth: CGFloat = 0
 
     // Song guessing
     var showSongGuess = false
@@ -367,8 +413,85 @@ class GameViewModel {
             view = .lobby
         }
 
+        // Solo in-game state: single player, solo header + timeline. `cards` controls
+        // the streak length so we can screenshot both the fit and scrolling cases.
+        func solo(cards count: Int) {
+            isCreator = true
+            gameSettings.gameMode = "solo"
+            let me = "p-solo"
+            myPersistentId = me
+            currentPlayerId = me
+            playerName = "You"
+            gamePlayers = [GamePlayer(id: me, persistentId: me, name: "You", score: count, credits: 3, correctGuesses: 2)]
+            let arts = [artFeelGood, artDoves, artLose, artHeyJude, artU2, artFallin, artNothing]
+            timeline = (0..<count).map { i in
+                song("solo-\(i)", "Song \(i)", "Artist \(i)", 1960 + i * 3, art: arts[i % arts.count])
+            }
+            currentCard = song("solo-new", "Fallin'", "Alicia Keys", 2001, art: artFallin)
+            placementResult = nil
+            challengeState = nil
+            gamePhase = "player-turn"
+        }
+
+        // Solo reveal after a wrong placement (streak-ending) — exercises the solo
+        // reveal copy + "See Your Score" CTA.
+        func soloRevealWrong() {
+            isCreator = true
+            gameSettings.gameMode = "solo"
+            let me = "p-solo"; myPersistentId = me; currentPlayerId = me; playerName = "You"
+            gamePlayers = [GamePlayer(id: me, persistentId: me, name: "You", score: 5, credits: 2, correctGuesses: 2)]
+            timeline = [song("s1", "When Doves Cry", "Prince", 1984, art: artDoves),
+                        song("s2", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood)]
+            currentCard = song("s2", "Feel Good Inc.", "Gorillaz", 2005, art: artFeelGood)
+            placementResult = PlacementResult(id: "s2", correct: false, year: 2005)
+            challengeState = nil
+            gamePhase = "reveal"
+        }
+
+        // Solo game-over scoreboard with a seeded soloResult.
+        func soloGameOver() {
+            isCreator = true
+            gameSettings.gameMode = "solo"
+            let me = "p-solo"; myPersistentId = me; currentPlayerId = me; playerName = "You"
+            gamePlayers = [GamePlayer(id: me, persistentId: me, name: "You", score: 8, credits: 2, correctGuesses: 3)]
+            let recap = [
+                SoloRecapSong(title: "Hey Jude", artist: "The Beatles", year: 1967, albumArt: artHeyJude),
+                SoloRecapSong(title: "When Doves Cry", artist: "Prince", year: 1984, albumArt: artDoves),
+                SoloRecapSong(title: "Fallin'", artist: "Alicia Keys", year: 2001, albumArt: artFallin),
+                SoloRecapSong(title: "Feel Good Inc.", artist: "Gorillaz", year: 2005, albumArt: artFeelGood),
+                SoloRecapSong(title: "Nothing Compares", artist: "Sinéad", year: 1990, albumArt: nil),
+            ]
+            let top = [
+                SoloLeaderEntry(name: "Ada", score: 15), SoloLeaderEntry(name: "Bo", score: 12),
+                SoloLeaderEntry(name: "Cy", score: 9), SoloLeaderEntry(name: "You", score: 7),
+                SoloLeaderEntry(name: "Di", score: 6), SoloLeaderEntry(name: "Ed", score: 5),
+            ]
+            soloResult = SoloResult(score: 7, rank: 4, creditsRemaining: 2, correctGuesses: 3, timeline: recap, top10: top)
+            gameWinner = GameWinner(name: "You", score: 8, persistentId: me)
+            gamePhase = "game-over"
+        }
+
+        // Reproduces the real cross-phase flow: seed the timeline height at
+        // player-turn (short footer), then flip to the streak-ending reveal (tall
+        // footer). Used to verify the timeline does NOT shift on the losing reveal.
+        func soloLoseTransition() {
+            solo(cards: 6)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self else { return }
+                let placed = self.timeline.last
+                self.placementResult = PlacementResult(id: placed?.id ?? "solo-5", correct: false, year: placed?.year ?? 2000)
+                self.lastSongGuess = nil
+                self.gamePhase = "reveal"
+            }
+        }
+
         switch scenario {
         case "reconnecting":                 roomCode = "ABCD"; isConnected = false; view = .reconnecting; return
+        case "solo":                         solo(cards: 6)
+        case "solo-scroll":                  solo(cards: 18)
+        case "solo-reveal":                  soloRevealWrong()
+        case "solo-lose-transition":         soloLoseTransition()
+        case "solo-game-over":               soloGameOver()
         case "lobby-creator":                lobbyCreator(); return
         case "observer-preview":             observerPreview()
         case "song-guess":                   songGuess()
@@ -619,6 +742,38 @@ class GameViewModel {
         }
     }
 
+    // Single-player: create a solo lobby and start immediately, skipping the
+    // lobby UI (solo has no settings and no one to wait for). The backend builds
+    // the fixed progressive-difficulty deck from the solo gameMode.
+    func createSolo(name: String) {
+        let code = randomCode()
+        playerName = name
+        roomCode = code
+        isCreator = true
+        gameSettings.gameMode = "solo"
+
+        let payload: [String: Any] = ["name": name, "code": code, "settings": settingsPayload()]
+
+        socket.emitWithAck("create_lobby", payload).timingOut(after: 10) { [weak self] data in
+            guard let self else { return }
+            guard let response = data.first as? [String: Any] else { return }
+            if let error = response["error"] as? String {
+                DispatchQueue.main.async { self.errorMessage = error }
+                return
+            }
+            DispatchQueue.main.async {
+                if let player = response["player"] as? [String: Any],
+                   let pId = player["persistentId"] as? String {
+                    self.myPersistentId = pId
+                }
+                if let lobby = response["lobby"] as? [String: Any] { self.applyLobby(lobby) }
+                self.persistSession()
+                // Auto-start — game_started switches the view to the game.
+                self.startGame()
+            }
+        }
+    }
+
     func joinLobby(name: String, code: String) {
         playerName = name
         roomCode = code.uppercased()
@@ -654,6 +809,12 @@ class GameViewModel {
     }
 
     func startGame() {
+        // Solo: the backend builds a fixed, progressive-difficulty deck from the
+        // solo gameMode, so skip the client-side song fetch and just start.
+        if isSolo {
+            socket.emit("start_game", ["code": roomCode] as [String: Any])
+            return
+        }
         guard let url = URL(string: Config.backendURL + "/api/curated/select") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -721,6 +882,12 @@ class GameViewModel {
     }
 
     func continueGame() {
+        // Solo + wrong placement = the run is over. Cover the screen immediately so
+        // the brief server-driven card-removal re-layout isn't visible before the
+        // scoreboard arrives (~400ms later).
+        if isSolo, let pr = placementResult, !pr.correct {
+            soloAwaitingScore = true
+        }
         if gamePhase == "challenge-resolved" {
             socket.emit("continue_after_challenge", ["code": roomCode] as [String: Any])
         } else {
@@ -794,7 +961,8 @@ class GameViewModel {
                     persistentId: p["persistentId"] as? String ?? id,
                     name: name,
                     score: p["score"] as? Int ?? 0,
-                    credits: p["tokens"] as? Int ?? 0
+                    credits: p["tokens"] as? Int ?? 0,
+                    correctGuesses: p["correctGuesses"] as? Int ?? 0
                 )
             }
         }
@@ -834,6 +1002,12 @@ class GameViewModel {
                 score: w["score"] as? Int ?? 0,
                 persistentId: w["persistentId"] as? String ?? ""
             )
+        }
+
+        // Solo game-over payload (sibling of winner) — drives the solo scoreboard.
+        if let sr = game["soloResult"] as? [String: Any] {
+            soloResult = GameViewModel.parseSoloResult(sr)
+            soloAwaitingScore = false
         }
 
         // Parse challenge state; find the disabled index (original placement slot)
@@ -879,7 +1053,15 @@ class GameViewModel {
             if phase == "player-turn", let card = currentCard, let url = card.previewURL {
                 if card.id != currentlyPlayingCardId {
                     currentlyPlayingCardId = card.id
-                    AudioPlayer.shared.load(url: url)
+                    // Solo: auto-play each new song from round 2 onward. The first
+                    // song stays manual so the initial user gesture unlocks audio
+                    // (iOS blocks programmatic playback before that).
+                    if isSolo && hasAutoPlayedSolo {
+                        AudioPlayer.shared.play(url: url)
+                    } else {
+                        AudioPlayer.shared.load(url: url)
+                        if isSolo { hasAutoPlayedSolo = true }
+                    }
                     startProgressSync()
                 }
             }
@@ -1018,6 +1200,32 @@ class GameViewModel {
         return PlacementResult(id: lpId, correct: correct, year: year)
     }
 
+    // Parse the solo game-over payload. Socket.IO may deliver numbers as Int or
+    // Double, so read defensively.
+    static func parseSoloResult(_ dict: [String: Any]) -> SoloResult {
+        func int(_ v: Any?) -> Int { (v as? Int) ?? (v as? Double).map { Int($0) } ?? 0 }
+        let recap: [SoloRecapSong] = (dict["timeline"] as? [[String: Any]] ?? []).map { s in
+            SoloRecapSong(
+                title: s["title"] as? String ?? "",
+                artist: s["artist"] as? String ?? "",
+                year: int(s["year"]),
+                albumArt: s["album_art"] as? String
+            )
+        }
+        let top: [SoloLeaderEntry] = (dict["top10"] as? [[String: Any]] ?? []).map { e in
+            SoloLeaderEntry(name: e["name"] as? String ?? "—", score: int(e["score"]))
+        }
+        let rankVal = dict["rank"]
+        return SoloResult(
+            score: int(dict["score"]),
+            rank: rankVal == nil ? nil : int(rankVal),
+            creditsRemaining: int(dict["creditsRemaining"]),
+            correctGuesses: int(dict["correctGuesses"]),
+            timeline: recap,
+            top10: top
+        )
+    }
+
     private func parseSong(_ dict: [String: Any]) -> Song? {
         guard let id = dict["id"] as? String,
               let title = dict["title"] as? String,
@@ -1054,6 +1262,7 @@ class GameViewModel {
         if let settings = lobby["settings"] as? [String: Any] {
             if let win = settings["winCondition"] as? Int { gameSettings.winCondition = win }
             if let diff = settings["difficulty"] as? String { gameSettings.difficulty = diff }
+            if let mode = settings["gameMode"] as? String { gameSettings.gameMode = mode }
             if let prefs = settings["musicPreferences"] as? [String: Any] {
                 if let markets = prefs["markets"] as? [String] { gameSettings.markets = markets }
                 if let yr = prefs["yearRange"] as? [String: Any],
@@ -1069,6 +1278,7 @@ class GameViewModel {
         [
             "difficulty": gameSettings.difficulty,
             "winCondition": gameSettings.winCondition,
+            "gameMode": gameSettings.gameMode,
             "musicPreferences": [
                 "markets": gameSettings.markets,
                 "yearRange": ["min": gameSettings.yearMin, "max": gameSettings.yearMax],
@@ -1091,6 +1301,9 @@ class GameViewModel {
         gamePhase = "player-turn"; currentPlayerId = ""; timeline = []
         currentCard = nil; gamePlayers = []; placementResult = nil
         gameWinner = nil; myPersistentId = ""; challengeState = nil
+        soloResult = nil; gameSettings.gameMode = "multiplayer"; hasAutoPlayedSolo = false
+        soloAwaitingScore = false
+        maxTimelineAreaHeight = 0; timelineAreaWidth = 0
         showSongGuess = false; songGuessNotification = nil; playerLeftMessage = nil; creditSpendMessage = nil
         lastSongGuess = nil; pendingPlacementIndex = nil
         syncedProgress = 0; syncedDuration = 30; syncedIsPlaying = false

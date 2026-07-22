@@ -45,6 +45,9 @@ struct TimelineLayoutResult {
     let scale: CGFloat
     let offsetX: CGFloat
     let offsetY: CGFloat
+    // Height of the laid-out content. In scroll mode (solo) this can exceed the
+    // viewport, and the container scrolls; otherwise it equals the viewport.
+    var contentHeight: CGFloat = 0
 }
 
 // MARK: - Layout engine
@@ -61,7 +64,8 @@ enum TimelineLayout {
         lastPlacedId: String?,
         gamePhase: String,
         isInteractive: Bool,
-        overrideOffsetY: CGFloat? = nil   // pin Y so adding rows doesn't shift existing content
+        overrideOffsetY: CGFloat? = nil,  // pin Y so adding rows doesn't shift existing content
+        scrollMode: Bool = false          // solo: keep node size fixed and scroll instead of shrinking
     ) -> TimelineLayoutResult {
 
         // Lay out exactly the cards we're given. Callers (TimelineView.displayCards /
@@ -108,9 +112,24 @@ enum TimelineLayout {
         // Horizontal: centers actual content.
         let scaledW = rawW * scale
         let offsetX = containerSize.width  / 2 - scaledW / 2 - minX * scale
-        // Vertical: always anchored to a 4-row block so adding rows never shifts Y.
-        let fixedMinY: CGFloat = -3 * rowHeight  // -240
-        let offsetY = overrideOffsetY ?? (containerSize.height / 2 - (fixedRawH * scale) / 2 - fixedMinY * scale)
+
+        // Vertical placement + content height. BOTTOM-anchor: the oldest row
+        // (raw y = 0) sits `vpad` above the bottom of the board and rows grow
+        // upward. This replaces vertical centering, which shifted the whole board
+        // whenever the footer resized (album art appears during reveal). The
+        // caller passes a stabilized height so a resizing footer doesn't move the
+        // anchor. Solo overflow scrolls; everything else anchors to the bottom.
+        let vpad = 40 * scale + 44   // node radius + year label
+        let scaledContentH = rawH * scale
+        let offsetY: CGFloat
+        let contentHeight: CGFloat
+        if scrollMode && scaledContentH + 2 * vpad > containerSize.height {
+            contentHeight = scaledContentH + 2 * vpad
+            offsetY = overrideOffsetY ?? (contentHeight - vpad)
+        } else {
+            contentHeight = containerSize.height
+            offsetY = overrideOffsetY ?? (containerSize.height - vpad)
+        }
 
         func toScreen(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: x * scale + offsetX, y: y * scale + offsetY)
@@ -164,7 +183,8 @@ enum TimelineLayout {
             items.append(TimelineItem(kind: .gap(index: gapIdx),
                                       position: CGPoint(x: containerSize.width / 2, y: containerSize.height / 2)))
             return TimelineLayoutResult(items: items, segments: segments,
-                                        scale: scale, offsetX: offsetX, offsetY: offsetY)
+                                        scale: scale, offsetX: offsetX, offsetY: offsetY,
+                                        contentHeight: contentHeight)
         }
 
         let firstY2 = years[0]
@@ -203,6 +223,7 @@ enum TimelineLayout {
                                   position: CGPoint(x: lastGapX2, y: lastY2.pos.y)))
 
         return TimelineLayoutResult(items: items, segments: segments,
-                                    scale: scale, offsetX: offsetX, offsetY: offsetY)
+                                    scale: scale, offsetX: offsetX, offsetY: offsetY,
+                                    contentHeight: contentHeight)
     }
 }

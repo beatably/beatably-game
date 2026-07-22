@@ -46,6 +46,7 @@ export default function usePlacementAnimation({
   pendingCard,
   baseCards,
   containerSize,
+  scrollMode = false,
 }) {
   const [frame, setFrame] = useState(null); // { slideP, trimP, growP } while animating
   const dataRef = useRef(null); // { slides, gapSlide, oldSegments, lockedOffsetY }
@@ -53,7 +54,7 @@ export default function usePlacementAnimation({
 
   // Latest inputs, read at trigger time without retriggering the effect.
   const inputsRef = useRef({});
-  inputsRef.current = { pendingCard, baseCards, containerSize };
+  inputsRef.current = { pendingCard, baseCards, containerSize, scrollMode };
 
   const stop = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -68,14 +69,16 @@ export default function usePlacementAnimation({
     prevPendingRef.current = pendingIndex;
 
     if (pendingIndex != null && prev == null) {
-      const { pendingCard: card, baseCards: cards, containerSize: size } = inputsRef.current;
+      const { pendingCard: card, baseCards: cards, containerSize: size, scrollMode: scroll } = inputsRef.current;
       if (!card || !size || size.width === 0) return;
 
-      // Old layout — its offsetY is locked for the whole animation.
-      const oldLayout = calculateLayout(cards, size);
+      // Old layout — its offsetY is locked for the whole animation. Must match
+      // the main render's scroll mode or the animation snaps to a different
+      // scale/offset.
+      const oldLayout = calculateLayout(cards, size, null, undefined, scroll);
       const newCards = [...cards];
       newCards.splice(Math.min(pendingIndex, newCards.length), 0, card);
-      const newLayout = calculateLayout(newCards, size, oldLayout.offsetY);
+      const newLayout = calculateLayout(newCards, size, oldLayout.offsetY, undefined, scroll);
 
       const oldYearPos = new Map();
       const oldGapPos = new Map();

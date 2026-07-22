@@ -9,6 +9,7 @@ const ICONS = {
   bubble: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />,
   coin: <><circle cx="12" cy="12" r="9" /><path d="M12 7v10M9.5 9.5h3.5a1.5 1.5 0 0 1 0 3h-2a1.5 1.5 0 0 0 0 3H14" /></>,
   bolt: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" />,
+  flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5Z" />,
   bulb: <><path d="M9 18h6m-5 3h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1v.2h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z" /></>,
   note: <path d="M9 18V5l12-2v13M9 9l12-2" />,
 };
@@ -49,6 +50,16 @@ const SECTIONS = [
       "If the challenger is right and the original player was wrong, the challenger steals the card.",
       "If the original player was right, they keep the card. If both are wrong, the card is discarded.",
       "You cannot challenge your own placement.",
+    ],
+  },
+  {
+    icon: "flame", title: "Solo Mode", items: [
+      "Playing on your own? Every run becomes a survival streak.",
+      "Songs come one at a time and get harder as your streak grows.",
+      "Keep placing correctly to extend your streak — your first wrong placement ends the run.",
+      "Your score is your streak: how many songs you placed in the right spot.",
+      "No challenges in solo, but credits still work — guess a song for a bonus, or spend one to skip.",
+      "Beat your best and climb the global Top 10 leaderboard.",
     ],
   },
   {

@@ -19,7 +19,11 @@ export function PathPair({ d, trim = null, opacity = 1 }) {
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ filter: 'blur(12px)', opacity: 0.18 }}
+        // SVG filter (not CSS `filter: blur`): mobile Safari drops/ignores CSS
+        // filters on SVG children, which left this glow stroke rendering hard
+        // and visually distorting the neon path. feGaussianBlur is honored.
+        filter="url(#beat-path-blur)"
+        style={{ opacity: 0.18 }}
         {...trimProps}
       />
       <path
@@ -35,12 +39,12 @@ export function PathPair({ d, trim = null, opacity = 1 }) {
   );
 }
 
-export function PathGradientDefs() {
-  // userSpaceOnUse (not the default objectBoundingBox) so the gradient still
-  // renders on a purely horizontal path — a single-row timeline has a
-  // zero-height bounding box, which makes an objectBoundingBox gradient vanish
-  // (the classic SVG "gradient on a straight line disappears" bug). Spanning
-  // the whole SVG viewport also matches iOS's diagonal .zero → (w,h) gradient.
+export function PathGradientDefs({ width = 0, height = 0 }) {
+  // Blur-filter region in user space (pixels). objectBoundingBox would collapse
+  // on a zero-height horizontal path (same reason the gradient uses
+  // userSpaceOnUse), so span the container plus a margin for the glow bleed.
+  const w = Math.max(width, 1);
+  const h = Math.max(height, 1);
   return (
     <defs>
       <linearGradient
@@ -52,6 +56,16 @@ export function PathGradientDefs() {
         <stop offset="50%" stopColor="rgba(255, 20, 147, 0.55)" />
         <stop offset="100%" stopColor="rgba(0, 206, 209, 0.55)" />
       </linearGradient>
+      <filter
+        id="beat-path-blur"
+        filterUnits="userSpaceOnUse"
+        x={-60}
+        y={-60}
+        width={w + 120}
+        height={h + 120}
+      >
+        <feGaussianBlur stdDeviation="12" />
+      </filter>
     </defs>
   );
 }

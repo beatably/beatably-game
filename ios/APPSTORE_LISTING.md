@@ -26,7 +26,11 @@ Listen to a track, then place it on your timeline — before or after the songs 
 
 Think a rival placed a song in the wrong spot? Challenge it. Guess better than they did and you steal the card for yourself. Earn credits by naming the artist and title, then spend them to skip tricky songs or launch challenges.
 
+Playing alone? Jump into Solo mode — a survival streak where you keep placing songs correctly for as long as you can, then climb the global leaderboard.
+
+• Two ways to play: multiplayer party games or a solo survival streak
 • Fast, social rounds — perfect for parties, road trips, or a quick match with friends
+• Join a friend's game in a tap by scanning a QR code
 • Play across decades of music, from classics to modern hits
 • Simple to learn: tap where the song belongs on the timeline
 • Challenge mechanic that rewards knowing your music history
@@ -56,10 +60,23 @@ transient and not broadcast publicly, so this is not "user-generated content" in
 ## Copyright
 `© 2026 Timothy Bjelkstam`
 
-## Version info (first release)
-- Version: `1.0` — set via `MARKETING_VERSION` in `project.yml`; bump manually per public release.
-- Build: auto-stamped from the git commit count at build time (currently `254`); no manual bumping.
-- "What's New": `Initial release.`
+## Version info
+- Version: `1.1` — set via `MARKETING_VERSION` in `project.yml`; bump manually per public release.
+- Build: auto-stamped from the git commit count at build time (will be `276`+ after this release's commit); no manual bumping.
+- "What's New" (1.1):
+```
+Solo mode is here! Play on your own in a survival-streak run — keep placing songs correctly for as long as you can and climb the global leaderboard.
+
+Also in this update:
+• Scan a QR code (or tap a link) to join a game instantly
+• A fresh look for the winner and score screens
+• Sound, animation, and stability polish throughout
+
+Thanks for playing Beatably!
+```
+
+### Previous versions
+- `1.0` (initial release) — "What's New": `Initial release.`
 
 The in-app version is shown at the bottom of the "How to Play" screen, read live from the
 bundle (`CFBundleShortVersionString` + `CFBundleVersion`).
@@ -86,13 +103,17 @@ Order (same for both sets):
 
 ## App Review notes (internal, for the reviewer)
 ```
-Beatably is a multiplayer music timeline game. To test:
-- Tap "Your name", enter any name, tap "Create Game" to host a room.
-- Share the room code (or open a second device) to join and start a match.
-- No login or account is required. Audio playback is host-only.
-```
-```
-NOTE: If review requires a second player to see gameplay, mention that the game is
-multiplayer and provide a second TestFlight/simulator instance, or point them to the
-web version at https://beatably.app for reference.
+Beatably is a music timeline game with a single-player and a multiplayer mode.
+No login or account is required.
+
+EASIEST WAY TO TEST FULL GAMEPLAY (single device):
+- Enter any name on the landing screen, then tap "Play solo".
+- A single-player run starts immediately. Listen to each song, tap where it
+  belongs on your timeline (before/after the songs already there), and confirm.
+- The run continues until you place a song incorrectly, then shows your score.
+
+To test multiplayer:
+- Enter a name and tap "Create multiplayer game" to host a room.
+- Share the room code / QR code (or use a second device) to join and start a match.
+- Audio playback is host-only.
 ```

@@ -76,7 +76,27 @@ struct GameView: View {
                 }
                 .zIndex(9)
             }
-            if vm.gamePhase == "game-over"              { GameOverOverlay() }
+            if vm.gamePhase == "game-over" {
+                if vm.isSolo, let solo = vm.soloResult {
+                    SoloScoreboardOverlay(result: solo)
+                } else {
+                    GameOverOverlay()
+                }
+            }
+
+            // Solo run-ending cover: same background as the scoreboard, shown from
+            // the "See Your Score" tap until the scoreboard arrives, so the brief
+            // card-removal re-layout behind it is never visible.
+            if vm.soloAwaitingScore && vm.soloResult == nil {
+                ZStack {
+                    Color.beatBg.ignoresSafeArea()
+                    RadialGradient(colors: [Color.beatPurple.opacity(0.18), .clear],
+                                   center: .center, startRadius: 0, endRadius: 360)
+                        .ignoresSafeArea()
+                }
+                .transition(.identity)
+                .zIndex(20)
+            }
 
             // Player-left modal (centered popup)
             if let msg = vm.playerLeftMessage {
@@ -216,6 +236,64 @@ private struct ScoreHeader: View {
     }
 
     var body: some View {
+        if vm.isSolo {
+            soloHeader
+        } else {
+            multiplayerHeader
+        }
+    }
+
+    // Solo: no turn to highlight, so drop the player cards and show a stat row
+    // (Streak / Guessed / Credits) across from the menu icon.
+    private var soloHeader: some View {
+        let p = vm.gamePlayers.first
+        return HStack(spacing: 14) {
+            soloStat(value: String(max(0, (p?.score ?? 1) - 1)), label: "Streak", color: .beatText)
+            soloDivider
+            soloStat(value: String(p?.correctGuesses ?? 0), label: "Guessed", color: .beatTeal)
+            soloDivider
+            VStack(spacing: 3) {
+                HStack(spacing: 3) {
+                    Text(verbatim: String(p?.credits ?? 0))
+                        .font(.system(.headline, design: .rounded).bold())
+                        .foregroundStyle(Color(hex: "F5C842"))
+                    CoinView(size: 13)
+                        // Record the coin-stack position so the credit-spend
+                        // animation flies from here (not the default left origin).
+                        .onGeometryChange(for: CGRect.self) { proxy in
+                            proxy.frame(in: .named("gameRoot"))
+                        } action: { frame in
+                            if let pid = p?.persistentId {
+                                coinOrigins[pid] = CGPoint(x: frame.midX, y: frame.midY)
+                            }
+                        }
+                }
+                Text("Credits")
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(Color.beatMuted)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private func soloStat(value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(verbatim: value)
+                .font(.system(.headline, design: .rounded).bold())
+                .foregroundStyle(color)
+            Text(label)
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(Color.beatMuted)
+        }
+    }
+
+    private var soloDivider: some View {
+        Rectangle().fill(Color.beatBorder).frame(width: 1, height: 24)
+    }
+
+    private var multiplayerHeader: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(vm.gamePlayers) { player in
@@ -471,13 +549,17 @@ private struct TimelineSection: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text(vm.currentPlayerName.isEmpty ? "Timeline" : "\(vm.currentPlayerName)'s Timeline")
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color.beatText)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
+            // Solo has no other player, and the title overlaps the top node once the
+            // streak grows — so it's hidden in solo.
+            if !vm.isSolo {
+                Text(vm.currentPlayerName.isEmpty ? "Timeline" : "\(vm.currentPlayerName)'s Timeline")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.beatText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
 
             TimelineView(
                 cards: vm.timeline,
@@ -495,6 +577,7 @@ private struct TimelineSection: View {
                 // Round-one explainer, rendered inside TimelineView anchored just above
                 // the single starter node (only place the exact node position is known).
                 startHint: showStartHint ? "Everyone starts with one random song on their timeline" : nil,
+                isSolo: vm.isSolo,
                 onPlace: {
                     vm.selectPlacement(index: $0)
                     SoundManager.shared.play(.placement)
@@ -623,20 +706,19 @@ private struct ChallengeWindowFooter: View {
             } else if vm.canChallenge {
                 HStack(spacing: 12) {
                     Button {
-                        SoundManager.shared.impact(.light)
-                        hasResponded = true; vm.skipChallenge()
+                        SoundManager.shared.play(.challenge)
+                        hasResponded = true; vm.initiateChallenge()
                     } label: {
-                        BeatSecondaryLabel(title: "Pass")
+                        BeatSecondaryLabel(title: "Challenge · 1 credit")
                     }
                     .buttonStyle(PressScaleStyle(haptic: .light))
                     .frame(maxWidth: .infinity)
 
                     Button {
-                        SoundManager.shared.play(.challenge)
-                        hasResponded = true; vm.initiateChallenge()
+                        SoundManager.shared.impact(.light)
+                        hasResponded = true; vm.skipChallenge()
                     } label: {
-                        // Challenge button uses default teal glow — no pink override
-                        BeatPrimaryLabel(title: "Challenge · 1 credit")
+                        BeatPrimaryLabel(title: "Pass")
                     }
                     .buttonStyle(PressScaleStyle())
                     .frame(maxWidth: .infinity)
@@ -715,10 +797,18 @@ private struct InlineRevealFooter: View {
     private var outcomeIcon: String { result.correct ? "checkmark.circle.fill" : "xmark.circle.fill" }
 
     private var outcomeText: String {
+        // Solo: a wrong placement ends the run.
+        if vm.isSolo && !result.correct {
+            return "Wrong answer — your streak ends here!"
+        }
         if vm.isMyTurn {
             return result.correct ? "You were correct!" : "You were wrong!"
         }
         return result.correct ? "\(vm.currentPlayerName) was correct!" : "\(vm.currentPlayerName) was wrong!"
+    }
+
+    private var continueTitle: String {
+        (vm.isSolo && !result.correct) ? "See Your Score" : "Continue"
     }
 
     var body: some View {
@@ -750,7 +840,7 @@ private struct InlineRevealFooter: View {
                 Button {
                     continued = true; vm.continueGame()
                 } label: {
-                    BeatPrimaryLabel(title: "Continue", isLoading: continued)
+                    BeatPrimaryLabel(title: continueTitle, isLoading: continued)
                 }
                 .buttonStyle(PressScaleStyle())
                 .disabled(continued)
@@ -826,11 +916,14 @@ private struct SongGuessSheet: View {
                 .buttonStyle(PressScaleStyle(haptic: .light))
                 .disabled(submitted)
 
-                Button { submitGuess() } label: {
-                    BeatPrimaryLabel(title: "Submit Guess", isLoading: submitted)
+                if !title.trimmingCharacters(in: .whitespaces).isEmpty
+                    && !artist.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button { submitGuess() } label: {
+                        BeatPrimaryLabel(title: "Submit Guess", isLoading: submitted)
+                    }
+                    .buttonStyle(PressScaleStyle())
+                    .disabled(submitted)
                 }
-                .buttonStyle(PressScaleStyle())
-                .disabled(submitted || (title.trimmingCharacters(in: .whitespaces).isEmpty && artist.trimmingCharacters(in: .whitespaces).isEmpty))
             }
 
         }
@@ -844,6 +937,72 @@ private struct SongGuessSheet: View {
         submitted = true
         vm.submitSongGuess(title: title.trimmingCharacters(in: .whitespaces),
                            artist: artist.trimmingCharacters(in: .whitespaces))
+    }
+}
+
+// MARK: - Confetti
+
+private struct ConfettiPiece: Identifiable {
+    let id = UUID()
+    let xFraction: CGFloat   // 0…1 across the screen width
+    let delay: Double
+    let duration: Double
+    let color: Color
+}
+
+// Falling confetti backdrop (web WinnerView parity): 50 chips drop from above the
+// top edge to below the bottom edge, spinning as they fall. Each piece starts
+// off-screen and invisible so nothing is parked at the top before its delay.
+private struct ConfettiView: View {
+    private static let colors: [Color] = [
+        Color(hex: "22C55E"), Color(hex: "00CED1"), Color(hex: "9945FF"),
+        Color(hex: "FF1493"), Color(hex: "F5C842")
+    ]
+    @State private var pieces: [ConfettiPiece] = []
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                ForEach(pieces) { piece in
+                    ConfettiPieceView(piece: piece, screenHeight: geo.size.height)
+                        .position(x: piece.xFraction * geo.size.width, y: 0)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+        .onAppear {
+            pieces = (0..<50).map { _ in
+                ConfettiPiece(
+                    xFraction: .random(in: 0...1),
+                    delay: .random(in: 0...2),
+                    duration: .random(in: 3...5),
+                    color: Self.colors.randomElement()!
+                )
+            }
+        }
+    }
+}
+
+private struct ConfettiPieceView: View {
+    let piece: ConfettiPiece
+    let screenHeight: CGFloat
+    @State private var fall = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(piece.color)
+            .frame(width: 8, height: 12)
+            .shadow(color: piece.color.opacity(0.33), radius: 3)
+            .rotationEffect(.degrees(fall ? 720 : 0))
+            .offset(y: fall ? screenHeight + 60 : -60)
+            .opacity(fall ? 0.9 : 0)
+            .onAppear {
+                withAnimation(.linear(duration: piece.duration).delay(piece.delay)) {
+                    fall = true
+                }
+            }
     }
 }
 
@@ -862,6 +1021,8 @@ private struct GameOverOverlay: View {
                 center: .center, startRadius: 0, endRadius: 360
             )
             .ignoresSafeArea()
+
+            ConfettiView()
 
             VStack(spacing: 24) {
                 Spacer()
@@ -954,6 +1115,225 @@ private struct GameOverOverlay: View {
                 trophyRotation = -5
             }
         }
+    }
+}
+
+// MARK: - Solo Scoreboard
+
+private struct SoloScoreboardOverlay: View {
+    @Environment(GameViewModel.self) private var vm
+    let result: SoloResult
+    @AppStorage("beatably_solo_best") private var soloBest: Int = 0
+    @State private var isPersonalBest = false
+    @State private var prevBest = 0
+    @State private var trophyScale: CGFloat = 0.3
+    @State private var trophyRotation: Double = -15
+
+    private var years: [Int] { result.timeline.map(\.year).filter { $0 > 0 } }
+
+    var body: some View {
+        ZStack {
+            Color.beatBg.ignoresSafeArea()
+            RadialGradient(colors: [Color.beatPurple.opacity(0.18), .clear],
+                           center: .center, startRadius: 0, endRadius: 360)
+                .ignoresSafeArea()
+
+            ConfettiView()
+
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        header
+                        statTiles
+                        if let mn = years.min(), let mx = years.max() { eraLine(mn, mx) }
+                        recap
+                        leaderboard
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 32)
+                    .padding(.bottom, 24)
+                }
+                actionsBar
+            }
+        }
+        .onAppear {
+            prevBest = soloBest
+            if result.score > soloBest { isPersonalBest = true; soloBest = result.score }
+            SoundManager.shared.play(.winner)
+            SoundManager.shared.notification(.success)
+            withAnimation(.spring(duration: 0.6, bounce: 0.4)) { trophyScale = 1; trophyRotation = 5 }
+            withAnimation(.easeInOut(duration: 0.8).delay(0.5).repeatForever(autoreverses: true)) { trophyRotation = -5 }
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 8) {
+            Text(isPersonalBest ? "🏆" : "🎵")
+                .font(.system(size: 60))
+                .scaleEffect(trophyScale)
+                .rotationEffect(.degrees(trophyRotation))
+                .shadow(color: Color.beatMagenta.opacity(0.5), radius: 16)
+            if isPersonalBest {
+                Text("New personal best!")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.beatTeal)
+                    .padding(.horizontal, 12).padding(.vertical, 4)
+                    .background(Capsule().fill(Color.beatTeal.opacity(0.12)))
+            } else {
+                Text("RUN OVER")
+                    .font(.system(.footnote, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.beatMuted)
+                    .tracking(1)
+            }
+            Text(verbatim: String(result.score))
+                .font(.system(size: 72, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.beatText)
+            Text(result.score == 1 ? "song placed in a row" : "songs placed in a row")
+                .font(.system(.body, design: .rounded))
+                .foregroundStyle(Color.beatMuted)
+            if !isPersonalBest && prevBest > 0 {
+                Text("Your best: \(prevBest)")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(Color.beatMuted)
+            }
+        }
+    }
+
+    private var statTiles: some View {
+        HStack(spacing: 12) {
+            statTile(value: result.rank.map { "#\($0)" } ?? "—", label: "Global rank",
+                     color: result.rank == 1 ? Color(hex: "F5C842") : ((result.rank ?? 99) <= 10 ? Color.beatTeal : Color.beatText))
+            statTile(value: String(result.correctGuesses), label: "Songs named", color: Color.beatTeal)
+            statTile(value: String(result.creditsRemaining), label: "Credits left", color: Color(hex: "F5C842"))
+        }
+    }
+
+    private func statTile(value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            Text(verbatim: value).font(.system(size: 26, weight: .heavy, design: .rounded)).foregroundStyle(color)
+            Text(label).font(.system(.caption2, design: .rounded)).foregroundStyle(Color.beatMuted).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.beatSurface2))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.beatBorder, lineWidth: 1))
+    }
+
+    private func eraLine(_ mn: Int, _ mx: Int) -> some View {
+        (Text("Era spanned ").foregroundStyle(Color.beatMuted)
+            + Text("\(String(mn)) – \(String(mx))").foregroundStyle(Color.beatText).fontWeight(.semibold)
+            + Text(" · \(mx - mn) yrs").foregroundStyle(Color.beatMuted))
+            .font(.system(.subheadline, design: .rounded))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.beatSurface2))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.beatBorder, lineWidth: 1))
+    }
+
+    @ViewBuilder private var recap: some View {
+        if !result.timeline.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Your timeline")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(Color.beatText)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(result.timeline) { song in
+                            VStack(spacing: 4) {
+                                recapArt(song)
+                                Text(verbatim: String(song.year))
+                                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                                    .foregroundStyle(Color.beatText)
+                            }
+                            .frame(width: 56)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func recapArt(_ song: SoloRecapSong) -> some View {
+        Group {
+            if let art = song.albumArt, let url = URL(string: art) {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase { img.resizable().aspectRatio(contentMode: .fill) }
+                    else { Color.beatSurface2 }
+                }
+            } else {
+                LinearGradient(colors: [Color(hex: "1E1B34"), Color(hex: "2A2547")],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .overlay(Image(systemName: "music.note").foregroundStyle(Color.beatMuted))
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.beatBorder, lineWidth: 1))
+    }
+
+    private var leaderboard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Global Top 10")
+                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.beatText)
+            VStack(spacing: 0) {
+                ForEach(Array(result.top10.enumerated()), id: \.element.id) { i, entry in
+                    leaderRow(rank: i + 1, name: entry.name, score: entry.score,
+                              highlight: isHighlighted(index: i, entry: entry), top: i == 0)
+                    if i < result.top10.count - 1 { Divider().overlay(Color.beatBorder) }
+                }
+                if let rank = result.rank, rank > 10 {
+                    Divider().overlay(Color.beatBorder)
+                    leaderRow(rank: rank, name: vm.playerName.isEmpty ? "You" : vm.playerName,
+                              score: result.score, highlight: true, top: false)
+                }
+            }
+            .background(Color.beatSurface2)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.beatBorder, lineWidth: 1))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func isHighlighted(index: Int, entry: SoloLeaderEntry) -> Bool {
+        guard let rank = result.rank, rank <= 10 else { return false }
+        return index + 1 == rank && entry.score == result.score && entry.name == vm.playerName
+    }
+
+    private func leaderRow(rank: Int, name: String, score: Int, highlight: Bool, top: Bool) -> some View {
+        HStack {
+            Text("#\(rank)")
+                .font(.system(.footnote, design: .rounded).bold())
+                .foregroundStyle(top ? Color.beatTeal : Color.beatMuted)
+                .frame(width: 34, alignment: .leading)
+            Text(name)
+                .font(.system(.subheadline, design: .rounded))
+                .foregroundStyle(Color.beatText)
+                .fontWeight(highlight ? .semibold : .regular)
+            Spacer()
+            Text("\(score) songs")
+                .font(.system(.footnote, design: .rounded))
+                .foregroundStyle(Color.beatMuted)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(highlight ? Color.beatTeal.opacity(0.10) : Color.clear)
+    }
+
+    private var actionsBar: some View {
+        HStack(spacing: 12) {
+            Button { vm.restartGame() } label: { BeatPrimaryLabel(title: "Play Again") }
+                .buttonStyle(PressScaleStyle())
+            Button { vm.leaveGame() } label: { BeatSecondaryLabel(title: "Exit to Menu") }
+                .buttonStyle(PressScaleStyle(haptic: .light))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 34)
+        .frame(maxWidth: .infinity)
+        .background(Color(hex: "19162E"))
+        .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.beatBorder), alignment: .top)
     }
 }
 

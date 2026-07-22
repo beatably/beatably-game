@@ -672,10 +672,10 @@ audio {
     --tw-ring-offset-shadow: none !important;
   }
   
-  /* Override outline variant background to be transparent */
+  /* Override outline variant background to a subtle semi-transparent fill */
   button[class*="border"][class*="bg-background"],
   .outline-button-override {
-    background-color: transparent !important;
+    background-color: hsl(var(--input) / 0.5) !important;
     border-color: hsl(var(--border)) !important;
   }
   

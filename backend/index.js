@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const curatedDb = require('./curatedDb');
 const analytics = require('./analytics');
+const soloScores = require('./soloScores');
 const feedback = require('./feedback');
 
 // Initialize curated database at startup to trigger migration if needed
@@ -3018,6 +3019,27 @@ function allowSocketLobbyOp(socket) {
   return bucket.count <= SOCKET_LOBBY_OPS_PER_MIN;
 }
 
+// Order a solo deck easy→hard: bucket by curated difficultyLevel (1=easiest),
+// shuffle within each bucket for variety, then concatenate. The player meets
+// progressively harder songs as their streak (and deck position) grows.
+function sortForProgression(tracks) {
+  const shuffleInPlace = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+  const buckets = new Map();
+  tracks.forEach((t) => {
+    const lvl = Number(t.difficultyLevel) || 2;
+    if (!buckets.has(lvl)) buckets.set(lvl, []);
+    buckets.get(lvl).push(t);
+  });
+  const levels = [...buckets.keys()].sort((a, b) => a - b);
+  return levels.flatMap((lvl) => shuffleInPlace(buckets.get(lvl)));
+}
+
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
@@ -3477,12 +3499,17 @@ io.on('connection', (socket) => {
       callback({ error: "No lobby found or game already started" });
       return;
     }
+    if (lobby.settings && lobby.settings.gameMode === 'solo') {
+      console.log('[Backend] Lobby is in solo mode, rejecting join:', code);
+      callback({ error: "This game is set to Solo mode. Ask the host to switch to multiplayer." });
+      return;
+    }
     if (lobby.players.length >= 4) {
       console.log('[Backend] Lobby is full:', lobby.players.length);
       callback({ error: "Lobby is full (maximum 4 players)" });
       return;
     }
-    
+
     // Generate persistent player ID
     const persistentId = generatePersistentPlayerId();
     socketToPlayerMap[socket.id] = persistentId;
@@ -3607,6 +3634,12 @@ const lobby = lobbies[code];
   socket.on('update_settings', ({ code, settings }) => {
     const lobby = lobbies[code];
     if (!lobby) return;
+    // Guard the join/toggle race: solo mode requires exactly one player, so if
+    // more than one player is present, coerce any incoming solo flag to
+    // multiplayer before storing it.
+    if (settings && settings.gameMode === 'solo' && lobby.players.length > 1) {
+      settings = { ...settings, gameMode: 'multiplayer' };
+    }
     lobby.settings = settings;
     io.to(code).emit('lobby_update', lobby);
   });
@@ -3691,13 +3724,38 @@ const lobby = lobbies[code];
       return arr;
     }
 
+    // Solo mode: a single player runs a survival streak. The deck is built
+    // server-side with fixed rules (international hits, all years) so every solo
+    // run is comparable on the global leaderboard, and ordered easy→hard so the
+    // songs get harder the longer the streak grows.
+    const isSolo = lobby.settings?.gameMode === 'solo' && lobby.players.length === 1;
+    if (isSolo) {
+      try {
+        const { tracks } = curatedDb.selectForGame({
+          difficulty: 'normal', // no easy-filter → keep the full difficultyLevel spread
+          genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
+          yearRange: { min: 1960, max: new Date().getFullYear() },
+          markets: ['international'],
+          playerCount: 5, // raises minSongsNeeded; cap stays 120
+          previewMode: true,
+        });
+        if (tracks && tracks.length > 0) {
+          realSongs = sortForProgression(tracks);
+          console.log('[Backend] Solo deck built:', realSongs.length, 'songs (progressive difficulty)');
+        }
+      } catch (e) {
+        console.warn('[Backend] Solo deck build failed, falling back to provided songs:', e && e.message);
+      }
+    }
+
     // Use real songs if available, otherwise fall back to fake songs
     const songsToUse = realSongs && realSongs.length > 0 ? realSongs : fakeSongs;
     console.log('[Backend] Using', songsToUse.length, 'songs for game');
     
-    // Create a shared shuffled deck for all players
-    const shuffledSongs = shuffle([...songsToUse]);
-    
+    // Create a shared deck. Solo keeps the deck in its progressive (easy→hard)
+    // order; multiplayer shuffles for fairness.
+    const shuffledSongs = isSolo ? [...songsToUse] : shuffle([...songsToUse]);
+
     // Each player gets their own timeline starting with one random card
     const timelines = {};
     // NEW: Use persistent IDs for player order instead of socket IDs
@@ -3706,14 +3764,20 @@ const lobby = lobbies[code];
     const hostPlayer = lobby.players.find((p) => p.isCreator);
     const orderedPlayers = hostPlayer ? [...nonHostPlayers, hostPlayer] : nonHostPlayers;
     const playerOrder = orderedPlayers.map((p) => p.persistentId);
-    
-    // Give each player a unique starting card for their timeline
+
+    // Give each player a unique starting card for their timeline. In solo the
+    // deck is ordered easy→hard, so the first (easiest) card seeds the timeline
+    // and the rest stay in progressive order.
     const usedStartCards = new Set();
     playerOrder.forEach((persistentId, index) => {
       let startCard;
-      do {
-        startCard = shuffledSongs[Math.floor(Math.random() * shuffledSongs.length)];
-      } while (usedStartCards.has(startCard.id));
+      if (isSolo) {
+        startCard = shuffledSongs[0];
+      } else {
+        do {
+          startCard = shuffledSongs[Math.floor(Math.random() * shuffledSongs.length)];
+        } while (usedStartCards.has(startCard.id));
+      }
       usedStartCards.add(startCard.id);
       // NEW: Use persistent ID as key for timelines
       timelines[persistentId] = [startCard];
@@ -3739,7 +3803,8 @@ const lobby = lobbies[code];
       playerNames: lobby.players.map(p => p.name),
       difficulty: lobby.settings?.difficulty || 'normal',
       musicMode: musicMode,
-      winCondition: winCondition
+      winCondition: winCondition,
+      gameMode: isSolo ? 'solo' : 'multiplayer'
     });
 
     games[code] = {
@@ -3770,6 +3835,7 @@ const lobby = lobbies[code];
       phase: "player-turn", // player-turn, reveal, challenge, song-guess, game-over
       playerOrder: playerOrder,  // NEW: Use persistent IDs for player order
       winCondition: winCondition, // First to N cards in timeline wins (configurable)
+      isSolo, // Solo survival mode: run ends on first miss; score = correct placements
       // CRITICAL FIX: Track played cards to prevent cycling back to already-played cards
       playedCards: new Set(), // Track which cards have been played
     };
@@ -4068,7 +4134,31 @@ const lobby = lobbies[code];
 
         // Normalize scores after removal
         updatePlayerScores(gameInTimeout);
-        
+
+        // Solo: the first miss ends the run. The player has already seen the
+        // full reveal (correct year) before tapping Continue, so we go straight
+        // to game-over here instead of advancing the turn.
+        if (gameInTimeout.isSolo) {
+          const soloResult = finalizeSoloGame(gameInTimeout, code);
+          const winnerPid = gameInTimeout.winner?.persistentId;
+          gameInTimeout.players.forEach((p) => {
+            io.to(p.id).emit('game_update', {
+              timeline: gameInTimeout.timelines[winnerPid] || [],
+              deck: [],
+              players: gameInTimeout.players,
+              phase: "game-over",
+              feedback: null,
+              lastPlaced: null,
+              removingId: null,
+              currentPlayerIdx: 0,
+              currentPlayerId: null,
+              winner: gameInTimeout.winner,
+              soloResult,
+            });
+          });
+          return;
+        }
+
         // CRITICAL FIX: Use unified advanceTurn function
         if (!advanceTurn(gameInTimeout, code)) {
           // Game should end
@@ -4166,15 +4256,16 @@ const lobby = lobbies[code];
 
     // Now advance turn
     if (!advanceTurn(game, code)) {
-      // Game should end
+      // Game should end (deck exhausted)
       game.phase = "game-over";
       const maxScore = Math.max(...game.players.map(p => p.score));
       const winners = game.players.filter(p => p.score === maxScore);
       game.winner = winners[0];
-      
+      const soloResult = game.isSolo ? finalizeSoloGame(game, code) : null;
+
       game.players.forEach((p) => {
         io.to(p.id).emit('game_update', {
-          timeline: game.timelines[game.winner?.id] || [],
+          timeline: game.timelines[game.isSolo ? game.winner?.persistentId : game.winner?.id] || [],
           deck: [],
           players: game.players,
           phase: "game-over",
@@ -4184,6 +4275,7 @@ const lobby = lobbies[code];
           currentPlayerIdx: game.currentPlayerIdx,
           currentPlayerId: null,
           winner: game.winner,
+          ...(soloResult ? { soloResult } : {}),
         });
       });
       return;
@@ -4200,9 +4292,10 @@ const lobby = lobbies[code];
     // Check if game should end with new win condition logic
     if (checkGameEnd(game)) {
       // Game has ended, broadcast final state
+      const soloResult = game.isSolo ? finalizeSoloGame(game, code) : null;
       game.players.forEach((p, idx) => {
         io.to(p.id).emit('game_update', {
-          timeline: game.timelines[game.winner?.id] || [],
+          timeline: game.timelines[game.isSolo ? game.winner?.persistentId : game.winner?.id] || [],
           deck: [],
           players: game.players,
           phase: game.phase,
@@ -4212,6 +4305,7 @@ const lobby = lobbies[code];
           currentPlayerIdx: game.currentPlayerIdx,
           currentPlayerId: null,
           winner: game.winner,
+          ...(soloResult ? { soloResult } : {}),
         });
       });
       return;
@@ -4383,43 +4477,7 @@ const lobby = lobbies[code];
     
     if (allResponded || eligibleChallengers.length === 0) {
       // All eligible players have responded, move to reveal phase
-      game.phase = "reveal";
-      game.lastPlaced.phase = 'resolved';
-      game.challengeResponses = null; // Clear responses
-      
-      const currentCard = game.sharedDeck[game.currentCardIndex];
-      
-    // Broadcast reveal state with visual-only timeline (non-committed)
-    const currentPersistentIdForReveal = game.playerOrder[game.currentPlayerIdx];
-    const revealTimeline = [...game.timelines[currentPersistentIdForReveal]];
-    // Insert the placed card visually for reveal only
-    // CRITICAL FIX: Check if lastPlaced exists and has a valid index before accessing it
-    if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCard) {
-      revealTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true });
-    } else {
-      console.error('[Backend] ERROR: game.lastPlaced is null or missing index in skip_challenge reveal. Cannot show card placement.', {
-        lastPlaced: game.lastPlaced,
-        hasCurrentCard: !!currentCard,
-        code
-      });
-    }
-    
-    updatePlayerScores(game); // scores from committed timelines only
-
-    game.players.forEach((p) => {
-      io.to(p.id).emit('game_update', {
-        timeline: revealTimeline,
-        deck: [currentCard],
-        players: game.players,
-        phase: "reveal",
-        feedback: game.feedback,
-        lastPlaced: game.lastPlaced,
-        removingId: null,
-        currentPlayerIdx: game.currentPlayerIdx,
-        currentPlayerId: currentPersistentIdForReveal,
-        lastSongGuess: game.lastSongGuess || null,
-      });
-    });
+      enterRevealPhase(game);
     } else {
       // Still waiting for other players to respond
       // Broadcast updated challenge window state with progress indicator
@@ -4862,11 +4920,104 @@ const lobby = lobbies[code];
       const persistentId = player.persistentId;
       const timelineLength = (game.timelines[persistentId] || []).length;
       player.score = timelineLength;
+      // Solo: expose the running correct-guess tally on the player so the
+      // in-game header can show it live (it rides along in every game_update).
+      if (game.isSolo) player.correctGuesses = game.soloCorrectGuesses || 0;
     });
+  };
+
+  // Transition from challenge-window (or song-guess in solo) straight to the
+  // reveal phase and broadcast the visual-only timeline with the placed card.
+  // Extracted from skip_challenge so the challenge-window can be short-circuited
+  // when there are no eligible challengers (always the case in solo, and in the
+  // multiplayer edge case where nobody holds a token).
+  const enterRevealPhase = (game) => {
+    game.phase = "reveal";
+    if (game.lastPlaced) game.lastPlaced.phase = 'resolved';
+    game.challengeResponses = null;
+
+    const currentCard = game.sharedDeck[game.currentCardIndex];
+    const currentPersistentIdForReveal = game.playerOrder[game.currentPlayerIdx];
+    const revealTimeline = [...(game.timelines[currentPersistentIdForReveal] || [])];
+    if (game.lastPlaced && game.lastPlaced.index !== undefined && currentCard) {
+      revealTimeline.splice(game.lastPlaced.index, 0, { ...currentCard, preview: true });
+    } else {
+      console.error('[Backend] ERROR: game.lastPlaced is null or missing index in enterRevealPhase. Cannot show card placement.', {
+        lastPlaced: game.lastPlaced,
+        hasCurrentCard: !!currentCard,
+      });
+    }
+
+    updatePlayerScores(game); // scores from committed timelines only
+
+    game.players.forEach((p) => {
+      io.to(p.id).emit('game_update', {
+        timeline: revealTimeline,
+        deck: [currentCard],
+        players: game.players,
+        phase: "reveal",
+        feedback: game.feedback,
+        lastPlaced: game.lastPlaced,
+        removingId: null,
+        currentPlayerIdx: game.currentPlayerIdx,
+        currentPlayerId: currentPersistentIdForReveal,
+        lastSongGuess: game.lastSongGuess || null,
+      });
+    });
+  };
+
+  // Solo mode: finalize a run, record the score to the global leaderboard, and
+  // stamp game.soloResult. Idempotent — a second call returns the memoized
+  // result without recording again (guards duplicate game-over emits and a
+  // restart between game-over and the room sweep, since soloResult persists).
+  const finalizeSoloGame = (game, code) => {
+    if (!game.isSolo) return null;
+    if (game.soloResult) return game.soloResult;
+    const player = game.players[0];
+    const timeline = game.timelines[player.persistentId] || [];
+    const score = Math.max(0, timeline.length - 1); // starting card excluded
+    const { rank, top10 } = soloScores.recordScore({
+      name: player.name,
+      score,
+      roomCode: code,
+    });
+    game.phase = "game-over";
+    game.winner = player; // keeps the client's game-over gate (needs game.winner) working
+    game.soloResult = {
+      score,
+      rank,
+      top10,
+      // End-of-run stats for the solo scoreboard.
+      creditsRemaining: player.tokens,
+      correctGuesses: game.soloCorrectGuesses || 0,
+      // Recap of the timeline the player built (chronological, as committed).
+      timeline: timeline.map((c) => ({
+        title: c.title,
+        artist: c.artist,
+        year: c.year,
+        album_art: c.album_art || c.image || null,
+      })),
+    };
+    const roomCode = code || Object.keys(games).find(c => games[c] === game);
+    if (roomCode) {
+      analytics.recordSessionEnd({ roomCode, winnerName: player?.name, completedNormally: true });
+    }
+    schedulePersist();
+    return game.soloResult;
   };
 
   // Helper function to check if game should end and determine winner
   const checkGameEnd = (game) => {
+    // Solo: a run only ends on a miss (handled in continue_game) or when the
+    // deck is exhausted. winCondition never ends a solo run.
+    if (game.isSolo) {
+      if (game.currentCardIndex >= game.sharedDeck.length) {
+        finalizeSoloGame(game, Object.keys(games).find(c => games[c] === game));
+        return true;
+      }
+      return false;
+    }
+
     const target = Number.isFinite(game.winCondition) ? game.winCondition : 10;
 
     // Build score snapshot for robust logging and evaluation
@@ -5052,9 +5203,10 @@ const lobby = lobbies[code];
     // Check if game should end with new win condition logic
     if (checkGameEnd(game)) {
       // Game has ended, broadcast final state
+      const soloResult = game.isSolo ? finalizeSoloGame(game, code) : null;
       game.players.forEach((p, idx) => {
         io.to(p.id).emit('game_update', {
-          timeline: game.timelines[game.winner?.id] || [],
+          timeline: game.timelines[game.isSolo ? game.winner?.persistentId : game.winner?.id] || [],
           deck: [],
           players: game.players,
           phase: game.phase,
@@ -5064,6 +5216,7 @@ const lobby = lobbies[code];
           currentPlayerIdx: game.currentPlayerIdx,
           currentPlayerId: null,
           winner: game.winner,
+          ...(soloResult ? { soloResult } : {}),
         });
       });
       return;
@@ -5360,11 +5513,31 @@ const lobby = lobbies[code];
         game.players[playerIdx].tokens += bonusTokens;
         game.players[playerIdx].doublePoints = false; // Reset double points
       }
+      // Solo: tally correct artist+title guesses for the end-of-run stats.
+      if (game.isSolo) game.soloCorrectGuesses = (game.soloCorrectGuesses || 0) + 1;
+    }
+
+    // Short-circuit the challenge window when no one can challenge (always the
+    // case in solo, and in the multiplayer edge case where nobody holds a
+    // token). Emit the submission notification, then go straight to reveal.
+    const eligibleChallengers = game.players.filter(p =>
+      p.persistentId !== currentPersistentId && p.tokens > 0
+    );
+    if (eligibleChallengers.length === 0) {
+      game.players.forEach((p) => {
+        io.to(p.id).emit('song_guess_result', {
+          playerId,
+          playerName: playerObj?.name,
+          submitted: true
+        });
+      });
+      enterRevealPhase(game);
+      return;
     }
 
     // Move to challenge window after song guess
     game.phase = "challenge-window";
-    
+
     // Normalize scores before broadcasting challenge window
     updatePlayerScores(game);
 
@@ -5428,12 +5601,22 @@ const lobby = lobbies[code];
     
     // Define currentPlayerId for timeline access
     const currentPlayerId = currentPersistentId;
-    
+
+    // Short-circuit the challenge window when no one can challenge (always the
+    // case in solo, and in the multiplayer edge case where nobody holds a token).
+    const eligibleChallengers = game.players.filter(p =>
+      p.persistentId !== currentPersistentId && p.tokens > 0
+    );
+    if (eligibleChallengers.length === 0) {
+      enterRevealPhase(game);
+      return;
+    }
+
     // Move to challenge window after skipping song guess
     game.phase = "challenge-window";
-    
+
     const currentCard = game.sharedDeck[game.currentCardIndex];
-    
+
     // Normalize scores before broadcasting challenge window
     updatePlayerScores(game);
 
@@ -5745,6 +5928,32 @@ app.get('/api/feature-flags', (req, res) => {
     res.json({ featureFlags: config.featureFlags || {} });
   } catch (e) {
     res.status(500).json({ error: 'Failed to read feature flags', message: e.message });
+  }
+});
+
+// Public: global solo high-score board (top 10).
+app.get('/api/solo-scores', publicRateLimit, (req, res) => {
+  try {
+    res.json({ top: soloScores.getTop(10) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read solo scores', message: e.message });
+  }
+});
+
+// Admin: full solo score list + reset.
+app.get('/api/admin/solo-scores', requireAdmin, (req, res) => {
+  try {
+    res.json({ scores: soloScores.getAll() });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read solo scores', message: e.message });
+  }
+});
+app.delete('/api/admin/solo-scores', requireAdmin, (req, res) => {
+  try {
+    soloScores.clear();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to clear solo scores', message: e.message });
   }
 });
 

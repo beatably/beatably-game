@@ -10,6 +10,7 @@ enum GameSound {
     case casino       // casino.mp3     — someone guessed the song correctly (casino bling)
     case win          // win.mp3        — you won the game
     case lose         // lose.mp3       — placement wrong / someone else won (losing)
+    case winner       // winner.mp3     — solo run over → leaderboard fanfare
 
     fileprivate var resource: String {
         switch self {
@@ -21,6 +22,7 @@ enum GameSound {
         case .casino:    return "casino"
         case .win:       return "win"
         case .lose:      return "lose"
+        case .winner:    return "winner"
         }
     }
 
@@ -34,6 +36,7 @@ enum GameSound {
         case .casino:    return 0.6
         case .win:       return 0.6
         case .lose:      return 0.5
+        case .winner:    return 0.6
         }
     }
 }

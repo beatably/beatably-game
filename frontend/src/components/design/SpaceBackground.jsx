@@ -148,8 +148,11 @@ function SpaceBackground({ parallax = null }) {
               left: orb.left,
               top: orb.top,
               transform: "translate(-50%, -50%)",
-              backgroundColor: orb.color,
-              filter: `blur(${orb.blur}px)`,
+              // Radial-gradient glow instead of solid color + CSS `filter: blur`.
+              // Mobile Safari drops the blur (and the parent's `contain: paint`
+              // clips it), leaving hard-edged orbs; a gradient renders softly and
+              // identically everywhere.
+              background: `radial-gradient(ellipse at center, ${orb.color} 0%, ${orb.color} 32%, transparent 72%)`,
             }}
           />
         ))}

@@ -72,7 +72,9 @@ struct LobbyView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .strokeBorder(Color.beatTeal, lineWidth: 2)
                                         .scaleEffect(startGlowPulse ? 1.06 : 1.0)
-                                        .opacity(startGlowPulse ? 0.0 : 0.6)
+                                        // Hide the accent ring entirely while the game can't start
+                                        // so the button reads as disabled (matches the dimmed label).
+                                        .opacity(!canStart ? 0.0 : (startGlowPulse ? 0.0 : 0.6))
                                         .animation(canStart ? .easeOut(duration: 1.2).repeatForever() : .default,
                                                    value: startGlowPulse)
                                 )
@@ -138,6 +140,14 @@ private struct RoomCodeCard: View {
                 .foregroundStyle(Color.beatText)
                 .textSelection(.enabled)
                 .accessibilityIdentifier("lobby.roomCodeValue")
+
+            QRCodeView(string: "https://play.beatably.app/join/\(code)", side: 108)
+                .padding(.top, 6)
+                .accessibilityIdentifier("lobby.roomCodeQR")
+
+            Text("Scan to join")
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(Color.beatMuted)
 
             if copied {
                 Text("Copied!")

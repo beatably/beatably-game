@@ -52,6 +52,115 @@ function TryIt() {
   );
 }
 
+// The catalog USP — Beatably's edge over similar games is a big, hand-curated
+// library of songs people actually recognize (not obscure filler). Presented as
+// a scannable three-stat band.
+function MusicDbBand() {
+  const ref = useRef(null);
+  const reduced = useMemo(prefersReducedMotion, []);
+
+  useLayoutEffect(() => {
+    if (reduced) return undefined;
+    const ctx = gsap.context(() => {
+      revealOnEnter(ref.current, '[data-reveal]');
+    }, ref);
+    return () => ctx.revert();
+  }, [reduced]);
+
+  const stats = [
+    { value: '3,700+', label: 'hand-picked tracks' },
+    { value: '6 decades', label: '1960 to today' },
+    { value: 'Every genre', label: 'pop · rock · hip-hop · more' },
+  ];
+
+  return (
+    <section
+      ref={ref}
+      className="max-w-5xl mx-auto px-6 py-20 sm:py-32 text-center"
+      aria-labelledby="catalog-heading"
+    >
+      <p
+        data-reveal
+        className="text-xs sm:text-sm font-black tracking-[0.24em] uppercase text-foreground/55"
+      >
+        The catalog
+      </p>
+      <h2 id="catalog-heading" data-reveal className="landing-h2 mt-3">
+        Songs you <span className="landing-gradient-text">actually</span> know.
+      </h2>
+      <p data-reveal className="mt-4 text-base sm:text-lg text-foreground/75 max-w-xl mx-auto">
+        Every track is curated by hand — real hits people recognize, not obscure
+        filler dug up to pad a deck. That's the difference between a lucky guess
+        and a genuine memory.
+      </p>
+      <div data-reveal className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
+        {stats.map((s) => (
+          <div key={s.label} className="flex flex-col items-center">
+            <span className="landing-gradient-text font-black leading-none text-4xl sm:text-5xl">
+              {s.value}
+            </span>
+            <span className="mt-2 text-xs sm:text-sm font-bold tracking-wide text-foreground/60">
+              {s.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Two ways to play — party (multiplayer) and solo survival streak.
+function ModesBand() {
+  const ref = useRef(null);
+  const reduced = useMemo(prefersReducedMotion, []);
+
+  useLayoutEffect(() => {
+    if (reduced) return undefined;
+    const ctx = gsap.context(() => {
+      revealOnEnter(ref.current, '[data-reveal]');
+    }, ref);
+    return () => ctx.revert();
+  }, [reduced]);
+
+  return (
+    <section
+      ref={ref}
+      className="max-w-4xl mx-auto px-6 py-20 sm:py-32 text-center"
+      aria-labelledby="modes-heading"
+    >
+      <p
+        data-reveal
+        className="text-xs sm:text-sm font-black tracking-[0.24em] uppercase text-foreground/55"
+      >
+        Two ways to play
+      </p>
+      <h2 id="modes-heading" data-reveal className="landing-h2 mt-3">
+        Bring friends — or go it alone.
+      </h2>
+      <div data-reveal className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-5 text-left">
+        <div className="beat-card p-6">
+          <div className="text-lg font-black" style={{ color: '#9945FF' }}>
+            Party mode
+          </div>
+          <p className="mt-2 text-sm sm:text-base text-foreground/75 leading-relaxed">
+            Gather round one device, pass it, and place your song. Earn coins,
+            challenge each other's cards — first to fill their timeline wins.
+          </p>
+        </div>
+        <div className="beat-card p-6">
+          <div className="text-lg font-black" style={{ color: '#00CED1' }}>
+            Solo streak
+          </div>
+          <p className="mt-2 text-sm sm:text-base text-foreground/75 leading-relaxed">
+            On your own? Chase your longest survival streak — the songs get
+            harder as you go, one miss ends the run — and climb the global Top 10.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CtaBand() {
   const ref = useRef(null);
   const reduced = useMemo(prefersReducedMotion, []);
@@ -145,8 +254,10 @@ function LandingPage() {
           <PlaceSection />
           <EarnSection />
           <StealSection />
+          <MusicDbBand />
           <PhoneShowcase />
           <TryIt />
+          <ModesBand />
           <CtaBand />
         </main>
         <Footer />

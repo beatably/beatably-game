@@ -103,6 +103,7 @@ struct TimelineView: View {
     var placementResult: PlacementResult? = nil
     var challengeResult: ChallengeResult? = nil
     var startHint: String? = nil
+    var isSolo: Bool = false   // solo: keep node size fixed and scroll instead of shrinking
     let onPlace: (Int) -> Void
     // Tapping the pending "?" node again cancels the placement (same as the Cancel button).
     // Only wired for the player who owns the placement; observers watching a remote pending
@@ -112,7 +113,13 @@ struct TimelineView: View {
     // Tapping a revealed art node asks the parent to show the song detail card.
     var onCardTap: ((Song) -> Void)? = nil
 
+    // The stable timeline height lives in the VM (survives SwiftUI recreating this
+    // view on phase changes), so a taller reveal footer can't re-seed it.
+    @Environment(GameViewModel.self) private var gameVM
+
     // ── Animation state ──────────────────────────────────────────────
+    // `containerSize` is the STABILIZED layout size (derived from the VM's max
+    // area height); used by layout + the placement animation so they agree.
     @State private var containerSize: CGSize = .zero
     @State private var animPhase: PlacementAnimPhase = .idle
     @State private var startHintHeight: CGFloat = 84   // measured; seeded near the real height
@@ -189,24 +196,46 @@ struct TimelineView: View {
 
     var body: some View {
         GeometryReader { geo in
+            // Stabilized height for layout math (bottom-anchor). Uses the MAX
+            // observed area height (player-turn state, tallest area) from the VM,
+            // minus a footer reserve, so a shrinking footer never moves the board.
+            let stableH = gameVM.maxTimelineAreaHeight > 0 ? gameVM.maxTimelineAreaHeight : geo.size.height
+            let layoutH = max(stableH - 120, 1)
+            let layoutSize = CGSize(width: geo.size.width, height: layoutH)
             let layout = TimelineLayout.calculate(
                 cards: displayCards,
-                containerSize: geo.size,
+                containerSize: layoutSize,
                 lastPlacedId: lastPlacedId,
                 gamePhase: gamePhase,
                 isInteractive: isInteractive,
-                overrideOffsetY: animPhase != .idle ? capturedOffsetY : nil
+                overrideOffsetY: animPhase != .idle ? capturedOffsetY : nil,
+                scrollMode: isSolo
             )
-
-            ZStack {
-                pathLayers(layout: layout, size: geo.size)
+            // `overflows` = the content genuinely exceeds the stable layout height
+            // (a long solo streak), NOT merely the footer-shrunken viewport. Only
+            // then do we scroll. Otherwise the board fills the viewport and is
+            // TOP-aligned so a taller footer (reveal) never re-centers / shifts it
+            // — matching the web (block-flow) behavior.
+            let overflows = layout.contentHeight > layoutH + 0.5
+            let boardHeight = overflows ? layout.contentHeight : geo.size.height
+            let boardSize = CGSize(width: geo.size.width, height: boardHeight)
+            let board = ZStack {
+                pathLayers(layout: layout, size: boardSize)
                 timelineNodes(layout: layout)
                 startHintOverlay(layout: layout)
             }
-            .background(
-                Color.clear
-                    .onGeometryChange(for: CGSize.self, of: { $0.size }) { containerSize = $0 }
-            )
+            .frame(width: geo.size.width, height: boardHeight, alignment: .top)
+
+            Group {
+                if isSolo && overflows {
+                    ScrollView(.vertical, showsIndicators: false) { board }
+                } else {
+                    board
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+            .onAppear { recordAreaHeight(geo.size) }
+            .onChange(of: geo.size) { _, s in recordAreaHeight(s) }
         }
         .onChange(of: pendingIndex) { old, new in
             if new != nil, old == nil {
@@ -403,6 +432,22 @@ struct TimelineView: View {
 
     // MARK: - Animation trigger
 
+    // Track the MAX timeline-area height in the VM (survives view recreation on
+    // phase changes). The area is tallest at player-turn (shortest footer); when
+    // the footer grows on reveal the area shrinks but the max — and thus the
+    // bottom-anchored board position — stays put. Reset the max on a width change
+    // (rotation); footer growth never changes the width.
+    private func recordAreaHeight(_ size: CGSize) {
+        guard size.height > 0 else { return }
+        if size.width != gameVM.timelineAreaWidth {
+            gameVM.timelineAreaWidth = size.width
+            gameVM.maxTimelineAreaHeight = size.height
+        } else if size.height > gameVM.maxTimelineAreaHeight {
+            gameVM.maxTimelineAreaHeight = size.height
+        }
+        containerSize = CGSize(width: size.width, height: max(gameVM.maxTimelineAreaHeight - 120, 1))
+    }
+
     private func triggerAnimation() {
         guard let confirmedIdx = pendingIndex, containerSize != .zero else { return }
 
@@ -414,7 +459,8 @@ struct TimelineView: View {
         // Old layout — lock its offsetY for the whole animation so existing rows don't shift.
         let oldLayout = TimelineLayout.calculate(
             cards: baseCards, containerSize: containerSize,
-            lastPlacedId: lastPlacedId, gamePhase: gamePhase, isInteractive: true
+            lastPlacedId: lastPlacedId, gamePhase: gamePhase, isInteractive: true,
+            scrollMode: isSolo
         )
         capturedOffsetY = oldLayout.offsetY
         capturedOldSegments = oldLayout.segments
@@ -425,7 +471,8 @@ struct TimelineView: View {
         let newLayout = TimelineLayout.calculate(
             cards: newCards, containerSize: containerSize,
             lastPlacedId: lastPlacedId, gamePhase: gamePhase, isInteractive: false,
-            overrideOffsetY: oldLayout.offsetY
+            overrideOffsetY: oldLayout.offsetY,
+            scrollMode: isSolo
         )
 
         // Position maps.

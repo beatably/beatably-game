@@ -33,6 +33,7 @@ const SOUND_CONFIG = {
   casino: { url: '/sounds/casino.mp3', volume: 0.6 }, // someone guessed the song (coin award)
   win: { url: '/sounds/win.mp3', volume: 0.6 }, // you won the game
   lose: { url: '/sounds/lose.mp3', volume: 0.5 }, // wrong placement / you lost
+  winner: { url: '/sounds/winner.mp3', volume: 0.6 }, // solo run over → leaderboard
 };
 
 function ensureAudioContext() {

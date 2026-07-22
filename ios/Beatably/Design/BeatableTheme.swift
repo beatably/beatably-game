@@ -88,6 +88,10 @@ struct BeatPrimaryLabel: View {
     var isLoading: Bool = false
     // accentColor controls the neon glow only; the background is always the brand gradient
     var accentColor: Color = .beatTeal
+    // Dim + drop the glow when the enclosing control is disabled so callers get a
+    // visible disabled state for free (matches the .opacity(0.55) convention used
+    // for the Create/Join buttons on the landing screen).
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         Group {
@@ -107,7 +111,8 @@ struct BeatPrimaryLabel: View {
         )
         .foregroundStyle(.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .neonGlow(accentColor, radius: 6)
+        .neonGlow(accentColor, radius: isEnabled ? 6 : 0)
+        .opacity(isEnabled ? 1 : 0.55)
     }
 }
 

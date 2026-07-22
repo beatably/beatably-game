@@ -67,12 +67,14 @@ const [, setChallengeResponseGiven] = useState(false);
   const [playerId, setPlayerId] = useState(""); // local socket id
   const [roomCode, setRoomCode] = useState("");
   const [isCreator, setIsCreator] = useState(false);
-  
+  // Room code from a scanned QR / shared join link (/join/CODE or ?join=CODE)
+  const [pendingJoinCode, setPendingJoinCode] = useState(null);
+
   // Initialize debug logging based on URL parameter or localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const debugParam = params.get('debug');
-    
+
     if (debugParam === 'true') {
       localStorage.setItem('debug_logging', 'true');
       debugLogger.enable();
@@ -81,6 +83,24 @@ const [, setChallengeResponseGiven] = useState(false);
       localStorage.removeItem('debug_logging');
       debugLogger.disable();
       console.log('[DebugLogger] Disabled via URL parameter');
+    }
+  }, []);
+
+  // Parse a shared join link (/join/CODE or ?join=CODE) once on load.
+  useEffect(() => {
+    const pathMatch = window.location.pathname.match(/^\/join\/(\d{4})$/);
+    const params = new URLSearchParams(window.location.search);
+    const queryCode = params.get('join');
+    const code = pathMatch ? pathMatch[1] : (/^\d{4}$/.test(queryCode || '') ? queryCode : null);
+
+    if (code) {
+      setPendingJoinCode(code);
+      // A scanned QR is explicit intent to join a new game — skip any session-restore prompt.
+      suppressAutoRejoinRef.current = true;
+      // Clean the URL so the join code isn't re-applied on refresh, preserving ?debug.
+      params.delete('join');
+      const query = params.toString();
+      window.history.replaceState(null, '', `/${query ? `?${query}` : ''}`);
     }
   }, []);
   
@@ -99,6 +119,7 @@ const [, setChallengeResponseGiven] = useState(false);
   const [gameSettings, setGameSettings] = useState({
     difficulty: "easy",
     winCondition: 10,
+    gameMode: "multiplayer",
     musicPreferences: {
       genres: ['pop', 'rock', 'hip-hop', 'electronic', 'indie'],
       yearRange: { min: 1960, max: 2025 },
@@ -130,6 +151,7 @@ const [, setChallengeResponseGiven] = useState(false);
   // Winner screen state
   const [winner, setWinner] = useState(null);
   const [showWinnerView, setShowWinnerView] = useState(false);
+  const [soloResult, setSoloResult] = useState(null);
   
   // Pending drop confirmation state
   const [pendingDropIndex, setPendingDropIndex] = useState(null);
@@ -183,6 +205,7 @@ const [, setChallengeResponseGiven] = useState(false);
     mySocketId: socketRef.current?.id,
     onCoinAward: (persistentId) =>
       setCoinFlight({ type: 'award', persistentId, id: Date.now() }),
+    isSolo: gameSettings.gameMode === 'solo',
   });
 
   // Initialize viewport manager for mobile Safari optimizations
@@ -257,8 +280,9 @@ const [, setChallengeResponseGiven] = useState(false);
       }
     };
 
-    // Only check for session if we're on the landing page and not already restoring
-    if (view === 'landing' && !isRestoring && !showSessionRestore) {
+    // Only check for session if we're on the landing page and not already restoring.
+    // A pending join code (scanned QR / shared link) takes priority over restoring an old session.
+    if (view === 'landing' && !isRestoring && !showSessionRestore && !pendingJoinCode) {
       const hasAnySaved =
         (sessionManager.hasValidSession && sessionManager.hasValidSession()) ||
         (sessionManager.hasValidGameBackup && sessionManager.hasValidGameBackup());
@@ -270,7 +294,7 @@ const [, setChallengeResponseGiven] = useState(false);
         suppressAutoRejoinRef.current = false;
       }
     }
-  }, [view, isRestoring, showSessionRestore]);
+  }, [view, isRestoring, showSessionRestore, pendingJoinCode]);
 
   // Handle device lock/unlock for iOS Safari fullscreen mode
   useEffect(() => {
@@ -756,6 +780,7 @@ const [, setChallengeResponseGiven] = useState(false);
     // Show winner view immediately when game over with winner info
     if (game.phase === 'game-over' && game.winner) {
       console.log("[App] Game over detected, showing winner view");
+      if (game.soloResult) setSoloResult(game.soloResult);
       setWinner(game.winner);
       setShowWinnerView(true);
       return;
@@ -1308,12 +1333,52 @@ const [, setChallengeResponseGiven] = useState(false);
     );
   };
 
+  // Single-player handler: create a solo lobby and start immediately, skipping
+  // the waiting room (solo has no settings and no one to wait for). The backend
+  // builds the fixed progressive-difficulty deck from the solo gameMode.
+  const handleCreateSolo = (name) => {
+    const code = randomCode();
+    const soloSettings = { ...gameSettings, gameMode: 'solo' };
+    setPlayerName(name);
+    setRoomCode(code);
+    setIsCreator(true);
+    setGameSettings(soloSettings);
+
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('create_session', {
+        roomCode: code,
+        playerName: name,
+        isCreator: true
+      }, (response) => {
+        if (response.sessionId) setSessionId(response.sessionId);
+      });
+    }
+
+    socketRef.current.emit(
+      "create_lobby",
+      { name, code, settings: soloSettings, sessionId },
+      ({ error, lobby, sessionId: returnedSessionId }) => {
+        if (error) {
+          alert(error);
+          setView("landing");
+          return;
+        }
+        if (returnedSessionId) setSessionId(returnedSessionId);
+        setPlayers(lobby.players);
+        setGameSettings(lobby.settings);
+        joinedRef.current = true;
+        // Auto-start — game_started will switch the view to the game.
+        socketRef.current.emit("start_game", { code });
+      }
+    );
+  };
+
   // Join game handler (calls backend)
   const handleJoin = (name, code) => {
     setPlayerName(name);
     setRoomCode(code);
     setIsCreator(false);
-    
+
     // Create session for tracking (for guest players too)
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('create_session', {
@@ -1327,24 +1392,26 @@ const [, setChallengeResponseGiven] = useState(false);
         }
       });
     }
-    
+
     console.log("[Socket] Emitting join_lobby", { name, code });
-    socketRef.current.emit(
-      "join_lobby",
-      { name, code },
-      ({ error, lobby, player }) => {
-        console.log("[Socket] join_lobby callback", { error, lobby, player });
-        if (error) {
-          alert(error);
-          setView("landing");
-          return;
+    return new Promise((resolve, reject) => {
+      socketRef.current.emit(
+        "join_lobby",
+        { name, code },
+        ({ error, lobby, player }) => {
+          console.log("[Socket] join_lobby callback", { error, lobby, player });
+          if (error) {
+            reject(new Error(error));
+            return;
+          }
+          setPlayers(lobby.players);
+          setGameSettings(lobby.settings);
+          setView("waiting");
+          joinedRef.current = true;
+          resolve();
         }
-        setPlayers(lobby.players);
-        setGameSettings(lobby.settings);
-        setView("waiting");
-        joinedRef.current = true;
-      }
-    );
+      );
+    });
   };
 
   // Ready status handler
@@ -1403,7 +1470,14 @@ const [, setChallengeResponseGiven] = useState(false);
   // Start game handler
   const handleStart = async () => {
     console.log("[App] Starting game - fetching fresh songs with current settings...");
-    
+
+    // Solo mode: the backend builds a fixed, progressive-difficulty deck, so we
+    // skip the client-side song fetch entirely and just start the game.
+    if (gameSettings.gameMode === 'solo') {
+      socketRef.current.emit("start_game", { code: roomCode });
+      return;
+    }
+
     // Always fetch fresh songs when starting the game to ensure settings are applied
     try {
       const freshSongsData = await fetchCuratedSongs(gameSettings.musicPreferences);
@@ -1801,10 +1875,20 @@ const [, setChallengeResponseGiven] = useState(false);
       <WinnerView
         winner={winner}
         players={players}
+        soloResult={soloResult}
+        isSolo={!!soloResult}
         onPlayAgain={() => {
-          // Keep same lobby and players, reset game state and go to waiting room
+          if (gameSettings.gameMode === 'solo') {
+            // Solo: start a fresh run immediately in the same lobby (no waiting
+            // room / settings). handleRestartGame resets state + starts.
+            setSoloResult(null);
+            handleRestartGame();
+            return;
+          }
+          // Multiplayer: keep same lobby and players, reset state, go to waiting.
           setShowWinnerView(false);
           setWinner(null);
+          setSoloResult(null);
           setTimeline([]);
           setDeck([]);
           setCurrentCard(null);
@@ -1817,9 +1901,17 @@ const [, setChallengeResponseGiven] = useState(false);
           setView('waiting');
         }}
         onReturnToLobby={() => {
-          // Full reset back to landing
+          // Full reset back to landing. Clear the persisted session/backup and
+          // pending-restore key first — the old reset skipped this, leaving a
+          // stale session that popped the rejoin prompt on landing.
+          sessionManager.clearSession();
+          try { sessionStorage.removeItem(PENDING_RESTORE_KEY); } catch { /* ignore */ }
+          suppressAutoRejoinRef.current = false;
+          joinedRef.current = false;
+          setShowSessionRestore(false);
           setShowWinnerView(false);
           setWinner(null);
+          setSoloResult(null);
           setPlayers([]);
           setCurrentPlayerIdx(0);
           setTimeline([]);
@@ -1843,7 +1935,7 @@ const [, setChallengeResponseGiven] = useState(false);
   if (view === "landing") {
     return (
       <>
-        <Landing onCreate={handleCreate} onJoin={handleJoin} onShowHowToPlay={() => setShowHowToPlay(true)} />
+        <Landing onCreate={handleCreate} onCreateSolo={handleCreateSolo} onJoin={handleJoin} onShowHowToPlay={() => setShowHowToPlay(true)} pendingJoinCode={pendingJoinCode} onClearPendingJoin={() => setPendingJoinCode(null)} />
         {showHowToPlay && <HowToPlayView onClose={() => setShowHowToPlay(false)} context="landing" />}
         {showSessionRestore && (
           <SessionRestore
@@ -1964,6 +2056,7 @@ const [, setChallengeResponseGiven] = useState(false);
             currentPlayerId={currentPlayerId}
             tokenAnimations={tokenAnimations}
             isCreator={isCreator}
+            isSolo={gameSettings.gameMode === 'solo'}
             onRestart={handleRestartGame}
             onExit={handleExitToLobby}
             onShowHowToPlay={() => setShowHowToPlay(true)}
@@ -1982,11 +2075,13 @@ const [, setChallengeResponseGiven] = useState(false);
               pendingDropIndex={pendingDropIndex}
               remotePreviewIndex={isMyTurn ? null : remotePreviewIndex}
               onPendingDrop={handlePendingDrop}
+              onCancelDrop={handleCancelDrop}
               onCardTap={(card) => setSongDetailCard(card)}
               currentPlayerName={timelineOwnerName}
               roomCode={roomCode}
               myPersistentId={myPersistentId}
               timelineOwnerPersistentId={timelineOwnerPersistentId}
+              isSolo={gameSettings.gameMode === 'solo'}
             />
           </div>
           <GameFooter
@@ -2021,6 +2116,7 @@ const [, setChallengeResponseGiven] = useState(false);
             onCancelDrop={handleCancelDrop}
             placeCardError={placeCardError}
             lastSongGuess={lastSongGuess}
+            isSolo={gameSettings.gameMode === 'solo'}
           />
           {/* Debug Panel */}
           <SongDebugPanel

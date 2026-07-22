@@ -13,7 +13,19 @@ function TokenStack({ count }) {
   );
 }
 
-function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreator, onRestart, onExit, onShowHowToPlay }) {
+// A single solo header stat: value on top, small caption below.
+function SoloStat({ value, label, accent }) {
+  return (
+    <div className="flex flex-col items-center justify-center px-1 min-w-0">
+      <div className={`font-bold text-base md:text-lg leading-none flex items-center ${accent || 'text-foreground'}`}>
+        {value}
+      </div>
+      <span className="text-[10px] md:text-xs text-muted-foreground mt-0.5 whitespace-nowrap">{label}</span>
+    </div>
+  );
+}
+
+function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreator, isSolo, onRestart, onExit, onShowHowToPlay }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [showExitConfirm, setShowExitConfirm] = React.useState(false);
   const [animatingTokens, setAnimatingTokens] = useState({});
@@ -93,8 +105,32 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
         </div>
       )}
 
-      {/* Score cards (iOS ScoreHeader): quarter-width cards, horizontal scroll,
-          active = magenta tint + gradient border + dual glow */}
+      {/* Solo: no turn to highlight, so drop the player card and spread a row of
+          run stats across from the menu icon. */}
+      {isSolo && players.length > 0 ? (
+        <div className="flex items-center gap-2 md:gap-5 pr-1">
+          <SoloStat value={Math.max(0, (players[0].score || 1) - 1)} label="Streak" />
+          <div className="w-px h-6 bg-border" />
+          <SoloStat value={players[0].correctGuesses || 0} label="Guessed" accent="text-primary" />
+          <div className="w-px h-6 bg-border" />
+          {/* data-player-card lets CoinFlightLayer originate the credit-spend
+              animation from the credits stack (matches multiplayer cards). */}
+          <div data-player-card={players[0].persistentId}>
+            <SoloStat
+              value={(
+                <>
+                  <span>{players[0].tokens}</span>
+                  <TokenStack count={players[0].tokens} />
+                </>
+              )}
+              label="Credits"
+              accent="text-[#F5C842]"
+            />
+          </div>
+        </div>
+      ) : (
+      /* Score cards (iOS ScoreHeader): quarter-width cards, horizontal scroll,
+          active = magenta tint + gradient border + dual glow */
       <div className="flex gap-2 overflow-x-auto text-[10px] md:text-xs" style={{ scrollbarWidth: 'none' }}>
         {players.map((p) => (
           <div
@@ -130,7 +166,8 @@ function PlayerHeader({ players, currentPlayerId, tokenAnimations = {}, isCreato
           </div>
         ))}
       </div>
-      
+      )}
+
       {players.length > 0 && (
         <>
           {/* Modal overlay - rendered via portal */}

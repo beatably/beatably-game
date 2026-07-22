@@ -4,102 +4,122 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function Landing({ onCreate, onJoin, onShowHowToPlay }) {
+// Landing flow (iOS parity): step 1 enter a name, step 2 pick a game mode
+// (multiplayer / solo / join). Solo has no settings, so it launches straight
+// into a game; multiplayer goes to the waiting room; join asks for a code.
+function Landing({ onCreate, onCreateSolo, onJoin, onShowHowToPlay, pendingJoinCode, onClearPendingJoin }) {
+  const [step, setStep] = useState("name"); // "name" | "options" | "join"
   const [name, setName] = useState("");
   const [joinCode, setJoinCode] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
-  const [joining, setJoining] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingSolo, setIsCreatingSolo] = useState(false);
   const [isJoiningGame, setIsJoiningGame] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const firstCodeRef = useRef(null);
-  const createButtonRef = useRef(null);
-  const joinWithCodeButtonRef = useRef(null);
-  const joinGameButtonRef = useRef(null);
-  const cancelButtonRef = useRef(null);
   const isProgrammaticFocus = useRef(false);
 
   useEffect(() => {
-    if (joining) {
-      // Focus the first code input when the join view appears
-      firstCodeRef.current?.focus();
-    }
-  }, [joining]);
+    if (step === "join") firstCodeRef.current?.focus();
+  }, [step]);
 
-  // Handle input focus to ensure visibility when virtual keyboard appears
+  // Ensure the first code input is visible when the virtual keyboard appears.
   useEffect(() => {
     const handleInputFocus = (e) => {
-      // Only handle for input elements
-      if (e.target.tagName !== 'INPUT') return;
-      
-      // Skip scrolling if this is a programmatic focus (auto-advance)
+      if (e.target.tagName !== "INPUT") return;
       if (isProgrammaticFocus.current) {
         isProgrammaticFocus.current = false;
         return;
       }
-      
-      // Only scroll for the very first manual focus on code inputs
-      // Check if this is the first code input and no other code inputs have values
-      const isFirstCodeInput = e.target.id === 'code-0';
-      const hasAnyCodeValues = joinCode.some(digit => digit !== '');
-      
+      const isFirstCodeInput = e.target.id === "code-0";
+      const hasAnyCodeValues = joinCode.some((digit) => digit !== "");
       if (isFirstCodeInput && !hasAnyCodeValues) {
-        // Only scroll for the initial focus on the first code field
         setTimeout(() => {
-          e.target.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'nearest'
-          });
+          e.target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
         }, 300);
       }
     };
-
-    // Add event listeners
-    document.addEventListener('focusin', handleInputFocus);
-
-    return () => {
-      document.removeEventListener('focusin', handleInputFocus);
-    };
+    document.addEventListener("focusin", handleInputFocus);
+    return () => document.removeEventListener("focusin", handleInputFocus);
   }, [joinCode]);
 
-  const handleCreate = async () => {
+  // Blur on tap to avoid the persistent mobile focus ring.
+  const press = (fn) => (e) => {
+    e.currentTarget.blur();
+    fn();
+  };
+
+  const goToOptions = async () => {
     if (!name.trim()) {
       setError("Please enter your name");
       return;
     }
+    setError("");
+    // Arrived via a shared join link / scanned QR: skip the options step and join directly.
+    if (pendingJoinCode) {
+      setIsJoiningGame(true);
+      try {
+        await onJoin(name, pendingJoinCode);
+      } catch (err) {
+        console.error("Error joining game from link:", err);
+        setError(err?.message || "Couldn't join that game. It may have ended or the code is wrong.");
+        onClearPendingJoin?.();
+        setIsJoiningGame(false);
+      }
+      return;
+    }
+    setStep("options");
+  };
+
+  const shareUrl = "https://beatably.app";
+  const handleShare = async () => {
+    setError("");
+    const shareData = {
+      title: "Beatably",
+      text: "Play Beatably — the music timeline party game!",
+      url: shareUrl,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if (err?.name !== "AbortError") console.error("Share failed:", err);
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  };
+
+  const handleCreate = async () => {
     setError("");
     setIsCreating(true);
     try {
       await onCreate(name);
-    } catch (error) {
-      console.error('Error creating game:', error);
+    } catch (err) {
+      console.error("Error creating game:", err);
       setIsCreating(false);
     }
   };
 
-  const handleStartJoin = () => {
-    if (!name.trim()) {
-      setError("Please enter your name");
-      return;
+  const handleCreateSolo = async () => {
+    setError("");
+    setIsCreatingSolo(true);
+    try {
+      await onCreateSolo(name);
+    } catch (err) {
+      console.error("Error starting solo game:", err);
+      setIsCreatingSolo(false);
     }
-    setError("");
-    setJoining(true);
-  };
-
-  const handleCancelJoin = () => {
-    setError("");
-    setJoining(false);
-    setJoinCode(["", "", "", ""]);
   };
 
   const handleJoin = async () => {
-    // Name should already be set from first step, but validate defensively
-    if (!name.trim()) {
-      setError("Please enter your name");
-      setJoining(false);
-      return;
-    }
     const code = joinCode.join("");
     if (!/^\d{4}$/.test(code)) {
       setError("Enter a valid 4-digit code");
@@ -109,25 +129,20 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
     setIsJoiningGame(true);
     try {
       await onJoin(name, code);
-    } catch (error) {
-      console.error('Error joining game:', error);
+    } catch (err) {
+      console.error("Error joining game:", err);
       setIsJoiningGame(false);
     }
   };
 
   const handleCodeChange = (index, value) => {
-    // Only allow digits
     if (value && !/^\d$/.test(value)) return;
-
     const newCode = [...joinCode];
     newCode[index] = value;
     setJoinCode(newCode);
-
-    // Auto-advance to next field
     if (value && index < 3) {
       const nextInput = document.getElementById(`code-${index + 1}`);
       if (nextInput) {
-        // Flag this as programmatic focus to prevent scrolling
         isProgrammaticFocus.current = true;
         nextInput.focus();
       }
@@ -135,33 +150,34 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
   };
 
   const handleCodeKeyDown = (index, e) => {
-    // Handle backspace to go to previous field
     if (e.key === "Backspace" && !joinCode[index] && index > 0) {
       const prevInput = document.getElementById(`code-${index - 1}`);
       if (prevInput) {
-        // Flag this as programmatic focus to prevent scrolling
         isProgrammaticFocus.current = true;
         prevInput.focus();
       }
     }
   };
 
+  const Spinner = () => (
+    <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
+
   return (
     <div
       className="view-fade-in flex flex-col items-center justify-between relative text-foreground px-6 landing-container"
       style={{
         backgroundColor: "#000000",
-        // Use single height declaration to avoid conflicts
         minHeight: "100dvh",
-        // Allow vertical scrolling when keyboard appears
         overflowY: "auto",
         overflowX: "hidden",
-        // iOS optimizations
         WebkitOverflowScrolling: "touch",
         overscrollBehavior: "contain",
-        // Ensure proper safe area handling
         paddingTop: "max(1rem, env(safe-area-inset-top))",
-        paddingBottom: "max(2rem, env(safe-area-inset-bottom))"
+        paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
       }}
     >
       {/* Background Video */}
@@ -182,17 +198,18 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
 
       {/* Minimal Header */}
       <div className="text-center pt-8 sm:pt-12 relative z-10">
-        <img
-          src={beatablyLogo}
-          alt="Beatably Logo"
-          className="h-16 sm:h-20 w-auto mx-auto"
-        />
+        <img src={beatablyLogo} alt="Beatably Logo" className="h-16 sm:h-20 w-auto mx-auto" />
       </div>
 
       <div className="w-full max-w-sm space-y-3 sm:space-y-4 relative z-10 pb-8 sm:pb-12">
-        {!joining ? (
+        {step === "name" && (
           <>
-            {/* Name Input */}
+            {pendingJoinCode && (
+              <div className="text-center text-sm text-foreground/70 pb-1">
+                Joining game{" "}
+                <span className="font-semibold text-foreground tracking-wider">{pendingJoinCode}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Input
                 id="name"
@@ -200,92 +217,78 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
                 placeholder="Enter your name..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && goToOptions()}
                 maxLength={16}
+                autoFocus
               />
             </div>
-
-            {/* Primary CTA: Create a new game */}
             <Button
-              ref={createButtonRef}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button no-focus-outline flex items-center justify-center"
-              disabled={!name.trim() || isCreating}
-              onClick={() => {
-                handleCreate();
-                // Immediately blur after click to prevent focus ring
-                if (createButtonRef.current) {
-                  setTimeout(() => {
-                    createButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (createButtonRef.current) {
-                  createButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (createButtonRef.current) {
-                  createButtonRef.current.blur();
-                }
-              }}
+              disabled={!name.trim() || isJoiningGame}
+              onClick={press(goToOptions)}
             >
-              {isCreating && (
-                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-              )}
-              {isCreating ? "Creating..." : "Create new game"}
-            </Button>
-
-            {/* Secondary: Reveal join with code */}
-            <Button
-              ref={joinWithCodeButtonRef}
-              variant="outline"
-              className="w-full h-12 font-semibold touch-button no-focus-outline outline-button-override"
-              disabled={!name.trim()}
-              onClick={() => {
-                handleStartJoin();
-                // Immediately blur after click to prevent focus ring
-                if (joinWithCodeButtonRef.current) {
-                  setTimeout(() => {
-                    joinWithCodeButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (joinWithCodeButtonRef.current) {
-                  joinWithCodeButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (joinWithCodeButtonRef.current) {
-                  joinWithCodeButtonRef.current.blur();
-                }
-              }}
-            >
-              Join game with code
+              {isJoiningGame && <Spinner />}
+              {pendingJoinCode ? (isJoiningGame ? "Joining..." : "Join Game") : "Continue"}
             </Button>
           </>
-        ) : (
+        )}
+
+        {step === "options" && (
           <>
-            {/* Join with 4-digit code */}
+            <div className="text-center text-sm text-foreground/70 pb-1">
+              Playing as <span className="font-semibold text-foreground">{name}</span>
+            </div>
+
+            {/* Multiplayer — primary */}
+            <Button
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button no-focus-outline flex items-center justify-center"
+              disabled={isCreating || isCreatingSolo}
+              onClick={press(handleCreate)}
+            >
+              {isCreating && <Spinner />}
+              {isCreating ? "Creating..." : "Create multiplayer game"}
+            </Button>
+
+            {/* Solo */}
+            <Button
+              variant="outline"
+              className="w-full h-12 font-semibold touch-button no-focus-outline outline-button-override flex items-center justify-center"
+              disabled={isCreating || isCreatingSolo}
+              onClick={press(handleCreateSolo)}
+            >
+              {isCreatingSolo && <Spinner />}
+              {isCreatingSolo ? "Starting..." : "Play solo"}
+            </Button>
+
+            {/* Join */}
+            <Button
+              variant="outline"
+              className="w-full h-12 font-semibold touch-button no-focus-outline outline-button-override"
+              disabled={isCreating || isCreatingSolo}
+              onClick={press(() => {
+                setError("");
+                setStep("join");
+              })}
+            >
+              Join a game
+            </Button>
+
+            <div className="text-center pt-1">
+              <button
+                onClick={press(() => {
+                  setError("");
+                  setStep("name");
+                })}
+                className="text-sm text-foreground/50 underline underline-offset-2 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button"
+              >
+                ← Change name
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "join" && (
+          <>
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Game Code</Label>
               <div className="flex gap-2 justify-center">
@@ -304,81 +307,22 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
                 ))}
               </div>
             </div>
-
-            {/* Primary CTA in join view */}
             <Button
-              ref={joinGameButtonRef}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold touch-button no-focus-outline flex items-center justify-center"
-              disabled={!name.trim() || joinCode.some((d) => !d) || isJoiningGame}
-              onClick={() => {
-                handleJoin();
-                // Immediately blur after click to prevent focus ring
-                if (joinGameButtonRef.current) {
-                  setTimeout(() => {
-                    joinGameButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (joinGameButtonRef.current) {
-                  joinGameButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (joinGameButtonRef.current) {
-                  joinGameButtonRef.current.blur();
-                }
-              }}
+              disabled={joinCode.some((d) => !d) || isJoiningGame}
+              onClick={press(handleJoin)}
             >
-              {isJoiningGame && (
-                <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-              )}
+              {isJoiningGame && <Spinner />}
               {isJoiningGame ? "Joining..." : "Join Game"}
             </Button>
-
-            {/* Secondary: Cancel back to name input */}
             <Button
-              ref={cancelButtonRef}
               variant="outline"
               className="w-full h-12 font-semibold touch-button no-focus-outline outline-button-override"
-              onClick={() => {
-                handleCancelJoin();
-                // Immediately blur after click to prevent focus ring
-                if (cancelButtonRef.current) {
-                  setTimeout(() => {
-                    cancelButtonRef.current.blur();
-                  }, 0);
-                }
-              }}
-              onTouchStart={() => {
-                // Prevent focus on touch start
-                if (cancelButtonRef.current) {
-                  cancelButtonRef.current.blur();
-                }
-              }}
-              onTouchEnd={() => {
-                // Blur the button after touch to remove persistent focus highlight
-                if (cancelButtonRef.current) {
-                  cancelButtonRef.current.blur();
-                }
-              }}
+              onClick={press(() => {
+                setError("");
+                setJoinCode(["", "", "", ""]);
+                setStep("options");
+              })}
             >
               Cancel
             </Button>
@@ -392,13 +336,31 @@ function Landing({ onCreate, onJoin, onShowHowToPlay }) {
           </div>
         )}
 
-        {/* How to play link */}
-        <div className="mt-8 pt-4 text-center">
+        {/* Secondary actions — compact, one row */}
+        <div className="mt-8 pt-4 flex items-center justify-center gap-6">
           <button
             onClick={onShowHowToPlay}
-            className="text-sm text-foreground/30 underline underline-offset-2 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button"
+            className="inline-flex items-center gap-1.5 text-sm text-foreground/40 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button whitespace-nowrap"
           >
-            What is Beatably and how to play?
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            About the game
+          </button>
+          <button
+            onClick={press(handleShare)}
+            className="inline-flex items-center gap-1.5 text-sm text-foreground/40 bg-transparent border-none cursor-pointer hover:text-foreground transition-colors no-focus-outline touch-button whitespace-nowrap"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            {shareCopied ? "Copied!" : "Share"}
           </button>
         </div>
       </div>

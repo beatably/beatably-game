@@ -130,6 +130,14 @@ struct HowToPlayView: View {
             "If the original player was right, they keep the card. If both are wrong, the card is discarded.",
             "You cannot challenge your own placement."
         ]),
+        Section(title: "Solo Mode", icon: "flame", items: [
+            "Playing on your own? Every run becomes a survival streak.",
+            "Songs come one at a time and get harder as your streak grows.",
+            "Keep placing correctly to extend your streak — your first wrong placement ends the run.",
+            "Your score is your streak: how many songs you placed in the right spot.",
+            "No challenges in solo, but credits still work — guess a song for a bonus, or spend one to skip.",
+            "Beat your best and climb the global Top 10 leaderboard."
+        ]),
         Section(title: "Tips", icon: "lightbulb", items: [
             "Save credits for challenges — stealing a card is more powerful than earning one.",
             "Easy mode uses chart hits. Advanced mode opens the full catalog across all genres.",

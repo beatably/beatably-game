@@ -20,6 +20,7 @@ export default function useGameSounds({
   myPersistentId,
   mySocketId,
   onCoinAward,
+  isSolo,
 }) {
   const prevPhaseRef = useRef(phase);
   const casinoPlayedRef = useRef(null);
@@ -70,11 +71,16 @@ export default function useGameSounds({
   useEffect(() => {
     if (showWinnerView && winner && !winPlayedRef.current) {
       winPlayedRef.current = true;
-      const iWon =
-        winner.persistentId === myPersistentId ||
-        winner.id === myPersistentId ||
-        winner.id === mySocketId;
-      playSound(iWon ? 'win' : 'lose');
+      if (isSolo) {
+        // Solo run over → leaderboard fanfare (win/lose doesn't apply).
+        playSound('winner');
+      } else {
+        const iWon =
+          winner.persistentId === myPersistentId ||
+          winner.id === myPersistentId ||
+          winner.id === mySocketId;
+        playSound(iWon ? 'win' : 'lose');
+      }
     }
     if (!showWinnerView) winPlayedRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -666,6 +666,7 @@ function selectForGame(criteria = {}) {
     market: (Array.isArray(s.markets) && s.markets.length ? s.markets[0] : (s.geography || null)),
     genre: s.genre || 'curated',
     popularity: s.popularity || null,
+    difficultyLevel: Number(s.difficultyLevel) || 2,
     source: 'curated',
     debugSource: 'curated',
     debugDifficulty: (function () {

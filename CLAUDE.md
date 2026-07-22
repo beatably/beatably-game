@@ -57,6 +57,7 @@ credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was re
 
 - **Real-time**: Socket.io WebSockets; game state persisted to `cache/state.json` every 250ms
 - **Production disk**: Render persistent disk mounts at `/var/data/cache/` (not `cache/`)
+- **Game modes** (`settings.gameMode`): `multiplayer` (default) and `solo` (single-player survival streak — web + iOS, added July 2026 / v1.1). Solo: server builds a fixed easy→hard deck (`sortForProgression` in `backend/index.js`), run ends on first miss, score = correct placements, recorded to a global leaderboard (`backend/soloScores.js`). See memory `solo_mode.md`.
 - **Game phases**: `setup → player-turn → song-guess → challenge-window → challenge → challenge-resolved → reveal → game-over`
 - **Audio**: 30s Apple Music preview clips only (Full Play/Spotify Premium removed July 2026); Spotify is admin-side sourcing only
 - **Song DB genres**: includes `'soundtrack'` (TV/movie themes) — gameplay integration not yet wired up
@@ -67,6 +68,9 @@ credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was re
 
 - **Timeline is tap-based** (`components/timeline/Timeline.jsx`); `react-dnd` and the old `CurvedTimeline.jsx` were removed in the July 2026 web↔iOS parity pass. The iOS app (`ios/Beatably/Components/TimelineView.swift`) is the visual source of truth.
 - **Full Play removed (July 2026)**: the Spotify Premium web-playback subsystem (Web Playback SDK, `/me/player` control, device discovery, OAuth `/login`+`/callback`) was deleted. Preview playback is the only audio mode; `PreviewModeContext.isPreviewMode` is always true. Don't reintroduce Spotify user-auth.
+- **QR / link join (v1.1)**: lobbies show a QR code for `<origin>/join/<CODE>` (web: `qrcode.react` in `WaitingRoom.jsx`; iOS: `QRCodeView.swift` → `play.beatably.app/join/<code>`). Web `App.jsx` parses `/join/CODE` and `?join=CODE` on load into `pendingJoinCode`, suppresses auto-rejoin, and cleans the URL. The `/*`→`index.html` SPA fallback in `netlify.toml` serves this — but join links **must** use `play.beatably.app`, since the apex `beatably.app/*` rule 301s everything to the marketing home.
+- **Solo entry is landing-only**: solo is created from the landing screen (`handleCreateSolo` / iOS `createSolo`) which auto-starts and skips the waiting room. The old WaitingRoom solo toggle was removed; backend `join_lobby`/`update_settings` solo guards remain as defense.
+- **Mobile-Safari rendering**: don't use CSS `filter: blur()` on SVG children or inside `contain: paint` — WebKit drops it. Use SVG `feGaussianBlur` / radial-gradient glows (see `TimelinePath.jsx`, `SpaceBackground.jsx`). Verify with Playwright webkit.
 - **Unused packages**: `@radix-ui/react-slider`, `@radix-ui/react-switch`, `lucide-react`
 
 ---

@@ -33,9 +33,6 @@ struct LandingView: View {
                         .scaledToFit()
                         .frame(height: 56)
                         .foregroundStyle(.white)
-                        .shadow(color: Color.beatPurple.opacity(0.9), radius: 8)
-                        .shadow(color: Color.beatPurple.opacity(0.5), radius: 20)
-                        .shadow(color: Color.beatPurple.opacity(0.2), radius: 40)
 
                     HStack(spacing: 6) {
                         Circle()
@@ -77,26 +74,37 @@ struct LandingView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { nameFocused = true }
 
-                    // Create + Join appear side by side once a name is entered
+                    // Three game modes appear once a name is entered.
                     if !nameIsEmpty {
-                        HStack(spacing: 12) {
+                        VStack(spacing: 12) {
                             Button {
                                 let trimmed = name.trimmingCharacters(in: .whitespaces)
                                 guard !trimmed.isEmpty else { return }
                                 SoundManager.shared.impact(.medium)
                                 vm.createLobby(name: trimmed)
                             } label: {
-                                BeatPrimaryLabel(title: "Create Game")
+                                BeatPrimaryLabel(title: "Create multiplayer game")
                             }
                             .buttonStyle(PressScaleStyle(haptic: .medium))
                             .accessibilityIdentifier("landing.createGameButton")
+
+                            Button {
+                                let trimmed = name.trimmingCharacters(in: .whitespaces)
+                                guard !trimmed.isEmpty else { return }
+                                SoundManager.shared.impact(.medium)
+                                vm.createSolo(name: trimmed)
+                            } label: {
+                                BeatSecondaryLabel(title: "Play solo")
+                            }
+                            .buttonStyle(PressScaleStyle(haptic: .medium))
+                            .accessibilityIdentifier("landing.soloGameButton")
 
                             Button {
                                 SoundManager.shared.impact(.light)
                                 joinSheetNeedsName = nameIsEmpty
                                 showJoin = true
                             } label: {
-                                BeatSecondaryLabel(title: "Join Game")
+                                BeatSecondaryLabel(title: "Join a game")
                             }
                             .buttonStyle(PressScaleStyle(haptic: .light))
                             .accessibilityIdentifier("landing.joinGameButton")
@@ -106,18 +114,35 @@ struct LandingView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
 
-                    // How to play button
-                    Button {
-                        showHowToPlay = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "questionmark.circle")
-                            Text("What is Beatably and how to play?")
+                    // Secondary actions — compact, one row
+                    HStack(spacing: 24) {
+                        Button {
+                            showHowToPlay = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "questionmark.circle")
+                                Text("About the game")
+                            }
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(Color.beatMuted)
                         }
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(Color.beatMuted)
+                        .buttonStyle(.plain)
+
+                        ShareLink(
+                            item: URL(string: "https://beatably.app")!,
+                            subject: Text("Beatably"),
+                            message: Text("Play Beatably — the music timeline party game!")
+                        ) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("Share")
+                            }
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(Color.beatMuted)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("landing.shareButton")
                     }
-                    .buttonStyle(.plain)
                     .padding(.top, 12)
                 }
                 .animation(.easeInOut(duration: 0.25), value: nameIsEmpty)

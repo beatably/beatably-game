@@ -36,7 +36,8 @@ function GameFooter({
   pendingDropIndex,
   onConfirmDrop,
   onCancelDrop,
-  placeCardError
+  placeCardError,
+  isSolo
 }) {
   // Preview Mode context
   const {
@@ -136,17 +137,27 @@ function GameFooter({
   React.useEffect(() => {
     if (currentCard?.id && currentCard.id !== lastCardIdRef.current) {
       console.log('[GameFooter] New song detected:', currentCard.title);
+      const isFirstSong = lastCardIdRef.current == null;
       lastCardIdRef.current = currentCard.id;
 
       // Reset hasPlayedOnce for new song
       setHasPlayedOnce(false);
 
-      // Show "new song loaded" message for creator only
       if (isCreator) {
-        setShowNewSongMessage(true);
+        const previewUrl = currentCard?.previewUrl || currentCard?.preview_url;
+        // Solo: auto-play each new song when advancing to the next round. The
+        // first song stays manual so the initial user gesture unlocks audio
+        // (iOS blocks programmatic playback before that); afterwards autoplay
+        // works. Fall back to the "press play" prompt if it's blocked.
+        if (isSolo && usingPreviewMode && !isFirstSong && previewUrl) {
+          setShowNewSongMessage(false);
+          Promise.resolve(playPreview(previewUrl)).catch(() => setShowNewSongMessage(true));
+        } else {
+          setShowNewSongMessage(true);
+        }
       }
     }
-  }, [currentCard?.id, isCreator]);
+  }, [currentCard?.id, isCreator, isSolo, usingPreviewMode]);
 
   // Reset progress when new song starts (when currentCard changes)
   React.useEffect(() => {
@@ -416,8 +427,8 @@ function GameFooter({
         <div className="text-foreground font-semibold mb-4">Other players can now challenge.</div>
         {!isMyTurn && myPlayer && myPlayer.tokens > 0 && !hasResponded ? (
           <div className="flex gap-3 justify-center">
-            <SheetButton onClick={onSkipChallenge}>Pass</SheetButton>
-            <SheetButton variant="primary" onClick={onInitiateChallenge}>Challenge · 1 credit</SheetButton>
+            <SheetButton onClick={onInitiateChallenge}>Challenge · 1 credit</SheetButton>
+            <SheetButton variant="primary" onClick={onSkipChallenge}>Pass</SheetButton>
           </div>
         ) : !isMyTurn && myPlayer && myPlayer.tokens === 0 && !hasResponded ? (
           <div className="flex flex-col items-center gap-3">
@@ -752,6 +763,8 @@ function GameFooter({
                 (myPlayerId === currentPlayerId ?
                   "Yay, your answer is correct!" :
                   `${currentPlayer?.name || 'The player'} was correct!`
+                ) : isSolo ? (
+                  "Wrong answer — your streak ends here!"
                 ) :
                 (myPlayerId === currentPlayerId ?
                   "Wrong answer!" :
@@ -765,7 +778,7 @@ function GameFooter({
             {/* Continue button - only creator can click */}
             {isCreator ? (
               <SheetButton variant="primary" onClick={handleContinueClick}>
-                Continue to Next Turn
+                {isSolo && !feedback.correct ? "See Your Score" : "Continue to Next Turn"}
               </SheetButton>
             ) : (
               <div className="mt-3 px-6 py-2 text-white rounded">

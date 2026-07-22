@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import GameSettings from "./GameSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,7 +107,7 @@ function WaitingRoom({
       <div className="w-full max-w-sm space-y-6 my-auto py-8">
         {/* Header */}
         <div className="text-center">
-          <h2 className="text-5xl font-bold chewy-regular text-foreground mb-2">Waiting Room</h2>
+          <h2 className="text-4xl sm:text-5xl font-bold chewy-regular text-foreground mb-2 whitespace-nowrap">Waiting Room</h2>
         </div>
 
         {/* Combined Game Code and Players Card */}
@@ -115,10 +116,19 @@ function WaitingRoom({
             {/* Game Code Section */}
             <div className="text-center mb-6">
               <div className="text-sm text-muted-foreground mb-2">Game Code</div>
-              <div className="text-4xl font-bold text-foreground tracking-wider select-all mb-2">
+              <div className="text-4xl font-bold text-foreground tracking-wider select-all mb-3">
                 {code}
               </div>
-              <div className="text-xs text-muted-foreground">Share this code with friends</div>
+              <div className="inline-block bg-white p-3 rounded-xl mb-2">
+                <QRCodeSVG
+                  value={`${window.location.origin}/join/${code}`}
+                  size={112}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#0C0A1A"
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">Scan to join, or share this code with friends</div>
             </div>
             
             {/* Players Section */}
@@ -165,10 +175,14 @@ function WaitingRoom({
                 ))}
               </div>
             </div>
-            {isCreator && !canStart && (
+            {isCreator && !enoughPlayers && (
+              <div className="mt-4 text-sm text-muted-foreground text-center">
+                Need at least 2 players to start
+              </div>
+            )}
+            {isCreator && !canStart && tooManyPlayers && (
               <div className="mt-4 text-sm text-foreground text-center">
-                {!enoughPlayers && "Need at least 2 players to start"}
-                {tooManyPlayers && "Maximum 4 players allowed"}
+                Maximum 4 players allowed
               </div>
             )}
             {!isCreator && (guestSeesLoading || isLoadingExternally || loadingStage > 0) && (

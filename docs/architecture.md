@@ -47,9 +47,16 @@ A turn-based multiplayer music game. Players take turns placing songs on their p
 
 | View | Component | Description |
 |---|---|---|
-| `landing` | `Landing.jsx` | Spotify OAuth login, create/join game |
-| `waiting` | `WaitingRoom.jsx` | Pre-game lobby, player list, settings |
+| `landing` | `Landing.jsx` | Enter name → create multiplayer / play solo / join a game (QR + link join supported) |
+| `waiting` | `WaitingRoom.jsx` | Pre-game lobby, player list, settings, join QR code |
 | `game` | (inline in App.jsx) | Active game: timeline, footer controls, header |
+
+### Game Modes
+
+`settings.gameMode` is `multiplayer` (default) or `solo`.
+
+- **Multiplayer**: 2+ players, turn-based, first to the target timeline size wins.
+- **Solo** (single-player survival streak, added v1.1): created from the landing screen (auto-starts, skips the waiting room). The server builds a fixed easy→hard deck (`sortForProgression` in `backend/index.js`) so runs are leaderboard-comparable; the run ends on the first wrong placement (or deck exhaustion), score = correct placements, recorded to a global leaderboard (`backend/soloScores.js`). No challenges in solo; the challenge window is short-circuited via `enterRevealPhase`.
 
 ### Game Phases
 
@@ -249,6 +256,10 @@ The database was built from Billboard Hot 100 history + genre-based Spotify sear
   `GET /api/admin/enrich-apple-music/report`; config check at `GET /api/admin/apple-music-status`.
 - `POST /api/curated/select` — Select songs for a session
 - `POST /api/fetch-songs` — Fetch songs with filters (year, genre, difficulty)
+
+**Solo leaderboard** (v1.1)
+- `GET /api/solo-scores` — public global top 10 (name/score/date only)
+- `GET /api/admin/solo-scores` — full board (admin); `DELETE /api/admin/solo-scores` — reset (admin)
 
 **Devices**
 - `GET /api/local-devices` — Discover Spotify Connect devices on LAN

@@ -120,18 +120,15 @@ function SongGuessModal({ isOpen, onClose, onGuessSong, onSkipSongGuess }) {
             >
               Skip
             </button>
-            <button
-              type="submit"
-              disabled={!songTitle.trim() || !songArtist.trim()}
-              className={`flex-1 h-12 px-4 font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline rounded-md ${
-                songTitle.trim() && songArtist.trim()
-                  ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                  : 'bg-input text-muted-foreground cursor-not-allowed'
-              }`}
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              Submit Guess
-            </button>
+            {songTitle.trim() && songArtist.trim() && (
+              <button
+                type="submit"
+                className="flex-1 h-12 px-4 font-semibold touch-button whitespace-nowrap flex items-center justify-center gap-2 setting-button no-focus-outline rounded-md bg-primary hover:bg-primary/90 text-primary-foreground"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                Submit Guess
+              </button>
+            )}
           </div>
         </form>
       </div>
