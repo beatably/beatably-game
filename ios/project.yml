@@ -49,14 +49,20 @@ targets:
         # by the "Set build number from git" phase below.
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
-    postCompileScripts:
+    # Runs as a PRE-BUILD phase so it stamps the SOURCE Info.plist before Xcode's
+    # ProcessInfoPlistFile step copies it into the product. Editing the built
+    # product plist (post-compile/post-build) was unreliable: incremental builds
+    # re-ran ProcessInfoPlistFile afterwards and reset CFBundleVersion to "1".
+    # Info.plist is git-ignored (generated from project.yml by xcodegen), so this
+    # stamp never dirties the working tree.
+    preBuildScripts:
       - name: "Set build number from git"
         basedOnDependencyAnalysis: false
         script: |
           # Auto-stamp CFBundleVersion with the git commit count so every upload
           # gets a unique, strictly-increasing build number with no manual bumping.
           build_number=$(git -C "$SRCROOT" rev-list --count HEAD 2>/dev/null || echo 0)
-          plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          plist="${SRCROOT}/${INFOPLIST_FILE}"
           if [ "$build_number" -gt 0 ] && [ -f "$plist" ]; then
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build_number" "$plist"
             echo "Set CFBundleVersion to $build_number"
