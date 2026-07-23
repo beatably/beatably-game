@@ -17,6 +17,11 @@ targets:
     info:
       path: Beatably/Info.plist
       properties:
+        # Drive the user-facing version from MARKETING_VERSION (below) so a single
+        # bump there updates the About screen. Without this, xcodegen defaults
+        # CFBundleShortVersionString to "1.0". (CFBundleVersion is stamped from the
+        # git commit count at build time by the post-compile script.)
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
