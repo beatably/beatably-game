@@ -62,7 +62,7 @@ transient and not broadcast publicly, so this is not "user-generated content" in
 
 ## Version info
 - Version: `1.1` — set via `MARKETING_VERSION` in `project.yml`; bump manually per public release.
-- Build: auto-stamped from the git commit count at build time (will be `276`+ after this release's commit); no manual bumping.
+- Build: auto-stamped from the git commit count at build time (`277`+ as of the 1.1 release commits); no manual bumping.
 - "What's New" (1.1):
 ```
 Solo mode is here! Play on your own in a survival-streak run — keep placing songs correctly for as long as you can and climb the global leaderboard.
