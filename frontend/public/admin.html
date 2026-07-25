@@ -841,7 +841,57 @@
         </div>
       </div>
 
+      <!-- Website Visits -->
+      <div class="row" style="margin:4px 0 8px;"><strong style="font-size:15px;">Website Visits</strong></div>
+      <div class="grid">
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Total Views</div>
+          <div id="webTotalViews" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Unique Visitors</div>
+          <div id="webUniqueVisitors" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Landing Views</div>
+          <div id="webLandingViews" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Game Views</div>
+          <div id="webGameViews" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+      </div>
+
+      <!-- Conversion funnel -->
+      <div class="grid">
+        <div class="card col-12">
+          <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:12px;">Conversion Funnel (unique)</div>
+          <div id="webFunnel" style="display:flex; align-items:stretch; gap:8px; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <!-- Visits over time + breakdown tables -->
+      <div class="grid">
+        <div class="card col-12">
+          <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:8px;">Views Over Time</div>
+          <canvas id="webViewsChart" height="80"></canvas>
+        </div>
+        <div class="card col-4">
+          <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:8px;">Top Referrers</div>
+          <table><tbody id="webReferrersTbody"><tr><td class="muted">No data</td></tr></tbody></table>
+        </div>
+        <div class="card col-4">
+          <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:8px;">Top Pages</div>
+          <table><tbody id="webPagesTbody"><tr><td class="muted">No data</td></tr></tbody></table>
+        </div>
+        <div class="card col-4">
+          <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:8px;">Top UTM Sources</div>
+          <table><tbody id="webUtmTbody"><tr><td class="muted">No data</td></tr></tbody></table>
+        </div>
+      </div>
+
       <!-- Overview Cards -->
+      <div class="row" style="margin:12px 0 8px;"><strong style="font-size:15px;">Game Sessions</strong></div>
       <div class="grid">
         <div class="card col-3">
           <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Total Games</div>
@@ -3132,7 +3182,87 @@
       }
     }
 
+    // --- Website Visits ---
+    function escapeText(s) {
+      return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+
+    function renderFunnel(funnel) {
+      const el = document.getElementById('webFunnel');
+      if (!el) return;
+      const palette = ['#1f6feb', '#2ea043', '#d29922', '#a371f7'];
+      const steps = [
+        { label: 'Landing visitors', value: funnel.landingVisitors || 0 },
+        { label: 'Game-page visitors', value: funnel.gameVisitors || 0 },
+        { label: 'Games started', value: funnel.gamesStarted || 0 },
+        { label: 'Games completed', value: funnel.gamesCompleted || 0 },
+      ];
+      let html = '';
+      steps.forEach((s, i) => {
+        if (i > 0) {
+          const prev = steps[i - 1].value;
+          const pct = prev > 0 ? Math.round((s.value / prev) * 100) : 0;
+          html += `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:52px; color:#8b949e; font-size:12px;"><div style="font-size:16px;">&rarr;</div><div>${pct}%</div></div>`;
+        }
+        html += `<div style="flex:1; min-width:120px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px;"><div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#8b949e; font-weight:600;">${s.label}</div><div style="font-size:24px; font-weight:600; color:${palette[i]};">${s.value.toLocaleString()}</div></div>`;
+      });
+      el.innerHTML = html;
+    }
+
+    function renderStatTable(tbodyId, entries) {
+      const tb = document.getElementById(tbodyId);
+      if (!tb) return;
+      if (!entries || entries.length === 0) {
+        tb.innerHTML = '<tr><td class="muted">No data</td></tr>';
+        return;
+      }
+      tb.innerHTML = entries.map(([k, v]) =>
+        `<tr><td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeText(k)}</td><td class="num">${(v || 0).toLocaleString()}</td></tr>`
+      ).join('');
+    }
+
+    function renderWebViewsChart(rawData) {
+      const labels = rawData.map(([d]) => d);
+      const values = rawData.map(([, c]) => c);
+      upsertChart('webViewsChart', {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Views per day',
+            data: values,
+            borderColor: '#a371f7',
+            backgroundColor: 'rgba(163, 113, 247, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: values.length > 60 ? 0 : 3,
+          }]
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    async function loadWebsiteStats() {
+      try {
+        const params = buildUsageDateParams();
+        const data = await adminFetch('/api/admin/website-stats' + params);
+        document.getElementById('webTotalViews').textContent = (data.overview?.totalViews || 0).toLocaleString();
+        document.getElementById('webUniqueVisitors').textContent = (data.overview?.uniqueVisitors || 0).toLocaleString();
+        document.getElementById('webLandingViews').textContent = (data.overview?.landingViews || 0).toLocaleString();
+        document.getElementById('webGameViews').textContent = (data.overview?.gameViews || 0).toLocaleString();
+        renderFunnel(data.funnel || {});
+        renderWebViewsChart(data.timeSeries?.viewsOverTime || []);
+        renderStatTable('webReferrersTbody', data.referrers);
+        renderStatTable('webPagesTbody', data.topPages);
+        renderStatTable('webUtmTbody', data.utmSources);
+      } catch (e) {
+        console.warn('Website stats failed:', e.message);
+      }
+    }
+
     async function loadUsageAnalytics() {
+      // Website visits load in parallel; additive to the game-session stats below.
+      loadWebsiteStats();
       try {
         const params = buildUsageDateParams();
         const data = await adminFetch('/api/admin/usage-stats' + params);

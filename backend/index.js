@@ -6091,6 +6091,26 @@ app.get('/api/admin/usage-stats', requireAdmin, (req, res) => {
   }
 });
 
+// Website visit statistics (pageviews + conversion funnel)
+app.get('/api/admin/website-stats', requireAdmin, (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    const pv = analytics.getPageviewStats({ dateFrom, dateTo });
+    const game = analytics.getStats({ dateFrom, dateTo });
+    // Funnel: unique landing visitors → unique game-page visitors → games started → completed.
+    const funnel = {
+      landingVisitors: pv.overview.landingUniques,
+      gameVisitors: pv.overview.gameUniques,
+      gamesStarted: game.overview.totalGames,
+      gamesCompleted: game.overview.completedGames,
+    };
+    res.json({ ok: true, ...pv, funnel });
+  } catch (e) {
+    console.error('[Admin] Website stats failed:', e?.message, e?.stack);
+    res.status(500).json({ ok: false, error: e?.message || 'Website stats failed' });
+  }
+});
+
 // Debug endpoint to test analytics recording
 app.post('/api/admin/test-analytics', requireAdmin, (req, res) => {
   try {
@@ -6170,6 +6190,27 @@ app.delete('/api/admin/analytics-data', requireAdmin, (req, res) => {
     console.error('[Admin] Clear analytics failed:', e?.message);
     res.status(500).json({ ok: false, error: e?.message || 'Clear failed' });
   }
+});
+
+// Public: record a website pageview (fired once on load by the landing + game
+// frontends). Fire-and-forget: always 204 so the beacon never surfaces errors.
+app.post('/api/track', publicRateLimit, (req, res) => {
+  try {
+    const b = req.body || {};
+    analytics.recordPageview({
+      site: b.site,
+      path: b.path,
+      referrer: b.referrer,
+      visitorId: b.visitorId,
+      utmSource: b.utmSource,
+      utmMedium: b.utmMedium,
+      utmCampaign: b.utmCampaign,
+      userAgent: req.get('user-agent'),
+    });
+  } catch (e) {
+    // Never let tracking failures affect the client.
+  }
+  res.status(204).end();
 });
 
 // --- Feedback Endpoints ---
