@@ -514,7 +514,8 @@ const [, setChallengeResponseGiven] = useState(false);
   useEffect(() => {
     if (!socketRef.current) {
       console.log("[Socket] Connecting to backend...");
-      socketRef.current = io(SOCKET_URL);
+      // client=web lets the backend record per-game platform mix (ios vs web)
+      socketRef.current = io(SOCKET_URL, { query: { client: 'web' } });
       socketRef.current.on("connect", () => {
         console.log("[Socket] Connected, id:", socketRef.current.id);
         setPlayerId(socketRef.current.id);

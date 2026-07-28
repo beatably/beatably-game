@@ -3040,8 +3040,27 @@ function sortForProgression(tracks) {
   return levels.flatMap((lvl) => shuffleInPlace(buckets.get(lvl)));
 }
 
+// Which client a socket is running: the app sends ?client=ios / ?client=web in
+// the handshake. Older builds (already in the wild) send nothing, so fall back to
+// the handshake user-agent — the iOS socket client goes through CFNetwork/Darwin,
+// browsers send a Mozilla-prefixed UA.
+function detectClient(socket) {
+  const q = socket.handshake?.query?.client;
+  if (q === 'ios' || q === 'web') return q;
+  const ua = socket.handshake?.headers?.['user-agent'] || '';
+  if (/CFNetwork|Darwin/i.test(ua)) return 'ios';
+  if (/Mozilla/i.test(ua)) return 'web';
+  return 'unknown';
+}
+
+// Client of the socket a player is currently on ('unknown' if they're offline).
+function clientForPlayer(player) {
+  return io.sockets.sockets.get(player?.id)?.data?.client || 'unknown';
+}
+
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  socket.data.client = detectClient(socket);
+  console.log('A user connected:', socket.id, 'client:', socket.data.client);
 
   // Socket.io does not catch exceptions thrown by event handlers: a single
   // throwing/rejecting handler would take down the process (and every game).
@@ -3801,6 +3820,7 @@ const lobby = lobbies[code];
       roomCode: code,
       playerCount: lobby.players.length,
       playerNames: lobby.players.map(p => p.name),
+      playerClients: lobby.players.map(clientForPlayer),
       difficulty: lobby.settings?.difficulty || 'normal',
       musicMode: musicMode,
       winCondition: winCondition,

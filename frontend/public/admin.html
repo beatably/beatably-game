@@ -838,6 +838,7 @@
           <span class="chip preset-btn" id="range90" onclick="setUsageRange('90')">Last 90 days</span>
           <span class="chip preset-btn" id="range30" onclick="setUsageRange('30')">Last 30 days</span>
           <span class="chip preset-btn" id="range7" onclick="setUsageRange('7')">Last 7 days</span>
+          <span class="chip preset-btn" id="range1" onclick="setUsageRange('1')">Last 24h</span>
         </div>
       </div>
 
@@ -943,8 +944,9 @@
         <div class="card col-4"><canvas id="playerCountChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="difficultyDistChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="musicModeChart" height="200"></canvas></div>
-        <div class="card col-6"><canvas id="errorTypesChart" height="200"></canvas></div>
-        <div class="card col-6"><canvas id="winConditionChart" height="200"></canvas></div>
+        <div class="card col-4"><canvas id="clientMixChart" height="200"></canvas></div>
+        <div class="card col-4"><canvas id="errorTypesChart" height="200"></canvas></div>
+        <div class="card col-4"><canvas id="winConditionChart" height="200"></canvas></div>
       </div>
 
       <!-- Recent Sessions Table -->
@@ -967,6 +969,7 @@
                 <th>Duration</th>
                 <th class="num">Players</th>
                 <th>Player Names</th>
+                <th>Clients</th>
                 <th class="num">Rounds</th>
                 <th class="num">Win At</th>
                 <th>Winner</th>
@@ -976,7 +979,7 @@
               </tr>
             </thead>
             <tbody id="sessionsTbody">
-              <tr><td colspan="11" class="muted">No data</td></tr>
+              <tr><td colspan="12" class="muted">No data</td></tr>
             </tbody>
           </table>
         </div>
@@ -3049,7 +3052,7 @@
       usageState.rangeDays = range === 'all' ? null : Number(range);
       usageState.sessionsPage = 0;
       // Update active chip
-      ['rangeAll', 'range90', 'range30', 'range7'].forEach(id => {
+      ['rangeAll', 'range90', 'range30', 'range7', 'range1'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.toggle('active', id === 'range' + (range === 'all' ? 'All' : range));
       });
@@ -3063,10 +3066,16 @@
       renderGamesOverTimeChart(usageState.rawGamesOverTime);
     }
 
+    // Exact timestamp (not date-truncated) so short ranges like "Last 24h" mean
+    // the last 24 hours rather than "since the start of yesterday".
+    function usageDateFrom() {
+      if (!usageState.rangeDays) return null;
+      return new Date(Date.now() - usageState.rangeDays * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     function buildUsageDateParams() {
-      if (!usageState.rangeDays) return '';
-      const from = new Date(Date.now() - usageState.rangeDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      return `?dateFrom=${from}`;
+      const from = usageDateFrom();
+      return from ? `?dateFrom=${encodeURIComponent(from)}` : '';
     }
 
     function formatDuration(secs) {
@@ -3322,6 +3331,31 @@
           options: { plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Music Mode', color: '#8b949e' } } }
         });
 
+        // Client mix per game (ios / web / mixed), labelled with player counts
+        const clientMixes = data.distributions?.clientMix || {};
+        const playerClients = data.distributions?.playerClient || {};
+        const mixEntries = Object.entries(clientMixes);
+        upsertChart('clientMixChart', {
+          type: 'doughnut',
+          data: {
+            labels: mixEntries.map(([k]) => k),
+            datasets: [{ data: mixEntries.map(([, v]) => v), backgroundColor: palette }]
+          },
+          options: {
+            plugins: {
+              legend: { position: 'bottom' },
+              title: {
+                display: true,
+                color: '#8b949e',
+                text: [
+                  'Client (per game)',
+                  `players: ${Object.entries(playerClients).map(([k, v]) => `${clientLabel(k)} ${v}`).join(' · ') || '—'}`
+                ]
+              }
+            }
+          }
+        });
+
         // Error types
         const errorTypes = data.distributions?.errorTypes || {};
         upsertChart('errorTypesChart', {
@@ -3360,10 +3394,30 @@
       }
     }
 
+    const CLIENT_LABELS = { ios: 'iOS', web: 'Web' };
+
+    function clientLabel(c) {
+      return CLIENT_LABELS[c] || '?';
+    }
+
+    // "Anna (iOS), Bo (Web)" — per-player client, index-aligned with playerNames.
+    // Sessions recorded before client tracking have no playerClients, so fall
+    // back to plain names.
+    function formatSessionPlayers(session) {
+      const names = session.playerNames || [];
+      const clients = session.playerClients || [];
+      if (!clients.length) return escapeText(names.join(', '));
+      return names
+        .map((n, i) => `${escapeText(n)} <span class="muted">(${clientLabel(clients[i])})</span>`)
+        .join(', ');
+    }
+
     async function loadGameSessions() {
       try {
         const offset = usageState.sessionsPage * usageState.sessionsPerPage;
-        const data = await adminFetch(`/api/admin/game-sessions?limit=${usageState.sessionsPerPage}&offset=${offset}`);
+        const from = usageDateFrom();
+        const dateParam = from ? `&dateFrom=${encodeURIComponent(from)}` : '';
+        const data = await adminFetch(`/api/admin/game-sessions?limit=${usageState.sessionsPerPage}&offset=${offset}${dateParam}`);
         usageState.sessionsTotal = data.total || 0;
 
         const tbody = document.getElementById('sessionsTbody');
@@ -3385,7 +3439,7 @@
         tbody.innerHTML = '';
 
         if (!data.items || !data.items.length) {
-          tbody.innerHTML = '<tr><td colspan="11" class="muted">No sessions yet</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="12" class="muted">No sessions yet</td></tr>';
           return;
         }
 
@@ -3396,7 +3450,8 @@
             <td class="nowrap">${new Date(session.startTime).toLocaleString()}</td>
             <td>${formatDuration(session.duration)}</td>
             <td class="num">${session.playerCount || 0}</td>
-            <td>${(session.playerNames || []).join(', ')}</td>
+            <td>${formatSessionPlayers(session)}</td>
+            <td><span class="pill">${session.clientMix || 'unknown'}</span></td>
             <td class="num">${session.totalRounds || 0}</td>
             <td class="num">${session.winCondition || '-'}</td>
             <td>${session.winnerName || '-'}</td>
@@ -3460,13 +3515,15 @@
         const data = await adminFetch('/api/admin/game-sessions?limit=500');
         const sessions = data.items || [];
 
-        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Rounds', 'Win Condition', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
+        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Player Clients', 'Client Mix', 'Rounds', 'Win Condition', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
         const rows = sessions.map(s => [
           s.roomCode || '',
           s.startTime || '',
           s.duration || '',
           s.playerCount || '',
           (s.playerNames || []).join(';'),
+          (s.playerClients || []).join(';'),
+          s.clientMix || '',
           s.totalRounds || '',
           s.winCondition || '',
           s.winnerName || '',

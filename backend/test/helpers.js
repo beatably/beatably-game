@@ -67,11 +67,12 @@ function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function connect() {
+function connect(query) {
   return io(BASE_URL, {
     transports: ['websocket'],
     forceNew: true,
     reconnection: false,
+    ...(query ? { query } : {}),
   });
 }
 

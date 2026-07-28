@@ -535,6 +535,9 @@ class GameViewModel {
         manager = SocketManager(
             socketURL: URL(string: Config.backendURL)!,
             config: [
+                // Tell the backend which client this is, so analytics can report
+                // per-game platform mix (see detectClient in backend/index.js).
+                .connectParams(["client": "ios"]),
                 // Deterministic auto-reconnect: keep retrying with a bounded backoff
                 // so a dropped/ backgrounded socket comes back on its own.
                 .log(Config.socketLogging),

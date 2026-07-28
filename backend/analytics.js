@@ -9,6 +9,11 @@ const path = require('path');
 
 // Use persistent disk in production if available, otherwise fall back to deployed cache
 function getCacheDir() {
+  // Explicit override (used by tests to isolate state from the dev cache).
+  if (process.env.BEATABLY_CACHE_DIR) {
+    console.log('[Analytics] Using BEATABLY_CACHE_DIR:', process.env.BEATABLY_CACHE_DIR);
+    return process.env.BEATABLY_CACHE_DIR;
+  }
   if (process.env.NODE_ENV === 'production') {
     const persistentPath = '/var/data/cache';
     const deployedPath = path.join(__dirname, 'cache');
@@ -188,12 +193,27 @@ function schedulePageviewsSave() {
   if (_pvSaveTimer.unref) _pvSaveTimer.unref();
 }
 
+const CLIENTS = ['ios', 'web'];
+
+// Summarise the per-player clients of one game: 'ios', 'web', 'mixed' (both) or
+// 'unknown' (nothing identifiable). Lets the dashboard chart games by platform.
+function summarizeClientMix(playerClients) {
+  const known = [...new Set(playerClients.filter(c => CLIENTS.includes(c)))];
+  if (known.length === 0) return 'unknown';
+  if (known.length === 1) return known[0];
+  return 'mixed';
+}
+
 /**
  * Record the start of a game session
  */
-function recordSessionStart({ roomCode, playerCount, playerNames, difficulty, musicMode, winCondition }) {
+function recordSessionStart({ roomCode, playerCount, playerNames, playerClients, difficulty, musicMode, winCondition, gameMode }) {
   loadSessions();
-  
+
+  // Per-player client ('ios' | 'web' | 'unknown'), index-aligned with playerNames
+  const clients = (Array.isArray(playerClients) ? playerClients : [])
+    .map(c => (CLIENTS.includes(c) ? c : 'unknown'));
+
   const session = {
     id: `game_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     roomCode: roomCode || null,
@@ -202,6 +222,9 @@ function recordSessionStart({ roomCode, playerCount, playerNames, difficulty, mu
     duration: null,
     playerCount: Number(playerCount) || 0,
     playerNames: Array.isArray(playerNames) ? playerNames : [],
+    playerClients: clients,
+    clientMix: summarizeClientMix(clients),
+    gameMode: gameMode || 'multiplayer',
     totalRounds: 0,
     winCondition: Number(winCondition) || 10,
     winnerName: null,
@@ -333,6 +356,18 @@ function getStats({ dateFrom, dateTo } = {}) {
     musicModeDist[mode] = (musicModeDist[mode] || 0) + 1;
   });
   
+  // Client distributions: per game (ios/web/mixed) and per participating player
+  const clientMixDist = {};
+  const playerClientDist = {};
+  sessions.forEach(s => {
+    const mix = s.clientMix || 'unknown';
+    clientMixDist[mix] = (clientMixDist[mix] || 0) + 1;
+    (s.playerClients || []).forEach(c => {
+      const client = c || 'unknown';
+      playerClientDist[client] = (playerClientDist[client] || 0) + 1;
+    });
+  });
+
   // Completion rate
   const completionRate = totalGames > 0 ? Math.round((completedGames / totalGames) * 100) : 0;
 
@@ -384,6 +419,8 @@ function getStats({ dateFrom, dateTo } = {}) {
       musicMode: musicModeDist,
       errorTypes: errorTypesDist,
       winCondition: winConditionDist,
+      clientMix: clientMixDist,
+      playerClient: playerClientDist,
     },
     timeSeries: {
       gamesOverTime: Object.entries(gamesOverTime).sort(),
