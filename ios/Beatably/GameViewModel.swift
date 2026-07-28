@@ -137,13 +137,24 @@ class GameViewModel {
     // initial user gesture must unlock audio; iOS blocks autoplay before it).
     @ObservationIgnored var hasAutoPlayedSolo = false
 
-    // Stable timeline layout height. The timeline area shrinks when the footer
-    // grows during reveal; to keep the bottom-anchored board from shifting we
-    // track the MAX observed area height (the player-turn state) here — in the VM
-    // so it survives SwiftUI recreating the timeline view on phase changes.
-    // Reset on leaving so a new session/orientation re-measures.
-    @ObservationIgnored var maxTimelineAreaHeight: CGFloat = 0
-    @ObservationIgnored var timelineAreaWidth: CGFloat = 0
+    // Stable timeline layout anchor. The timeline *area* shrinks when the footer
+    // grows (audio controls + song info arrive over the socket on reveal), so a
+    // running max of the area is racy: on a live game the first frame has the
+    // shortest footer / tallest area and poisons the max, leaving the board
+    // anchored too low until a re-measure. Instead we measure the whole region
+    // BELOW the header (timeline area + footer), which is invariant across phases
+    // and network timing, and reserve a fixed slice for the tallest footer. Kept
+    // in the VM so it survives SwiftUI recreating the timeline view on phase
+    // changes. Reset on leaving so a new session/orientation re-measures.
+    //
+    // NOT @ObservationIgnored: GameView writes these (it measures the region) but
+    // TimelineView reads them, so the reader must observe the writes — otherwise
+    // the timeline keeps its stale first-render (fallback) layout until an
+    // unrelated state change forces a re-render, which looked like the board
+    // "jumping into place" on first interaction. The value is invariant once laid
+    // out, so observing it doesn't churn.
+    var timelineRegionHeight: CGFloat = 0
+    var timelineRegionWidth: CGFloat = 0
 
     // Song guessing
     var showSongGuess = false
@@ -228,6 +239,10 @@ class GameViewModel {
         d.removeObject(forKey: kRoomCode)
         d.removeObject(forKey: kIsCreator)
         d.removeObject(forKey: "beatably_seen_start_hint")
+        // The solo scoreboard compares against this record, so a leftover value flips the
+        // seeded solo-game-over screenshot between "New personal best!" and "RUN OVER"
+        // depending on what ran before.
+        d.removeObject(forKey: "beatably_solo_best")
         d.synchronize()
     }
 
@@ -471,6 +486,25 @@ class GameViewModel {
             gamePhase = "game-over"
         }
 
+        // Mimics a LIVE solo start: on device the timeline + currentCard (and thus
+        // the AudioControls footer row) arrive over the socket AFTER the view first
+        // lays out. That transient — short footer → tall timeline area — used to seed
+        // maxTimelineAreaHeight too tall. Seed with NO card, then deliver it late.
+        func soloLateCard() {
+            isCreator = true
+            gameSettings.gameMode = "solo"
+            let me = "p-solo"; myPersistentId = me; currentPlayerId = me; playerName = "You"
+            gamePlayers = [GamePlayer(id: me, persistentId: me, name: "You", score: 0, credits: 3, correctGuesses: 0)]
+            timeline = [song("solo-0", "Song 0", "Artist 0", 2019, art: artDoves)]
+            currentCard = nil
+            placementResult = nil
+            challengeState = nil
+            gamePhase = "player-turn"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.currentCard = song("solo-new", "Fallin'", "Alicia Keys", 2001, art: artFallin)
+            }
+        }
+
         // Reproduces the real cross-phase flow: seed the timeline height at
         // player-turn (short footer), then flip to the streak-ending reveal (tall
         // footer). Used to verify the timeline does NOT shift on the losing reveal.
@@ -491,6 +525,7 @@ class GameViewModel {
         case "solo-scroll":                  solo(cards: 18)
         case "solo-reveal":                  soloRevealWrong()
         case "solo-lose-transition":         soloLoseTransition()
+        case "solo-late-card":               soloLateCard()
         case "solo-game-over":               soloGameOver()
         case "lobby-creator":                lobbyCreator(); return
         case "observer-preview":             observerPreview()
@@ -953,6 +988,12 @@ class GameViewModel {
             showSongGuess = false
         }
 
+        // Count each finished game once, on the transition into game-over — the
+        // review prompt gate needs to know how much the player has actually played.
+        if phase == "game-over" && gamePhase != "game-over" {
+            ReviewPrompter.recordGamePlayed()
+        }
+
         gamePhase = phase
         currentPlayerId = game["currentPlayerId"] as? String ?? ""
 
@@ -1306,7 +1347,7 @@ class GameViewModel {
         gameWinner = nil; myPersistentId = ""; challengeState = nil
         soloResult = nil; gameSettings.gameMode = "multiplayer"; hasAutoPlayedSolo = false
         soloAwaitingScore = false
-        maxTimelineAreaHeight = 0; timelineAreaWidth = 0
+        timelineRegionHeight = 0; timelineRegionWidth = 0
         showSongGuess = false; songGuessNotification = nil; playerLeftMessage = nil; creditSpendMessage = nil
         lastSongGuess = nil; pendingPlacementIndex = nil
         syncedProgress = 0; syncedDuration = 30; syncedIsPlaying = false

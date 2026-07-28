@@ -196,11 +196,15 @@ struct TimelineView: View {
 
     var body: some View {
         GeometryReader { geo in
-            // Stabilized height for layout math (bottom-anchor). Uses the MAX
-            // observed area height (player-turn state, tallest area) from the VM,
-            // minus a footer reserve, so a shrinking footer never moves the board.
-            let stableH = gameVM.maxTimelineAreaHeight > 0 ? gameVM.maxTimelineAreaHeight : geo.size.height
-            let layoutH = max(stableH - 120, 1)
+            // Deterministic layout height. `timelineRegionHeight` (measured in
+            // GameView = timeline area + footer, below the header) is invariant
+            // across phases and network timing; reserving a fixed slice for the
+            // tallest footer yields a board whose position + scale never change
+            // when the footer resizes. Fall back to the live area before the region
+            // is measured. See the VM comment on `timelineRegionHeight`.
+            let region = gameVM.timelineRegionHeight
+            let stableH = region > 0 ? (region - Self.footerReserve) : geo.size.height
+            let layoutH = max(stableH, 1)
             let layoutSize = CGSize(width: geo.size.width, height: layoutH)
             let layout = TimelineLayout.calculate(
                 cards: displayCards,
@@ -212,12 +216,12 @@ struct TimelineView: View {
                 scrollMode: isSolo
             )
             // `overflows` = the content genuinely exceeds the stable layout height
-            // (a long solo streak), NOT merely the footer-shrunken viewport. Only
-            // then do we scroll. Otherwise the board fills the viewport and is
-            // TOP-aligned so a taller footer (reveal) never re-centers / shifts it
-            // — matching the web (block-flow) behavior.
+            // (a long solo streak). Only then do we scroll. Otherwise the board is
+            // exactly `layoutH` tall and TOP-aligned within the (possibly taller)
+            // area, so a growing footer never re-centers / shifts it — matching the
+            // web (block-flow) behavior.
             let overflows = layout.contentHeight > layoutH + 0.5
-            let boardHeight = overflows ? layout.contentHeight : geo.size.height
+            let boardHeight = overflows ? layout.contentHeight : layoutH
             let boardSize = CGSize(width: geo.size.width, height: boardHeight)
             let board = ZStack {
                 pathLayers(layout: layout, size: boardSize)
@@ -234,8 +238,9 @@ struct TimelineView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
-            .onAppear { recordAreaHeight(geo.size) }
-            .onChange(of: geo.size) { _, s in recordAreaHeight(s) }
+            .onAppear { syncContainerSize() }
+            .onChange(of: region) { _, _ in syncContainerSize() }
+            .onChange(of: geo.size.width) { _, _ in syncContainerSize() }
         }
         .onChange(of: pendingIndex) { old, new in
             if new != nil, old == nil {
@@ -432,20 +437,21 @@ struct TimelineView: View {
 
     // MARK: - Animation trigger
 
-    // Track the MAX timeline-area height in the VM (survives view recreation on
-    // phase changes). The area is tallest at player-turn (shortest footer); when
-    // the footer grows on reveal the area shrinks but the max — and thus the
-    // bottom-anchored board position — stays put. Reset the max on a width change
-    // (rotation); footer growth never changes the width.
-    private func recordAreaHeight(_ size: CGSize) {
-        guard size.height > 0 else { return }
-        if size.width != gameVM.timelineAreaWidth {
-            gameVM.timelineAreaWidth = size.width
-            gameVM.maxTimelineAreaHeight = size.height
-        } else if size.height > gameVM.maxTimelineAreaHeight {
-            gameVM.maxTimelineAreaHeight = size.height
-        }
-        containerSize = CGSize(width: size.width, height: max(gameVM.maxTimelineAreaHeight - 120, 1))
+    // Fixed slice of the below-header region reserved for the footer. Sized to the
+    // TALLEST footer (reveal: song info + album art + audio controls + primary CTA)
+    // so the bottom-anchored board clears it in every phase. Over-reserving only
+    // raises the board slightly during shorter-footer phases (stable, never shifts);
+    // under-reserving would let reveal content overlap the board.
+    static let footerReserve: CGFloat = 300
+
+    // Keep `containerSize` (used by the placement animation) in lockstep with the
+    // layout container the body computes, so the animation's positions agree with
+    // the idle layout. Derived from the stable region height, not the live area.
+    private func syncContainerSize() {
+        let region = gameVM.timelineRegionHeight
+        guard region > 0, gameVM.timelineRegionWidth > 0 else { return }
+        containerSize = CGSize(width: gameVM.timelineRegionWidth,
+                               height: max(region - Self.footerReserve, 1))
     }
 
     private func triggerAnimation() {

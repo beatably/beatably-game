@@ -79,12 +79,15 @@ final class TimelineFilterTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), ["a", "b", "c"])
     }
 
-    func test_songGuess_placedCardHidden() {
-        // song-guess: active player's own pending placement is hidden (they're deciding
-        // whether to guess the song, not viewing a placement to challenge).
+    func test_songGuess_placedCardShown() {
+        // song-guess: the placed card STAYS on the timeline — TimelineView renders it as
+        // the hidden "?" mystery marker (isChallengWindowMarker covers song-guess too), so
+        // everyone can see where it went without the year being revealed. Only the
+        // challenge phase removes the card outright.
         let cards = [song(id: "a"), song(id: "b"), song(id: "c")]
         let result = TimelineView.filterDisplayCards(cards, lastPlacedId: "b", gamePhase: "song-guess")
-        XCTAssertEqual(result.map(\.id), ["a", "c"])
+        XCTAssertEqual(result.map(\.id), ["a", "b", "c"],
+                       "Placed card must remain visible (as a mystery marker) during song-guess")
     }
 
     func test_challengeWindow_placedCardShown() {

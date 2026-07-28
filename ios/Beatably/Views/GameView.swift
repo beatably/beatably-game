@@ -32,35 +32,48 @@ struct GameView: View {
                     .padding(.trailing, 16)
                 }
 
-                // ── Timeline — fills all available space ────────────────────────
-                TimelineSection(onCardTap: { songDetail = $0 })
-                    .frame(maxHeight: .infinity)
-
-                // ── Bottom footer — solid surface for readability ───────────────
-                Divider().overlay(Color.beatBorder.opacity(0.4))
+                // ── Timeline + footer region ────────────────────────────────────
+                // Measured as one block: the timeline area shrinks as the footer
+                // grows across phases, but their SUM (this region, below the header)
+                // is invariant. TimelineView anchors to this stable height + a fixed
+                // footer reserve, so the board never shifts when the footer resizes
+                // and never depends on which frame the socket data lands on.
                 VStack(spacing: 0) {
-                    // Song info — shown once the card is revealed
-                    if let card = vm.currentCard,
-                       vm.gamePhase == "reveal" || vm.gamePhase == "challenge-resolved" {
-                        FooterSongInfo(card: card, revealedYear: vm.placementResult?.year)
-                        Divider().overlay(Color.beatBorder.opacity(0.4))
-                    }
-                    // Playback controls (all phases while a card is active)
-                    if let card = vm.currentCard {
-                        if vm.isCreator && card.previewURL != nil {
-                            AudioControls()
-                        } else if !vm.isCreator {
-                            NonCreatorProgressBar()
+                    // ── Timeline — fills all available space ────────────────────
+                    TimelineSection(onCardTap: { songDetail = $0 })
+                        .frame(maxHeight: .infinity)
+
+                    // ── Bottom footer — solid surface for readability ───────────
+                    Divider().overlay(Color.beatBorder.opacity(0.4))
+                    VStack(spacing: 0) {
+                        // Song info — shown once the card is revealed
+                        if let card = vm.currentCard,
+                           vm.gamePhase == "reveal" || vm.gamePhase == "challenge-resolved" {
+                            FooterSongInfo(card: card, revealedYear: vm.placementResult?.year)
+                            Divider().overlay(Color.beatBorder.opacity(0.4))
                         }
-                        Divider().overlay(Color.beatBorder.opacity(0.4))
+                        // Playback controls (all phases while a card is active)
+                        if let card = vm.currentCard {
+                            if vm.isCreator && card.previewURL != nil {
+                                AudioControls()
+                            } else if !vm.isCreator {
+                                NonCreatorProgressBar()
+                            }
+                            Divider().overlay(Color.beatBorder.opacity(0.4))
+                        }
+                        PhaseActionsFooter()
+                            .frame(minHeight: 110)
                     }
-                    PhaseActionsFooter()
-                        .frame(minHeight: 110)
+                    .animation(.spring(duration: 0.3), value: vm.gamePhase)
+                    // Slightly lighter than beatSurface so the action card stands out from the
+                    // near-black starry timeline area (still below beatSurface2 for nested contrast).
+                    .background(Color(hex: "19162E"))
                 }
-                .animation(.spring(duration: 0.3), value: vm.gamePhase)
-                // Slightly lighter than beatSurface so the action card stands out from the
-                // near-black starry timeline area (still below beatSurface2 for nested contrast).
-                .background(Color(hex: "19162E"))
+                .background(GeometryReader { g in
+                    Color.clear
+                        .onAppear { recordRegion(g.size) }
+                        .onChange(of: g.size) { _, s in recordRegion(s) }
+                })
             }
 
             // ── Full-screen overlays ────────────────────────────────────────────
@@ -198,6 +211,20 @@ struct GameView: View {
         }
         .animation(.spring(duration: 0.35), value: songDetail)
         .animation(.spring(duration: 0.35), value: vm.showSongGuess)
+    }
+
+    // Record the stable below-header region height (timeline area + footer). This
+    // sum is invariant across phases, so a running max is safe: a taller footer
+    // shrinks the area by the same amount it grows, and orientation changes (width)
+    // re-baseline it. TimelineView derives its layout height from this.
+    private func recordRegion(_ size: CGSize) {
+        guard size.height > 0 else { return }
+        if size.width != vm.timelineRegionWidth {
+            vm.timelineRegionWidth = size.width
+            vm.timelineRegionHeight = size.height
+        } else if size.height > vm.timelineRegionHeight {
+            vm.timelineRegionHeight = size.height
+        }
     }
 }
 
@@ -1010,6 +1037,7 @@ private struct ConfettiPieceView: View {
 
 private struct GameOverOverlay: View {
     @Environment(GameViewModel.self) private var vm
+    @Environment(\.requestReview) private var requestReview
     @State private var trophyScale: CGFloat = 0.3
     @State private var trophyRotation: Double = -15
 
@@ -1103,6 +1131,11 @@ private struct GameOverOverlay: View {
             if iWon {
                 SoundManager.shared.play(.win)
                 SoundManager.shared.notification(.success)
+                // Let the trophy, confetti and win sound land before the system
+                // review sheet can cover them.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    ReviewPrompter.requestIfEligible(requestReview, after: .multiplayerWin)
+                }
             } else {
                 SoundManager.shared.play(.lose)
                 SoundManager.shared.impact(.soft)
@@ -1123,6 +1156,7 @@ private struct GameOverOverlay: View {
 private struct SoloScoreboardOverlay: View {
     @Environment(GameViewModel.self) private var vm
     let result: SoloResult
+    @Environment(\.requestReview) private var requestReview
     @AppStorage("beatably_solo_best") private var soloBest: Int = 0
     @State private var isPersonalBest = false
     @State private var prevBest = 0
@@ -1161,6 +1195,13 @@ private struct SoloScoreboardOverlay: View {
             if result.score > soloBest { isPersonalBest = true; soloBest = result.score }
             SoundManager.shared.play(.winner)
             SoundManager.shared.notification(.success)
+            if isPersonalBest {
+                // Delay as in GameOverOverlay: celebrate first, ask second.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    ReviewPrompter.requestIfEligible(requestReview,
+                                                     after: .soloPersonalBest(score: result.score))
+                }
+            }
             withAnimation(.spring(duration: 0.6, bounce: 0.4)) { trophyScale = 1; trophyRotation = 5 }
             withAnimation(.easeInOut(duration: 0.8).delay(0.5).repeatForever(autoreverses: true)) { trophyRotation = -5 }
         }
