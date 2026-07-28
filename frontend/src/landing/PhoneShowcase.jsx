@@ -21,7 +21,18 @@ function Phone({ src, alt, priority = false, className = '', style, ...rest }) {
             : '0 18px 44px rgba(0,0,0,0.5)',
         }}
       >
-        <img src={src} alt={alt} loading="lazy" className="block w-full" style={{ borderRadius: 32 }} />
+        {/* Intrinsic size = the screenshots' real pixels, so the aspect ratio
+            reserves height before these lazy images load. Without it the
+            section grew ~500px mid-scroll, shifting every ScrollTrigger. */}
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          width={620}
+          height={1341}
+          className="block w-full h-auto"
+          style={{ borderRadius: 32 }}
+        />
       </div>
     </div>
   );

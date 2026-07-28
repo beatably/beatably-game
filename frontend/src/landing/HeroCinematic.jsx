@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import beatablyLogo from '@/assets/beatably_logo.png';
-import CtaButtons, { PLAY_URL } from './CtaButtons';
+import CtaButtons from './CtaButtons';
 import { gsap, prefersReducedMotion } from './fx';
 
 // Fullscreen cinematic hero: the ghost mascot video (the game's own landing
@@ -79,7 +79,7 @@ function HeroCinematic() {
       <div className="absolute inset-y-0 left-0 w-[62%] hidden lg:block bg-gradient-to-r from-[#0C0A1A]/80 via-[#0C0A1A]/30 to-transparent" />
 
       <div className="relative h-full flex flex-col" style={{ zIndex: 2 }}>
-        <header className="max-w-6xl w-full mx-auto px-6 pt-6 flex items-center justify-between">
+        <header className="max-w-6xl w-full mx-auto px-6 pt-6 flex items-center">
           <img
             src={beatablyLogo}
             alt="Beatably"
@@ -88,13 +88,6 @@ function HeroCinematic() {
             height={80}
             data-hero-stagger
           />
-          <a
-            href={PLAY_URL}
-            data-hero-stagger
-            className="text-sm sm:text-base font-bold text-foreground/85 hover:text-foreground transition-colors press-scale"
-          >
-            Play in browser →
-          </a>
         </header>
 
         <div className="flex-1 flex items-end pb-20 sm:pb-24">

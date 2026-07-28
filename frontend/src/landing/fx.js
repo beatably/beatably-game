@@ -5,6 +5,12 @@
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
+// Required by Lenis. Its `html.lenis, html.lenis body { height: auto }` undoes
+// the game's global `html, body { height: 100% }` (index.css) — without it the
+// document box never changes size, so Lenis's content ResizeObserver never
+// fires and the scroll limit stays stuck at whatever the page measured on
+// init, making the last stretch of the page unreachable.
+import 'lenis/dist/lenis.css';
 
 gsap.registerPlugin(ScrollTrigger);
 
