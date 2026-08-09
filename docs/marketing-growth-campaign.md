@@ -6,6 +6,23 @@ Primary markets: Sweden and English-speaking markets
 Primary conversion: a game session starts  
 Secondary conversions: a completed game, a returning player, and an App Store visit/install where measurable
 
+## Execution log
+
+### 2026-08-09 — measurement deployed and Product Hunt activated
+
+- Commit `b8b9d9b` was pushed to `main`; Netlify and Render deployed the campaign-attribution update.
+- Production verification passed:
+  - `https://beatably-backend.onrender.com/healthz` returned `{"ok":true}` after the Render process restarted.
+  - The published landing-page CTA preserved `utm_source`, `utm_medium`, `utm_campaign`, and `utm_content` when moving from `beatably.app` to `play.beatably.app`.
+  - A labeled solo QA session was started with player name `Campaign QA` and source `codex_verification`.
+  - Usage Analytics displayed the session in room `5196` with client `web`, campaign `codex_verification`, and start time 2026-08-09 17:34:49 local time.
+- Product Hunt's launch URL was changed and saved as:
+  - `https://beatably.app/?utm_source=producthunt&utm_medium=launch&utm_campaign=organic_launch_2026&utm_content=product_page`
+- A maker reply was published to Zvonimir Sabljic. A second reply was briefly placed in the wrong thread, detected immediately, and deleted.
+- After the discussion reloaded, Product Hunt reported three comments and no longer exposed the earlier Camille Gordon or Nathan Bryant comments. Their prepared replies were not posted as standalone comments because that would misrepresent the conversation.
+
+The `codex_verification` pageviews and incomplete QA session must be excluded when evaluating real campaign performance.
+
 ## Positioning
 
 **English:** Beatably is a free multiplayer music timeline party game. Hear a song, guess when it was released, and place it in chronological order. First to fill their timeline wins. Play in the browser or on iPhone; no account is required.
@@ -66,15 +83,17 @@ For individual posts, add a short `utm_content` value such as `guess_the_year_v1
 
 ### Attribution implementation status
 
-A local measurement improvement is prepared and verified. It preserves UTM parameters when a visitor moves from `beatably.app` to `play.beatably.app`, sends the campaign with the web socket connection, stores the host's campaign on the resulting game session, and shows game-session source in Admin and CSV exports. Existing untagged sessions remain `unattributed`. The change is not live until the frontend and backend are deployed.
+A measurement improvement is live in production. It preserves UTM parameters when a visitor moves from `beatably.app` to `play.beatably.app`, sends the campaign with the web socket connection, stores the host's campaign on the resulting game session, and shows game-session source in Admin and CSV exports. Existing untagged sessions remain `unattributed`.
 
-Verification completed locally on 9 August 2026: production frontend build passed, lint reported no errors, and all 36 backend tests passed, including a new end-to-end Product Hunt attribution test.
+Production verification completed on 9 August 2026: a labeled `codex_verification` visit preserved all four UTM fields across both domains and appeared on the resulting game-session row in Usage Analytics. That QA traffic must be excluded from campaign results.
+
+A second measurement improvement is prepared locally but not deployed: explicit App Store and browser-play CTA clicks are recorded by campaign source and page placement without inflating pageview totals. The frontend build and lint pass, and all 37 backend tests pass, including an integration test covering both CTA branches.
 
 ## Channel tests
 
 ### 1. Directory discovery — AlternativeTo
 
-Status: submitted; awaiting editorial review. Beatably was linked to HITSTER, WhatTheHit, and SongPop as alternatives.
+Status checked on 9 August 2026: submitted and still awaiting editorial review. AlternativeTo says only the submitter can see the page until approval and warns that review can take a few months. Beatably is linked to HITSTER, WhatTheHit, and SongPop as alternatives. No queue-priority action has been purchased or requested.
 
 Hypothesis: people already searching for music-trivia and music-party products will have higher intent than general social traffic.
 
@@ -82,15 +101,15 @@ Success gate for the first seven days after approval: at least 10 referred visit
 
 ### 2. Product Hunt launch
 
-Status: already launched on 28 July 2026. This is Beatably's first Product Hunt launch. As of 9 August, the maker dashboard reports 3 counted launch points, 4 comments, position #560, and the Product page has 9 followers. Beatably Admin recorded 2 Product Hunt referrals. The public page displays 4 upvotes, but the maker dashboard's 3-point count is used as the authoritative launch metric.
+Status: already launched on 28 July 2026. This is Beatably's first Product Hunt launch. The 9 August baseline was 3 counted launch points, 4 comments, position #560, 9 followers, and 2 Product Hunt referrals in Beatably Admin. Product Hunt later displayed 4 upvotes. After the maker reply was published and the discussion reloaded, the page exposed only 3 comments; the missing comments were not answered out of context.
 
 The launch did not meet the original success gate and should be treated as a completed low-volume channel test, not as an upcoming launch. Product Hunt asks makers to wait at least six months before relaunching the same product, with a significant update required, so no relaunch should be attempted before 28 January 2027.
 
 Result: low acquisition volume but useful qualitative feedback. Commenters specifically praised the instant browser experience, absence of a signup wall, and the challenge-and-steal mechanic. One commenter requested themed genre/decade packs. These signals strengthen `instant/no account` and `challenge and steal` as future copy angles.
 
-Measurement limitation: the current Product Hunt destination is `https://beatably.app/?ref=producthunt`, so the 2 referrals were not UTM-tagged and cannot be tied to game starts. After the attribution improvement is deployed, edit the Product Hunt website destination to the tracked Product Hunt URL, subject to approval before saving the public edit.
+Measurement limitation for the historical launch traffic: the original Product Hunt destination used `?ref=producthunt`, so the first 2 referrals cannot be tied to game starts.
 
-The Product Hunt edit form has been prepared with `utm_content=product_page`, but the public **Save changes** action has not been used. The unsaved change is intentionally waiting for approval and should be saved only after the attribution code is deployed.
+The launch destination is now saved as `https://beatably.app/?utm_source=producthunt&utm_medium=launch&utm_campaign=organic_launch_2026&utm_content=product_page`. Future Product Hunt visits and resulting web game starts can therefore be evaluated separately.
 
 Current public fields:
 
@@ -189,6 +208,8 @@ Message draft:
 Success gate after the first 15 personal messages: 5 replies, 3 playtests, and 1 organic mention. Each message must contain a real reference to the creator's work; no bulk automation.
 
 ## 30-day execution schedule
+
+The authoritative weekly measurement template is `docs/marketing-weekly-scorecard.md`. It fixes checkpoint dates, QA exclusions, channel and creative ledgers, derived metrics, and continuation/pause rules before results are known.
 
 ### Week 1 — baseline and first distribution
 

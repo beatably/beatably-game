@@ -556,6 +556,7 @@ function recordPageview({ site, path: pagePath, referrer, visitorId, utmSource, 
 
   const pv = {
     t: new Date().toISOString(),
+    kind: 'pageview',
     site: site === 'game' ? 'game' : site === 'landing' ? 'landing' : 'unknown',
     path: (pagePath || '/').slice(0, 200),
     ref: referrerDomain(referrer),
@@ -571,6 +572,39 @@ function recordPageview({ site, path: pagePath, referrer, visitorId, utmSource, 
   return pv;
 }
 
+/**
+ * Record a small allowlisted set of conversion events alongside pageviews.
+ * Keeping the same visitor and campaign fields lets the admin dashboard show
+ * which source produced an App Store or browser-play click without adding a
+ * third-party analytics service.
+ */
+function recordEvent({ event, target, site, path: pagePath, referrer, visitorId, utmSource, utmMedium, utmCampaign, utmContent, userAgent } = {}) {
+  if (userAgent && BOT_UA_RE.test(userAgent)) return null;
+  if (event !== 'cta_click' || !target) return null;
+
+  loadPageviews();
+
+  const clean = (value, limit = 80) => value ? String(value).slice(0, limit) : null;
+  const item = {
+    t: new Date().toISOString(),
+    kind: 'event',
+    event,
+    target: clean(target),
+    site: site === 'game' ? 'game' : site === 'landing' ? 'landing' : 'unknown',
+    path: clean(pagePath || '/', 200),
+    ref: referrerDomain(referrer),
+    utmSource: clean(utmSource),
+    utmMedium: clean(utmMedium),
+    utmCampaign: clean(utmCampaign),
+    utmContent: clean(utmContent),
+    vid: clean(visitorId, 64),
+  };
+
+  _pageviews.push(item);
+  schedulePageviewsSave();
+  return item;
+}
+
 function topEntries(map, limit = 15) {
   return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, limit);
 }
@@ -581,15 +615,19 @@ function topEntries(map, limit = 15) {
 function getPageviewStats({ dateFrom, dateTo } = {}) {
   loadPageviews();
 
-  let views = _pageviews;
+  let records = _pageviews;
   if (dateFrom || dateTo) {
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : 0;
     const toTime = dateTo ? new Date(dateTo).getTime() : Date.now();
-    views = views.filter(v => {
+    records = records.filter(v => {
       const t = new Date(v.t).getTime();
       return t >= fromTime && t <= toTime;
     });
   }
+
+  // Legacy entries do not have `kind`; they are all pageviews.
+  const views = records.filter(v => !v.kind || v.kind === 'pageview');
+  const events = records.filter(v => v.kind === 'event');
 
   const uniques = new Set();
   const landingUniques = new Set();
@@ -601,6 +639,9 @@ function getPageviewStats({ dateFrom, dateTo } = {}) {
   const utmSources = {};
   const utmCampaigns = {};
   const pages = {};
+  const ctaTargets = {};
+  const ctaSources = {};
+  const ctaBreakdown = {};
 
   views.forEach(v => {
     if (v.vid) uniques.add(v.vid);
@@ -620,6 +661,18 @@ function getPageviewStats({ dateFrom, dateTo } = {}) {
     pages[pageKey] = (pages[pageKey] || 0) + 1;
   });
 
+  events.forEach(v => {
+    if (v.event !== 'cta_click' || !v.target) return;
+    const source = v.utmSource || 'unattributed';
+    ctaTargets[v.target] = (ctaTargets[v.target] || 0) + 1;
+    ctaSources[source] = (ctaSources[source] || 0) + 1;
+    const breakdownKey = `${source} → ${v.target}`;
+    ctaBreakdown[breakdownKey] = (ctaBreakdown[breakdownKey] || 0) + 1;
+  });
+
+  const appStoreClicks = events.filter(v => v.event === 'cta_click' && v.target?.startsWith('app_store_')).length;
+  const browserPlayClicks = events.filter(v => v.event === 'cta_click' && v.target?.startsWith('play_browser_')).length;
+
   return {
     overview: {
       totalViews: views.length,
@@ -628,6 +681,8 @@ function getPageviewStats({ dateFrom, dateTo } = {}) {
       landingUniques: landingUniques.size,
       gameViews,
       gameUniques: gameUniques.size,
+      appStoreClicks,
+      browserPlayClicks,
     },
     timeSeries: {
       viewsOverTime: Object.entries(viewsOverTime).sort(),
@@ -636,6 +691,9 @@ function getPageviewStats({ dateFrom, dateTo } = {}) {
     utmSources: topEntries(utmSources),
     utmCampaigns: topEntries(utmCampaigns),
     topPages: topEntries(pages),
+    ctaTargets: topEntries(ctaTargets),
+    ctaSources: topEntries(ctaSources),
+    ctaBreakdown: topEntries(ctaBreakdown),
     timestamp: new Date().toISOString(),
   };
 }
@@ -650,5 +708,6 @@ module.exports = {
   getErrors,
   clearOldData,
   recordPageview,
+  recordEvent,
   getPageviewStats,
 };

@@ -23,6 +23,24 @@ function httpGetJson(pathname, headers = {}) {
   });
 }
 
+function httpPostJson(pathname, body) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const req = http.request(BASE_URL + pathname, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(payload),
+      },
+    }, (res) => {
+      res.resume();
+      res.on('end', () => resolve({ status: res.statusCode }));
+    });
+    req.on('error', reject);
+    req.end(payload);
+  });
+}
+
 function adminGet(pathname) {
   return httpGetJson(pathname, { 'x-admin-secret': 'test-admin-pw' });
 }
@@ -108,4 +126,37 @@ test('session attributes a game start to the host campaign', async (t) => {
 
   const stats = await adminGet('/api/admin/usage-stats');
   assert.equal(stats.json.distributions?.campaignSource?.producthunt, 1);
+});
+
+test('website stats separate pageviews from campaign CTA clicks', async () => {
+  const campaign = {
+    utmSource: 'instagram',
+    utmMedium: 'social_video',
+    utmCampaign: 'organic_launch_2026',
+    utmContent: 'guess_the_year_v1',
+  };
+
+  assert.equal((await httpPostJson('/api/track', {
+    site: 'landing', path: '/', visitorId: 'visitor-cta-test', ...campaign,
+  })).status, 204);
+  assert.equal((await httpPostJson('/api/track', {
+    event: 'cta_click', target: 'app_store_hero', site: 'landing', path: '/',
+    visitorId: 'visitor-cta-test', ...campaign,
+  })).status, 204);
+  assert.equal((await httpPostJson('/api/track', {
+    event: 'cta_click', target: 'play_browser_hero', site: 'landing', path: '/',
+    visitorId: 'visitor-cta-test', ...campaign,
+  })).status, 204);
+
+  const stats = await adminGet('/api/admin/website-stats');
+  assert.equal(stats.status, 200);
+  assert.equal(stats.json.overview.totalViews, 1, 'CTA events do not inflate pageviews');
+  assert.equal(stats.json.overview.uniqueVisitors, 1);
+  assert.equal(stats.json.overview.appStoreClicks, 1);
+  assert.equal(stats.json.overview.browserPlayClicks, 1);
+  assert.deepEqual(stats.json.ctaSources, [['instagram', 2]]);
+  assert.deepEqual(stats.json.ctaBreakdown, [
+    ['instagram → app_store_hero', 1],
+    ['instagram → play_browser_hero', 1],
+  ]);
 });

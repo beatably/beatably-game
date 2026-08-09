@@ -7,6 +7,7 @@ import PhoneShowcase from './PhoneShowcase';
 import TryItDemo from './TryItDemo';
 import CtaButtons from './CtaButtons';
 import { PLAY_URL } from './CtaButtons';
+import { appendCampaignParams, trackEvent } from '../utils/track';
 import { gsap, prefersReducedMotion, initSmoothScroll, revealOnEnter } from './fx';
 
 // Marketing landing page for beatably.app. The game itself lives at
@@ -211,7 +212,7 @@ function CtaBand() {
           holds up. First to fill their timeline wins.
         </p>
         <div data-reveal className="mt-10 flex justify-center">
-          <CtaButtons className="justify-center" />
+          <CtaButtons className="justify-center" placement="final" />
         </div>
         <p data-reveal className="mt-4 text-xs sm:text-sm text-foreground/55">
           Free on iOS and web · No account — pick a name and play
@@ -222,6 +223,8 @@ function CtaBand() {
 }
 
 function Footer() {
+  const playUrl = appendCampaignParams(PLAY_URL);
+
   return (
     <footer className="max-w-6xl mx-auto px-6 pb-10 pt-4" style={{ background: '#020106' }}>
       <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-foreground/50">
@@ -230,7 +233,11 @@ function Footer() {
           <a href="/privacy.html" className="hover:text-foreground transition-colors">
             Privacy
           </a>
-          <a href={PLAY_URL} className="hover:text-foreground transition-colors">
+          <a
+            href={playUrl}
+            onClick={() => trackEvent('cta_click', 'play_browser_footer')}
+            className="hover:text-foreground transition-colors"
+          >
             Play in browser
           </a>
         </nav>

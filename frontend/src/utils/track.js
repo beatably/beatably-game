@@ -47,6 +47,15 @@ function getVisitorId() {
   }
 }
 
+function sendTrackingPayload(payload) {
+  fetch(`${API_BASE_URL}/api/track`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 /**
  * Record a pageview. `site` is 'landing' or 'game'.
  */
@@ -60,12 +69,27 @@ export function trackPageview(site) {
       visitorId: getVisitorId(),
       ...campaign,
     };
-    fetch(`${API_BASE_URL}/api/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      keepalive: true,
-    }).catch(() => {});
+    sendTrackingPayload(payload);
+  } catch (e) {
+    // Tracking must never break the app.
+  }
+}
+
+
+/**
+ * Record an explicit conversion action without delaying navigation.
+ */
+export function trackEvent(event, target, site = 'landing') {
+  try {
+    sendTrackingPayload({
+      event,
+      target,
+      site,
+      path: window.location.pathname,
+      referrer: document.referrer || '',
+      visitorId: getVisitorId(),
+      ...readCampaignParams(),
+    });
   } catch (e) {
     // Tracking must never break the app.
   }

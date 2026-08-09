@@ -117,7 +117,7 @@ function HeroCinematic() {
               friends get wrong. First full timeline wins.
             </p>
             <div data-hero-stagger>
-              <CtaButtons className="mt-8" />
+              <CtaButtons className="mt-8" placement="hero" />
             </div>
             <p data-hero-stagger className="mt-3.5 text-xs sm:text-sm text-foreground/55">
               Free on iOS and web · No account — pick a name and play

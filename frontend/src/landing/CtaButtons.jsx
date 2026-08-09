@@ -1,5 +1,5 @@
 import React from 'react';
-import { appendCampaignParams } from '../utils/track';
+import { appendCampaignParams, trackEvent } from '../utils/track';
 
 export const PLAY_URL = 'https://play.beatably.app';
 
@@ -17,14 +17,18 @@ function PlayGlyph() {
 
 // The page's CTA pair: official App Store badge + the game's gradient button.
 // Both are 48px tall so they sit as one row wherever they appear.
-export function CtaButtons({ className = '' }) {
+export function CtaButtons({ className = '', placement = 'unknown' }) {
   // The landing page and game use different subdomains, so explicitly carry
   // campaign attribution into the browser game instead of losing it on click.
   const playUrl = appendCampaignParams(PLAY_URL);
 
   return (
     <div className={`flex flex-wrap items-center gap-3 ${className}`}>
-      <a href={APP_STORE_URL} className="press-scale inline-flex flex-none">
+      <a
+        href={APP_STORE_URL}
+        className="press-scale inline-flex flex-none"
+        onClick={() => trackEvent('cta_click', `app_store_${placement}`)}
+      >
         <img
           src="/img/landing/appstore-badge.svg"
           alt="Download on the App Store"
@@ -35,6 +39,7 @@ export function CtaButtons({ className = '' }) {
       </a>
       <a
         href={playUrl}
+        onClick={() => trackEvent('cta_click', `play_browser_${placement}`)}
         className="bg-primary h-12 px-6 rounded-md text-base font-bold inline-flex items-center justify-center gap-2 press-scale whitespace-nowrap"
       >
         <PlayGlyph />

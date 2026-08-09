@@ -861,6 +861,14 @@
           <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Game Views</div>
           <div id="webGameViews" style="font-size:28px; font-weight:600;">0</div>
         </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">App Store Clicks</div>
+          <div id="webAppStoreClicks" style="font-size:28px; font-weight:600;">0</div>
+        </div>
+        <div class="card col-3">
+          <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Browser Play Clicks</div>
+          <div id="webBrowserPlayClicks" style="font-size:28px; font-weight:600;">0</div>
+        </div>
       </div>
 
       <!-- Conversion funnel -->
@@ -888,6 +896,10 @@
         <div class="card col-4">
           <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:8px;">Top UTM Sources</div>
           <table><tbody id="webUtmTbody"><tr><td class="muted">No data</td></tr></tbody></table>
+        </div>
+        <div class="card col-12">
+          <div style="font-size:13px; font-weight:600; color:#8b949e; margin-bottom:8px;">CTA Clicks by Source and Placement</div>
+          <table><tbody id="webCtaBreakdownTbody"><tr><td class="muted">No data</td></tr></tbody></table>
         </div>
       </div>
 
@@ -3261,11 +3273,14 @@
         document.getElementById('webUniqueVisitors').textContent = (data.overview?.uniqueVisitors || 0).toLocaleString();
         document.getElementById('webLandingViews').textContent = (data.overview?.landingViews || 0).toLocaleString();
         document.getElementById('webGameViews').textContent = (data.overview?.gameViews || 0).toLocaleString();
+        document.getElementById('webAppStoreClicks').textContent = (data.overview?.appStoreClicks || 0).toLocaleString();
+        document.getElementById('webBrowserPlayClicks').textContent = (data.overview?.browserPlayClicks || 0).toLocaleString();
         renderFunnel(data.funnel || {});
         renderWebViewsChart(data.timeSeries?.viewsOverTime || []);
         renderStatTable('webReferrersTbody', data.referrers);
         renderStatTable('webPagesTbody', data.topPages);
         renderStatTable('webUtmTbody', data.utmSources);
+        renderStatTable('webCtaBreakdownTbody', data.ctaBreakdown);
       } catch (e) {
         console.warn('Website stats failed:', e.message);
       }

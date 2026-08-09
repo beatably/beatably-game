@@ -6234,7 +6234,7 @@ app.delete('/api/admin/analytics-data', requireAdmin, (req, res) => {
 app.post('/api/track', publicRateLimit, (req, res) => {
   try {
     const b = req.body || {};
-    analytics.recordPageview({
+    const record = {
       site: b.site,
       path: b.path,
       referrer: b.referrer,
@@ -6244,7 +6244,12 @@ app.post('/api/track', publicRateLimit, (req, res) => {
       utmCampaign: b.utmCampaign,
       utmContent: b.utmContent,
       userAgent: req.get('user-agent'),
-    });
+    };
+    if (b.event) {
+      analytics.recordEvent({ ...record, event: b.event, target: b.target });
+    } else {
+      analytics.recordPageview(record);
+    }
   } catch (e) {
     // Never let tracking failures affect the client.
   }

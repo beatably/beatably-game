@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import { gsap, prefersReducedMotion, revealOnEnter } from './fx';
 import { APP_STORE_URL } from './CtaButtons';
+import { trackEvent } from '../utils/track';
 
 // Real iOS app shown inside phone frames. These are actual App Store
 // screenshots ("displaying your app's functionality"), so the real album art
@@ -107,7 +108,11 @@ function PhoneShowcase() {
       </div>
 
       <div data-reveal className="mt-16 flex justify-center">
-        <a href={APP_STORE_URL} className="press-scale inline-flex">
+        <a
+          href={APP_STORE_URL}
+          className="press-scale inline-flex"
+          onClick={() => trackEvent('cta_click', 'app_store_phone_showcase')}
+        >
           <img
             src="/img/landing/appstore-badge.svg"
             alt="Download Beatably on the App Store"

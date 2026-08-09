@@ -3,6 +3,7 @@ import DemoTimeline from './DemoTimeline';
 import { EqBars } from './HeroDemo';
 import { PLAY_URL } from './CtaButtons';
 import { REAL_SONGS } from './realSongs';
+import { appendCampaignParams, trackEvent } from '../utils/track';
 
 // One real round, playable on the page — the same loop as the game. A real
 // randomized song plays its 30s Apple Music preview (tap play), you guess where
@@ -102,6 +103,7 @@ function AppleMusicLink({ href, className = '' }) {
 }
 
 function TryItDemo() {
+  const playUrl = appendCampaignParams(PLAY_URL);
   const [round, setRound] = useState(newRound);
   const [phase, setPhase] = useState('idle'); // idle | placing | done
   const [result, setResult] = useState(null); // null | 'correct' | 'wrong'
@@ -242,7 +244,8 @@ function TryItDemo() {
       {result && (
         <div className="view-fade-in mt-6 flex items-center justify-center gap-5">
           <a
-            href={PLAY_URL}
+            href={playUrl}
+            onClick={() => trackEvent('cta_click', 'play_browser_demo')}
             className="bg-primary h-11 px-6 rounded-md text-base font-extrabold inline-flex items-center justify-center press-scale"
           >
             Start a real game
