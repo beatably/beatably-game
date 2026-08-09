@@ -23,6 +23,14 @@
   status = 301
   force = true
 
+# Short, branded Instagram profile link. Keep this as a temporary redirect so
+# campaign attribution can change later without replacing the public URL.
+[[redirects]]
+  from = "https://beatably.app/ig"
+  to = "https://beatably.app/?utm_source=instagram&utm_medium=social&utm_campaign=organic_launch_2026&utm_content=profile"
+  status = 302
+  force = true
+
 # Marketing landing page at the apex root
 [[redirects]]
   from = "https://beatably.app/"
