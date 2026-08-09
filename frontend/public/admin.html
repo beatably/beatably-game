@@ -945,6 +945,7 @@
         <div class="card col-4"><canvas id="difficultyDistChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="musicModeChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="clientMixChart" height="200"></canvas></div>
+        <div class="card col-4"><canvas id="campaignSourceChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="errorTypesChart" height="200"></canvas></div>
         <div class="card col-4"><canvas id="winConditionChart" height="200"></canvas></div>
       </div>
@@ -970,6 +971,7 @@
                 <th class="num">Players</th>
                 <th>Player Names</th>
                 <th>Clients</th>
+                <th>Campaign</th>
                 <th class="num">Rounds</th>
                 <th class="num">Win At</th>
                 <th>Winner</th>
@@ -3356,6 +3358,20 @@
           }
         });
 
+        const campaignSources = data.distributions?.campaignSource || {};
+        const attributedCampaigns = Object.entries(campaignSources).filter(([key]) => key !== 'unattributed');
+        const campaignEntries = attributedCampaigns.length > 0
+          ? attributedCampaigns
+          : Object.entries(campaignSources);
+        upsertChart('campaignSourceChart', {
+          type: 'doughnut',
+          data: {
+            labels: campaignEntries.map(([key]) => key),
+            datasets: [{ data: campaignEntries.map(([, value]) => value), backgroundColor: palette }]
+          },
+          options: { plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Game Campaign Source', color: '#8b949e' } } }
+        });
+
         // Error types
         const errorTypes = data.distributions?.errorTypes || {};
         upsertChart('errorTypesChart', {
@@ -3439,7 +3455,7 @@
         tbody.innerHTML = '';
 
         if (!data.items || !data.items.length) {
-          tbody.innerHTML = '<tr><td colspan="12" class="muted">No sessions yet</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="13" class="muted">No sessions yet</td></tr>';
           return;
         }
 
@@ -3452,6 +3468,7 @@
             <td class="num">${session.playerCount || 0}</td>
             <td>${formatSessionPlayers(session)}</td>
             <td><span class="pill">${session.clientMix || 'unknown'}</span></td>
+            <td><span class="pill">${escapeText(session.campaign?.source || '-')}</span></td>
             <td class="num">${session.totalRounds || 0}</td>
             <td class="num">${session.winCondition || '-'}</td>
             <td>${session.winnerName || '-'}</td>
@@ -3515,7 +3532,7 @@
         const data = await adminFetch('/api/admin/game-sessions?limit=500');
         const sessions = data.items || [];
 
-        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Player Clients', 'Client Mix', 'Rounds', 'Win Condition', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
+        const headers = ['Room Code', 'Start Time', 'Duration (s)', 'Players', 'Player Names', 'Player Clients', 'Client Mix', 'Campaign Source', 'Campaign Medium', 'Campaign', 'Campaign Content', 'Rounds', 'Win Condition', 'Winner', 'Difficulty', 'Music Mode', 'Status'];
         const rows = sessions.map(s => [
           s.roomCode || '',
           s.startTime || '',
@@ -3524,6 +3541,10 @@
           (s.playerNames || []).join(';'),
           (s.playerClients || []).join(';'),
           s.clientMix || '',
+          s.campaign?.source || '',
+          s.campaign?.medium || '',
+          s.campaign?.campaign || '',
+          s.campaign?.content || '',
           s.totalRounds || '',
           s.winCondition || '',
           s.winnerName || '',

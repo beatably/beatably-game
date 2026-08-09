@@ -207,7 +207,19 @@ function summarizeClientMix(playerClients) {
 /**
  * Record the start of a game session
  */
-function recordSessionStart({ roomCode, playerCount, playerNames, playerClients, difficulty, musicMode, winCondition, gameMode }) {
+function normalizeCampaign(campaign) {
+  if (!campaign || typeof campaign !== 'object') return null;
+  const clean = (value) => value ? String(value).slice(0, 80) : null;
+  const normalized = {
+    source: clean(campaign.source),
+    medium: clean(campaign.medium),
+    campaign: clean(campaign.campaign),
+    content: clean(campaign.content),
+  };
+  return Object.values(normalized).some(Boolean) ? normalized : null;
+}
+
+function recordSessionStart({ roomCode, playerCount, playerNames, playerClients, difficulty, musicMode, winCondition, gameMode, campaign }) {
   loadSessions();
 
   // Per-player client ('ios' | 'web' | 'unknown'), index-aligned with playerNames
@@ -230,6 +242,7 @@ function recordSessionStart({ roomCode, playerCount, playerNames, playerClients,
     winnerName: null,
     difficulty: difficulty || 'normal',
     musicMode: musicMode || 'unknown',
+    campaign: normalizeCampaign(campaign),
     completedNormally: false,
   };
   
@@ -359,6 +372,7 @@ function getStats({ dateFrom, dateTo } = {}) {
   // Client distributions: per game (ios/web/mixed) and per participating player
   const clientMixDist = {};
   const playerClientDist = {};
+  const campaignSourceDist = {};
   sessions.forEach(s => {
     const mix = s.clientMix || 'unknown';
     clientMixDist[mix] = (clientMixDist[mix] || 0) + 1;
@@ -366,6 +380,8 @@ function getStats({ dateFrom, dateTo } = {}) {
       const client = c || 'unknown';
       playerClientDist[client] = (playerClientDist[client] || 0) + 1;
     });
+    const source = s.campaign?.source || 'unattributed';
+    campaignSourceDist[source] = (campaignSourceDist[source] || 0) + 1;
   });
 
   // Completion rate
@@ -421,6 +437,7 @@ function getStats({ dateFrom, dateTo } = {}) {
       winCondition: winConditionDist,
       clientMix: clientMixDist,
       playerClient: playerClientDist,
+      campaignSource: campaignSourceDist,
     },
     timeSeries: {
       gamesOverTime: Object.entries(gamesOverTime).sort(),
@@ -532,7 +549,7 @@ function referrerDomain(referrer) {
  * the client so the funnel is reliable even in dev (both entry points share an
  * origin locally). Obvious bots are dropped rather than stored.
  */
-function recordPageview({ site, path: pagePath, referrer, visitorId, utmSource, utmMedium, utmCampaign, userAgent } = {}) {
+function recordPageview({ site, path: pagePath, referrer, visitorId, utmSource, utmMedium, utmCampaign, utmContent, userAgent } = {}) {
   if (userAgent && BOT_UA_RE.test(userAgent)) return null;
 
   loadPageviews();
@@ -545,6 +562,7 @@ function recordPageview({ site, path: pagePath, referrer, visitorId, utmSource, 
     utmSource: utmSource ? String(utmSource).slice(0, 80) : null,
     utmMedium: utmMedium ? String(utmMedium).slice(0, 80) : null,
     utmCampaign: utmCampaign ? String(utmCampaign).slice(0, 80) : null,
+    utmContent: utmContent ? String(utmContent).slice(0, 80) : null,
     vid: visitorId ? String(visitorId).slice(0, 64) : null,
   };
 

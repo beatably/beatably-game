@@ -3053,6 +3053,20 @@ function detectClient(socket) {
   return 'unknown';
 }
 
+function detectCampaign(socket) {
+  const q = socket.handshake?.query || {};
+  const clean = (value) => typeof value === 'string' && value.trim()
+    ? value.trim().slice(0, 80)
+    : null;
+  const campaign = {
+    source: clean(q.utmSource),
+    medium: clean(q.utmMedium),
+    campaign: clean(q.utmCampaign),
+    content: clean(q.utmContent),
+  };
+  return Object.values(campaign).some(Boolean) ? campaign : null;
+}
+
 // Client of the socket a player is currently on ('unknown' if they're offline).
 function clientForPlayer(player) {
   return io.sockets.sockets.get(player?.id)?.data?.client || 'unknown';
@@ -3060,6 +3074,7 @@ function clientForPlayer(player) {
 
 io.on('connection', (socket) => {
   socket.data.client = detectClient(socket);
+  socket.data.campaign = detectCampaign(socket);
   console.log('A user connected:', socket.id, 'client:', socket.data.client);
 
   // Socket.io does not catch exceptions thrown by event handlers: a single
@@ -3471,6 +3486,7 @@ io.on('connection', (socket) => {
     };
     lobbies[code] = {
       players: [player],
+      campaign: socket.data.campaign,
       settings: settings || { difficulty: "normal" },
       status: "waiting",
       createdAt: Date.now(),
@@ -3824,7 +3840,8 @@ const lobby = lobbies[code];
       difficulty: lobby.settings?.difficulty || 'normal',
       musicMode: musicMode,
       winCondition: winCondition,
-      gameMode: isSolo ? 'solo' : 'multiplayer'
+      gameMode: isSolo ? 'solo' : 'multiplayer',
+      campaign: lobby.campaign
     });
 
     games[code] = {
@@ -6225,6 +6242,7 @@ app.post('/api/track', publicRateLimit, (req, res) => {
       utmSource: b.utmSource,
       utmMedium: b.utmMedium,
       utmCampaign: b.utmCampaign,
+      utmContent: b.utmContent,
       userAgent: req.get('user-agent'),
     });
   } catch (e) {

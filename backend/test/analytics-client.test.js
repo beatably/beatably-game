@@ -78,3 +78,34 @@ test('single-client game reports that client as the mix, and stats aggregate it'
   assert.equal(dist.playerClient.web, 3, 'three web players across both games');
   assert.equal(dist.playerClient.ios, 1, 'one ios player');
 });
+
+test('session attributes a game start to the host campaign', async (t) => {
+  const code = newCode();
+  const host = connect({
+    client: 'web',
+    utmSource: 'producthunt',
+    utmMedium: 'launch',
+    utmCampaign: 'organic_launch_2026',
+    utmContent: 'maker_launch_v1',
+  });
+  t.after(() => { host.close(); });
+
+  await emitAck(host, 'create_lobby', { name: 'CampaignHost', code, settings: { winCondition: 10 } });
+
+  const started = waitFor(host, 'game_started');
+  host.emit('start_game', { code, realSongs: makeDeck() });
+  await started;
+
+  const { json } = await adminGet('/api/admin/game-sessions?limit=10');
+  const session = (json.items || []).find((s) => s.roomCode === code);
+  assert.ok(session, 'session was recorded for the room');
+  assert.deepEqual(session.campaign, {
+    source: 'producthunt',
+    medium: 'launch',
+    campaign: 'organic_launch_2026',
+    content: 'maker_launch_v1',
+  });
+
+  const stats = await adminGet('/api/admin/usage-stats');
+  assert.equal(stats.json.distributions?.campaignSource?.producthunt, 1);
+});
