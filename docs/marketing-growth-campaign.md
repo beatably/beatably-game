@@ -23,6 +23,14 @@ Secondary conversions: a completed game, a returning player, and an App Store vi
 
 The `codex_verification` pageviews and incomplete QA session must be excluded when evaluating real campaign performance.
 
+### 2026-08-09 — batch 2 activated
+
+- Commit `7e4ff23` was pushed to `main`; Netlify and Render deployed explicit CTA conversion measurement.
+- Production verification passed: a labeled `codex_verification` click on the hero's browser-play CTA appeared in Usage Analytics as `codex_verification → play_browser_hero`, while pageviews remained separate. This QA click and its two pageviews must be excluded from campaign results.
+- Four personalized creator-outreach emails were sent individually to MusikQuizStockholm, Debaser/Stockholms Musikquiz, Uncas Quiz, and Moumo. Gmail accepted all four sends at 2026-08-09 17:49 CEST. Replies and attributed sessions will be checked after 48 hours; no follow-up before 14 August.
+- Reddit publication is ready but could not be submitted because the browser has no signed-in Reddit session and Reddit presented a human verification/login step.
+- The Vinyl Music Quiz Instagram DM is ready but could not be sent because the browser has no signed-in Instagram session.
+
 ## Positioning
 
 **English:** Beatably is a free multiplayer music timeline party game. Hear a song, guess when it was released, and place it in chronological order. First to fill their timeline wins. Play in the browser or on iPhone; no account is required.
@@ -87,7 +95,7 @@ A measurement improvement is live in production. It preserves UTM parameters whe
 
 Production verification completed on 9 August 2026: a labeled `codex_verification` visit preserved all four UTM fields across both domains and appeared on the resulting game-session row in Usage Analytics. That QA traffic must be excluded from campaign results.
 
-A second measurement improvement is prepared locally but not deployed: explicit App Store and browser-play CTA clicks are recorded by campaign source and page placement without inflating pageview totals. The frontend build and lint pass, and all 37 backend tests pass, including an integration test covering both CTA branches.
+The second measurement improvement is also live: explicit App Store and browser-play CTA clicks are recorded by campaign source and page placement without inflating pageview totals. The frontend build passes, all 37 backend tests pass, and a production browser-play click was attributed to both source and placement in Usage Analytics.
 
 ## Channel tests
 

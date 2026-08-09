@@ -132,7 +132,7 @@ Verified basis: Moumo's current quiz page describes even-week Wednesday quizzes 
 | Recipient | Sent | Delivered | Reply | First attributed visit | First attributed game start | Follow-up due |
 |---|---|---|---|---|---|---|
 | MusikQuizStockholm | 2026-08-09 17:49 CEST | Gmail accepted send | — | — | — | 2026-08-14 or later |
-| Vinyl Music Quiz | — | — | — | — | — | — |
+| Vinyl Music Quiz | Pending — Instagram login required | — | — | — | — | — |
 | Stockholms Musikquiz / Debaser | 2026-08-09 17:49 CEST | Gmail accepted send | — | — | — | 2026-08-14 or later |
 | Uncas Quiz | 2026-08-09 17:49 CEST | Gmail accepted send | — | — | — | 2026-08-14 or later |
 | Moumo | 2026-08-09 17:49 CEST | Gmail accepted send | — | — | — | 2026-08-14 or later |
