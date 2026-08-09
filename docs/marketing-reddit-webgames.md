@@ -2,6 +2,21 @@
 
 Prepared: 2026-08-09
 
+## Execution result
+
+Published: 2026-08-09 18:33 CEST  
+URL: `https://www.reddit.com/r/WebGames/comments/1vjudqq/beatably_a_free_multiplayer_music_timeline_game/`  
+Initial state: live in the community feed, score 1, 0 comments, 1 view
+
+The live rules differed from the prepared format. r/WebGames required a direct link to the playable game, a title beginning with the game's name, and no referral links. The published version therefore used:
+
+- Title: `Beatably — a free multiplayer music timeline game`
+- Destination: `https://play.beatably.app/`
+- Body: `I’m the developer. Beatably is free, works on mobile and desktop, and needs no account. If you try it, I’d especially appreciate feedback on whether starting and joining the first multiplayer room feels clear.`
+- Flair: none; no suitable web-game flair was offered in the composer
+
+No video, landing-page intermediary, UTM parameters, cross-post, or vote request was used. Measure referral pageviews from Reddit and treat downstream game-start lift as correlated rather than deterministically attributed.
+
 ## Channel decision
 
 First community: `r/WebGames`

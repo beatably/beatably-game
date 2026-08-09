@@ -28,7 +28,7 @@ The `codex_verification` pageviews and incomplete QA session must be excluded wh
 - Commit `7e4ff23` was pushed to `main`; Netlify and Render deployed explicit CTA conversion measurement.
 - Production verification passed: a labeled `codex_verification` click on the hero's browser-play CTA appeared in Usage Analytics as `codex_verification → play_browser_hero`, while pageviews remained separate. This QA click and its two pageviews must be excluded from campaign results.
 - Four personalized creator-outreach emails were sent individually to MusikQuizStockholm, Debaser/Stockholms Musikquiz, Uncas Quiz, and Moumo. Gmail accepted all four sends at 2026-08-09 17:49 CEST. Replies and attributed sessions will be checked after 48 hours; no follow-up before 14 August.
-- Reddit publication is ready but could not be submitted because the browser has no signed-in Reddit session and Reddit presented a human verification/login step.
+- Reddit publication completed at 2026-08-09 18:33 CEST after the user signed in. The live r/WebGames post is `https://www.reddit.com/r/WebGames/comments/1vjudqq/beatably_a_free_multiplayer_music_timeline_game/`.
 - The Vinyl Music Quiz Instagram DM is ready but could not be sent because the browser has no signed-in Instagram session.
 
 ## Positioning
@@ -181,7 +181,7 @@ Success gate per platform after seven days: 1,000 views or 5% engagement, plus a
 
 ### 4. Community post — Reddit (controlled test)
 
-Status: `r/WebGames` is selected for the first controlled test and the complete rule-aware publication packet is prepared in `docs/marketing-reddit-webgames.md`. A live rule and account-standing check is still required immediately before posting.
+Status: published in `r/WebGames` on 9 August 2026. The live rules required a direct link to the web game, a title beginning with the game's name, and no referral links, so the final post links directly to `https://play.beatably.app/` without UTM parameters. Reddit referral pageviews remain measurable, but resulting game sessions cannot be attributed with the same campaign precision as UTM-tagged channels.
 
 Reddit permits relevant promotional content in some communities, but repeated unsolicited promotion and mass-posting are prohibited. Only one tailored community post will be tested initially, with transparent maker disclosure and no cross-post blast.
 
