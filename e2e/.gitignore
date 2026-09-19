@@ -3,3 +3,20 @@ logs/
 screenshots/
 .profiles/
 .cache/
+# promo capture: multi-MB raw footage + intermediates (assets/ font is kept)
+promo/raw/
+promo/shots/
+promo/work/
+promo/probe/
+promo/markers.json
+promo-capture.log
+
+# Rendered promo artwork and video: tens of MB of binaries that git would keep
+# in history forever. The scripts and prompts next to them are enough to
+# re-create these, so only the recipe is tracked, not the output.
+promo/out/
+beatably-graphics/exports/
+beatably-graphics/masters/
+beatably-graphics/source/
+beatably-graphics/*.jpg
+beatably-graphics/*.png
