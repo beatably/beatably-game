@@ -128,11 +128,7 @@ struct LandingView: View {
                         }
                         .buttonStyle(.plain)
 
-                        ShareLink(
-                            item: URL(string: "https://beatably.app")!,
-                            subject: Text("Beatably"),
-                            message: Text("Play Beatably — the music timeline party game!")
-                        ) {
+                        ShareLink(item: ShareText.invite, subject: Text("Beatably")) {
                             HStack(spacing: 6) {
                                 Image(systemName: "square.and.arrow.up")
                                 Text("Share")

@@ -1123,8 +1123,11 @@ private struct GameOverOverlay: View {
                     .buttonStyle(PressScaleStyle(haptic: .light))
                     ShareResultLink(
                         placement: "scoreboard_multiplayer",
-                        message: vm.gameWinner.map { "\($0.name) won our game of Beatably!" }
-                            ?? "We just played Beatably — the music timeline party game!"
+                        message: ShareText.multiplayer(
+                            iWon: vm.gameWinner.map { !$0.persistentId.isEmpty && $0.persistentId == vm.myPersistentId } ?? false,
+                            winnerName: vm.gameWinner?.name,
+                            score: vm.gameWinner?.score
+                        )
                     )
                 }
                 .padding(.bottom, 40)
@@ -1163,11 +1166,7 @@ private struct ShareResultLink: View {
     let message: String
 
     var body: some View {
-        ShareLink(
-            item: URL(string: "https://beatably.app")!,
-            subject: Text("Beatably"),
-            message: Text(message)
-        ) {
+        ShareLink(item: message, subject: Text("Beatably")) {
             HStack(spacing: 8) {
                 Image(systemName: "square.and.arrow.up")
                 Text("Share")
@@ -1407,7 +1406,7 @@ private struct SoloScoreboardOverlay: View {
             }
             ShareResultLink(
                 placement: "scoreboard_solo",
-                message: "I placed \(result.score) \(result.score == 1 ? "song" : "songs") in a row on Beatably!"
+                message: ShareText.solo(score: result.score, rank: result.rank)
             )
         }
         .padding(.horizontal, 20)

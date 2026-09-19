@@ -1904,6 +1904,8 @@ const [, setChallengeResponseGiven] = useState(false);
         players={players}
         soloResult={soloResult}
         isSolo={!!soloResult}
+        // Lets the share copy say "I won" only when it really was this player.
+        myPersistentId={players.find((p) => p.id === playerId)?.persistentId || null}
         onPlayAgain={() => {
           if (gameSettings.gameMode === 'solo') {
             // Solo: start a fresh run immediately in the same lobby (no waiting

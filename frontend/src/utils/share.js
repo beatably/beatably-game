@@ -1,8 +1,10 @@
 // One share entry point for every button in the app, so the wording, the
 // fallback and the analytics stay identical wherever it is used.
 import { trackShare } from './track';
+import { composeShare, soloShareText, multiplayerShareText } from './shareText';
 
-const SHARE_URL = 'https://beatably.app';
+// Re-exported so callers import their wording from the same place they share.
+export { soloShareText, multiplayerShareText };
 
 /**
  * Open the native share sheet, falling back to the clipboard where there is
@@ -15,15 +17,11 @@ const SHARE_URL = 'https://beatably.app';
 export async function shareBeatably({ placement, text }) {
   trackShare(placement);
 
-  const data = {
-    title: 'Beatably',
-    text: text || 'Play Beatably — the music timeline party game!',
-    url: SHARE_URL,
-  };
+  const body = composeShare(text);
 
   if (navigator.share) {
     try {
-      await navigator.share(data);
+      await navigator.share({ title: 'Beatably', text: body });
       return 'shared';
     } catch (err) {
       // The user backing out of the sheet is not an error.
@@ -34,7 +32,7 @@ export async function shareBeatably({ placement, text }) {
   }
 
   try {
-    await navigator.clipboard.writeText(`${data.text} ${data.url}`);
+    await navigator.clipboard.writeText(body);
     return 'copied';
   } catch (err) {
     console.error('Copy failed:', err);

@@ -1,4 +1,4 @@
-import { shareBeatably } from './utils/share';
+import { shareBeatably, soloShareText, multiplayerShareText } from './utils/share';
 import React, { useEffect, useState } from 'react';
 
 // Shared animated backdrop: keyframes + radial purple glow + falling confetti.
@@ -279,7 +279,7 @@ const SoloScoreboard = ({ soloResult, playerName, isPersonalBest, prevBest, part
           </button>
           <ShareResultButton
             placement="scoreboard_solo"
-            text={`I placed ${score} ${score === 1 ? 'song' : 'songs'} in a row on Beatably${rank ? ` — #${rank} in the world` : ''}!`}
+            text={soloShareText({ score, rank })}
             className="shrink-0"
           />
         </div>
@@ -292,7 +292,7 @@ const SoloScoreboard = ({ soloResult, playerName, isPersonalBest, prevBest, part
 // trophy springs in (scale 0.3 / -15° → 1 / +5°) then rocks ±5° forever with a
 // magenta glow; final scores in a surface-2 card with the #1 row teal-tinted.
 // Solo mode renders a dedicated full-width scoreboard instead.
-const WinnerView = ({ winner, players, soloResult, isSolo, onPlayAgain, onReturnToLobby }) => {
+const WinnerView = ({ winner, players, soloResult, isSolo, myPersistentId, onPlayAgain, onReturnToLobby }) => {
   const [showContent, setShowContent] = useState(false);
   const [particles, setParticles] = useState([]);
   const [isPersonalBest, setIsPersonalBest] = useState(false);
@@ -406,9 +406,12 @@ const WinnerView = ({ winner, players, soloResult, isSolo, onPlayAgain, onReturn
           </button>
           <ShareResultButton
             placement="scoreboard_multiplayer"
-            text={winnerData?.name
-              ? `${winnerData.name} won our game of Beatably!`
-              : 'We just played Beatably — the music timeline party game!'}
+            text={multiplayerShareText({
+              // Bragging only reads right when it was actually you who won.
+              iWon: !!(myPersistentId && winnerData?.persistentId === myPersistentId),
+              winnerName: winnerData?.name,
+              score: winnerData?.score,
+            })}
             className="shrink-0"
           />
         </div>
