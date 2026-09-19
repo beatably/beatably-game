@@ -331,7 +331,7 @@ function touchVisitor(vid, hit) {
  * visitor dashboard can separate browsers from actual players.
  * The iOS app never sends a pageview, so a first game also creates the profile.
  */
-function noteVisitorGame(vid, { client } = {}) {
+function noteVisitorGame(vid, { client, country } = {}) {
   if (!vid) return;
   loadVisitors();
   const now = new Date().toISOString();
@@ -339,7 +339,7 @@ function noteVisitorGame(vid, { client } = {}) {
   if (!v) {
     v = {
       first: now, last: now, views: 0, ctas: 0, games: 0, days: [],
-      country: 'unknown',
+      country: country || 'unknown',
       device: client === 'ios' ? 'mobile' : 'unknown',
       browser: client === 'ios' ? 'ios-app' : 'unknown',
       os: client === 'ios' ? 'ios' : 'unknown',
@@ -350,6 +350,8 @@ function noteVisitorGame(vid, { client } = {}) {
   }
   v.games = (v.games || 0) + 1;
   v.last = now;
+  // A game can be the first time we learn where someone is (no pageview yet).
+  if (country && (!v.country || v.country === 'unknown')) v.country = country;
   const d = dayNumber(now);
   if (!v.days.includes(d)) {
     v.days.push(d);
@@ -385,7 +387,7 @@ function normalizeCampaign(campaign) {
   return Object.values(normalized).some(Boolean) ? normalized : null;
 }
 
-function recordSessionStart({ roomCode, playerCount, playerNames, playerClients, playerVisitorIds, difficulty, musicMode, winCondition, gameMode, campaign }) {
+function recordSessionStart({ roomCode, playerCount, playerNames, playerClients, playerVisitorIds, playerCountries, difficulty, musicMode, winCondition, gameMode, campaign }) {
   loadSessions();
 
   // Per-player client ('ios' | 'web' | 'unknown'), index-aligned with playerNames
@@ -417,12 +419,17 @@ function recordSessionStart({ roomCode, playerCount, playerNames, playerClients,
     endReason: null,
   };
 
-  // Resolve each player's country from their visitor profile, and count the game
-  // against that profile so repeat-player stats work.
+  // Country per player: prefer what the live socket reported, and fall back to
+  // the visitor profile. The socket value is the reliable one — it is present
+  // even when no pageview beacon has landed for this visitor yet.
   loadVisitors();
-  session.countries = [...new Set(session.playerVisitorIds
-    .map(vid => (vid && _visitors[vid]?.country) || 'unknown'))];
-  session.playerVisitorIds.forEach((vid, i) => noteVisitorGame(vid, { client: clients[i] }));
+  const socketCountries = Array.isArray(playerCountries) ? playerCountries : [];
+  session.countries = [...new Set(session.playerVisitorIds.map((vid, i) =>
+    socketCountries[i] || (vid && _visitors[vid]?.country) || 'unknown'))];
+  session.playerVisitorIds.forEach((vid, i) => noteVisitorGame(vid, {
+    client: clients[i],
+    country: socketCountries[i] || null,
+  }));
 
   _sessions.push(session);
   saveSessions();

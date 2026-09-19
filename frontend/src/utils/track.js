@@ -39,7 +39,7 @@ export function appendCampaignParams(url, search = (typeof window !== 'undefined
 }
 
 /** IANA timezone, used server-side to infer a country without touching IPs. */
-function getTimezone() {
+export function getTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
   } catch (e) {

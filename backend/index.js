@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const curatedDb = require('./curatedDb');
 const analytics = require('./analytics');
+const { resolveCountry } = require('./visitorMeta');
 const soloScores = require('./soloScores');
 const feedback = require('./feedback');
 
@@ -3063,6 +3064,18 @@ function detectVisitorId(socket) {
   return (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 64) : null;
 }
 
+// Country for this socket, from the timezone the client reports. The client
+// only sends it once the player has opted in, so this stays consent-gated.
+// Games are tagged with it directly, which is more reliable than looking up a
+// visitor profile that may not exist yet (the socket often connects before the
+// first pageview beacon lands, and the iOS app sends no pageviews at all).
+function detectSocketCountry(socket, timezone) {
+  const tz = timezone || socket.handshake?.query?.tz;
+  if (!tz || typeof tz !== 'string') return null;
+  const country = resolveCountry({ headers: socket.handshake?.headers || {}, timezone: tz });
+  return country === 'unknown' ? null : country;
+}
+
 function detectCampaign(socket) {
   const q = socket.handshake?.query || {};
   const clean = (value) => typeof value === 'string' && value.trim()
@@ -3087,11 +3100,26 @@ function visitorIdForPlayer(player) {
   return io.sockets.sockets.get(player?.id)?.data?.visitorId || null;
 }
 
+// Country of the socket a player is currently on (null when unknown/offline).
+function countryForPlayer(player) {
+  return io.sockets.sockets.get(player?.id)?.data?.country || null;
+}
+
 io.on('connection', (socket) => {
   socket.data.client = detectClient(socket);
   socket.data.campaign = detectCampaign(socket);
   socket.data.visitorId = detectVisitorId(socket);
+  socket.data.country = detectSocketCountry(socket);
   console.log('A user connected:', socket.id, 'client:', socket.data.client);
+
+  // The socket usually connects while the consent banner is still open, so it
+  // starts with no visitor id. The client sends this once the player opts in,
+  // rather than reconnecting the whole socket mid-session.
+  socket.on('set_visitor', ({ vid, tz } = {}) => {
+    if (typeof vid === 'string' && vid.trim()) socket.data.visitorId = vid.trim().slice(0, 64);
+    const country = detectSocketCountry(socket, tz);
+    if (country) socket.data.country = country;
+  });
 
   // Socket.io does not catch exceptions thrown by event handlers: a single
   // throwing/rejecting handler would take down the process (and every game).
@@ -3854,6 +3882,7 @@ const lobby = lobbies[code];
       playerNames: lobby.players.map(p => p.name),
       playerClients: lobby.players.map(clientForPlayer),
       playerVisitorIds: lobby.players.map(visitorIdForPlayer),
+      playerCountries: lobby.players.map(countryForPlayer),
       difficulty: lobby.settings?.difficulty || 'normal',
       musicMode: musicMode,
       winCondition: winCondition,

@@ -37,6 +37,10 @@
     page: 0,
     perPage: 50,
     sessionsTotal: 0,
+    // Full country list for the picker. visitor-stats comes back filtered once a
+    // country is chosen, so caching the unfiltered list keeps every option
+    // selectable instead of collapsing the dropdown to the current choice.
+    countryOptions: [],
     data: {},
   };
 
@@ -315,9 +319,12 @@
   function populateFilterOptions() {
     var select = $('filterCountry');
     var countries = (state.data.visitors && state.data.visitors.byCountry) || [];
+    // Only refresh the option list from an unfiltered response.
+    if (!state.country && !state.device) state.countryOptions = countries;
+    var options = state.countryOptions.length ? state.countryOptions : countries;
     var current = state.country;
     select.innerHTML = '<option value="">All countries</option>'
-      + countries.map(function (c) {
+      + options.map(function (c) {
         return '<option value="' + esc(c[0]) + '">' + esc(countryLabel(c[0])) + ' (' + c[1] + ')</option>';
       }).join('');
     select.value = current;
@@ -585,7 +592,7 @@
           + '<td>' + esc(s.difficulty || '–') + '</td>'
           + '<td>' + esc(s.musicMode || '–') + '</td>'
           + '</tr>';
-      }).join('') : '<tr><td colspan="15" class="muted">No sessions match these filters</td></tr>';
+      }).join('') : '<tr><td colspan="15" class="muted">' + esc(emptySessionsReason()) + '</td></tr>';
 
       var start = state.page * state.perPage;
       $('gmSessionsCount').textContent = num(state.sessionsTotal) + ' sessions match';
@@ -597,6 +604,17 @@
     } catch (e) {
       showStatus('Could not load sessions: ' + e.message, 'error');
     }
+  }
+
+  // Games recorded before country tracking existed carry no country at all, so
+  // a country filter silently hides them. Say so rather than showing a bare 0.
+  function emptySessionsReason() {
+    if (state.country) {
+      return 'No games from ' + countryLabel(state.country) + ' in this range. '
+        + 'Country is only recorded for games played after a visitor opted in to analytics '
+        + '— older games carry no country and are never matched by this filter.';
+    }
+    return 'No sessions match these filters';
   }
 
   // --- Health --------------------------------------------------------------

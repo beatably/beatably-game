@@ -156,3 +156,59 @@ test('an iOS player is counted even though the app sends no pageview', async (t)
   assert.ok(profile, 'a profile was created from the game alone');
   assert.equal(profile.games, 1);
 });
+
+test('a game is tagged with the country from the socket timezone, with no pageview', async (t) => {
+  const code = newCode();
+  const host = connect({ client: 'web', vid: 'v-tz-handshake', tz: 'Europe/Stockholm' });
+  t.after(() => { host.close(); });
+
+  await emitAck(host, 'create_lobby', { name: 'TzHost', code, settings: { winCondition: 10 } });
+  const started = waitFor(host, 'game_started');
+  host.emit('start_game', { code, realSongs: makeDeck() });
+  await started;
+
+  const { json } = await adminGet('/api/admin/game-sessions?limit=20');
+  const session = json.items.find((s) => s.roomCode === code);
+  assert.deepEqual(session.countries, ['SE'], 'country comes straight off the handshake');
+
+  const byCountry = await adminGet('/api/admin/game-sessions?country=SE&limit=20');
+  assert.ok(byCountry.json.items.some((s) => s.roomCode === code), 'the country filter finds it');
+});
+
+test('opting in after the socket connected still tags the game', async (t) => {
+  // The real path: the socket comes up while the consent banner is still open,
+  // so it carries no id. The client sends one via set_visitor once the player
+  // agrees, and games started after that must be attributed.
+  const code = newCode();
+  const host = connect({ client: 'web' }); // no vid, no tz — consent not given yet
+  t.after(() => { host.close(); });
+
+  await emitAck(host, 'create_lobby', { name: 'LateConsent', code, settings: { winCondition: 10 } });
+  host.emit('set_visitor', { vid: 'v-late-consent', tz: 'Asia/Tokyo' });
+  await new Promise((r) => setTimeout(r, 150));
+
+  const started = waitFor(host, 'game_started');
+  host.emit('start_game', { code, realSongs: makeDeck() });
+  await started;
+
+  const { json } = await adminGet('/api/admin/game-sessions?limit=20');
+  const session = json.items.find((s) => s.roomCode === code);
+  assert.deepEqual(session.playerVisitorIds, ['v-late-consent']);
+  assert.deepEqual(session.countries, ['JP']);
+});
+
+test('a player who never opts in is recorded with no id and no country', async (t) => {
+  const code = newCode();
+  const host = connect({ client: 'web' }); // declined: nothing is ever sent
+  t.after(() => { host.close(); });
+
+  await emitAck(host, 'create_lobby', { name: 'NoConsent', code, settings: { winCondition: 10 } });
+  const started = waitFor(host, 'game_started');
+  host.emit('start_game', { code, realSongs: makeDeck() });
+  await started;
+
+  const { json } = await adminGet('/api/admin/game-sessions?limit=20');
+  const session = json.items.find((s) => s.roomCode === code);
+  assert.deepEqual(session.playerVisitorIds, [null]);
+  assert.deepEqual(session.countries, ['unknown']);
+});

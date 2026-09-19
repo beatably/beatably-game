@@ -22,7 +22,8 @@ import './App.css';
 import WinnerView from "./WinnerView";
 import { API_BASE_URL, SOCKET_URL } from './config';
 import { usePreviewMode } from './contexts/PreviewModeContext';
-import { readCampaignParams, getVisitorId, trackFunnel } from './utils/track';
+import { readCampaignParams, getVisitorId, getTimezone, trackFunnel } from './utils/track';
+import { hasAnalyticsConsent, onConsentChange } from './utils/consent';
 
 
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
@@ -512,6 +513,14 @@ const [, setChallengeResponseGiven] = useState(false);
       feedback, lastPlaced, challenge]);
 
   // Connect to backend on mount
+  // The socket connects while the consent banner is still open, so it starts
+  // with no visitor id. When the player opts in, hand the id and timezone over
+  // on the live connection instead of tearing it down and reconnecting.
+  useEffect(() => onConsentChange((value) => {
+    if (value !== 'granted' || !socketRef.current) return;
+    socketRef.current.emit('set_visitor', { vid: getVisitorId(), tz: getTimezone() });
+  }), []);
+
   useEffect(() => {
     if (!socketRef.current) {
       console.log("[Socket] Connecting to backend...");
@@ -520,9 +529,15 @@ const [, setChallengeResponseGiven] = useState(false);
         Object.entries(readCampaignParams()).filter(([, value]) => value)
       );
       // vid ties this game back to the web visitor, so admin can tell a new
-      // player from someone starting their fifth game.
+      // player from someone starting their fifth game. tz lets the backend tag
+      // the game with a country. Both are consent-gated and therefore usually
+      // absent here — the socket connects while the banner is still open — so
+      // they are also sent later via set_visitor (see below).
       const vid = getVisitorId();
-      socketRef.current = io(SOCKET_URL, { query: { client: 'web', ...(vid ? { vid } : {}), ...campaignQuery } });
+      const tz = hasAnalyticsConsent() ? getTimezone() : null;
+      socketRef.current = io(SOCKET_URL, {
+        query: { client: 'web', ...(vid ? { vid } : {}), ...(tz ? { tz } : {}), ...campaignQuery },
+      });
       socketRef.current.on("connect", () => {
         console.log("[Socket] Connected, id:", socketRef.current.id);
         setPlayerId(socketRef.current.id);
