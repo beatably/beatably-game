@@ -1,3 +1,4 @@
+import { shareBeatably } from './utils/share';
 import React, { useEffect, useState } from 'react';
 
 // Shared animated backdrop: keyframes + radial purple glow + falling confetti.
@@ -159,6 +160,35 @@ const SoloLeaderboard = ({ soloResult, playerName }) => {
   );
 };
 
+// Share button for the end-of-game screens. Bragging is the cheapest growth we
+// have, so it sits next to the result rather than being buried in a menu.
+const ShareResultButton = ({ placement, text, className = '' }) => {
+  const [state, setState] = React.useState('idle');
+
+  const onClick = async () => {
+    const result = await shareBeatably({ placement, text });
+    if (result === 'copied') {
+      setState('copied');
+      setTimeout(() => setState('idle'), 2000);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Share your result"
+      className={`h-11 px-4 bg-transparent border border-border font-semibold whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-md hover:bg-input hover:text-foreground text-foreground focus:ring-primary transition-all duration-200 ease-out active:scale-95 ${className}`}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+      </svg>
+      {state === 'copied' ? 'Copied!' : 'Share'}
+    </button>
+  );
+};
+
 // Full-width solo scoreboard: hero streak, stat tiles, timeline recap, and the
 // global leaderboard, all scrollable on a single screen.
 const SoloScoreboard = ({ soloResult, playerName, isPersonalBest, prevBest, particles, showContent, onPlayAgain, onReturnToLobby }) => {
@@ -247,6 +277,11 @@ const SoloScoreboard = ({ soloResult, playerName, isPersonalBest, prevBest, part
           >
             Exit to Menu
           </button>
+          <ShareResultButton
+            placement="scoreboard_solo"
+            text={`I placed ${score} ${score === 1 ? 'song' : 'songs'} in a row on Beatably${rank ? ` — #${rank} in the world` : ''}!`}
+            className="shrink-0"
+          />
         </div>
       </div>
     </div>
@@ -369,6 +404,13 @@ const WinnerView = ({ winner, players, soloResult, isSolo, onPlayAgain, onReturn
           >
             Return to Lobby
           </button>
+          <ShareResultButton
+            placement="scoreboard_multiplayer"
+            text={winnerData?.name
+              ? `${winnerData.name} won our game of Beatably!`
+              : 'We just played Beatably — the music timeline party game!'}
+            className="shrink-0"
+          />
         </div>
       </div>
     </div>

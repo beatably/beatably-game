@@ -23,6 +23,9 @@
     }
     .card.tightcard { padding: 12px; }
     .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    /* A class with display:flex outranks the UA rule for the hidden attribute,
+       so hidden rows would stay visible without this. */
+    [hidden] { display: none !important; }
     input, select, button, textarea {
       background: #0b0f14; color: #e6edf3; border: 1px solid #223045;
       border-radius: 6px; padding: 8px 10px; outline: none; font-size: 13px;
@@ -169,6 +172,13 @@
           <span class="chip active" data-range="30">30d</span>
           <span class="chip" data-range="90">90d</span>
           <span class="chip" data-range="all">All</span>
+          <span class="chip" data-range="custom">Custom…</span>
+        </div>
+        <div class="row" id="customRange" hidden style="gap:6px; flex:0 0 auto;">
+          <input id="rangeFrom" type="date" aria-label="From date" />
+          <span class="muted">to</span>
+          <input id="rangeTo" type="date" aria-label="To date" />
+          <button id="applyRangeBtn" class="small">Apply</button>
         </div>
         <div class="row" style="gap:6px; flex:0 0 auto;">
           <span class="muted">Country:</span>
@@ -241,6 +251,7 @@
         <div class="kpi col-3"><div class="label">New visitors</div><div class="value" id="acqNew">–</div><div class="sub" id="acqNewSub"></div></div>
         <div class="kpi col-3"><div class="label">App Store clicks</div><div class="value" id="acqAppStore">–</div><div class="sub" id="acqAppStoreSub"></div></div>
         <div class="kpi col-3"><div class="label">Play-in-browser clicks</div><div class="value" id="acqBrowser">–</div><div class="sub" id="acqBrowserSub"></div></div>
+        <div class="kpi col-3"><div class="label">Shares</div><div class="value" id="acqShares">–</div><div class="sub" id="acqSharesSub"></div></div>
       </div>
 
       <div class="card">
@@ -289,6 +300,14 @@
         <div class="card col-4">
           <div class="sectiontitle">Landing pages</div>
           <div class="barlist" id="acqTopPages"></div>
+        </div>
+        <div class="card col-6">
+          <div class="sectiontitle">Where people share from</div>
+          <div class="barlist" id="acqSharePlacements"></div>
+        </div>
+        <div class="card col-6">
+          <div class="sectiontitle">Shares by platform</div>
+          <div class="barlist" id="acqShareClients"></div>
         </div>
         <div class="card col-12">
           <div class="sectiontitle">CTA clicks by source and placement</div>

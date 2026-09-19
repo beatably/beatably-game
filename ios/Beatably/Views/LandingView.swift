@@ -142,6 +142,9 @@ struct LandingView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("landing.shareButton")
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.share("landing")
+                        })
                     }
                     .padding(.top, 12)
                 }

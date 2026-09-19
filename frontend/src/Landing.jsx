@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { shareBeatably } from "./utils/share";
 import beatablyLogo from "./assets/beatably_logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,28 +73,12 @@ function Landing({ onCreate, onCreateSolo, onJoin, onShowHowToPlay, pendingJoinC
     setStep("options");
   };
 
-  const shareUrl = "https://beatably.app";
   const handleShare = async () => {
     setError("");
-    const shareData = {
-      title: "Beatably",
-      text: "Play Beatably — the music timeline party game!",
-      url: shareUrl,
-    };
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        if (err?.name !== "AbortError") console.error("Share failed:", err);
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
+    const result = await shareBeatably({ placement: "landing" });
+    if (result === "copied") {
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2000);
-    } catch (err) {
-      console.error("Copy failed:", err);
     }
   };
 

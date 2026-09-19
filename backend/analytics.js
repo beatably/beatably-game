@@ -847,6 +847,7 @@ const TRACKED_EVENTS = [
   'cta_click',      // App Store / play-in-browser buttons
   'funnel',         // named step in the play funnel (target = step name)
   'audio_failure',  // a preview clip would not play (target = reason)
+  'share',          // the player tapped a share button (target = placement)
 ];
 
 /**
@@ -914,6 +915,7 @@ function getPageviewStats({ dateFrom, dateTo, country, device, site, utmSource }
   const ctaEvents = events.filter(v => v.event === 'cta_click' && v.target);
   const funnelEvents = events.filter(v => v.event === 'funnel' && v.target);
   const audioFailures = events.filter(v => v.event === 'audio_failure');
+  const shareEvents = events.filter(v => v.event === 'share' && v.target);
 
   const uniques = new Set();
   const landingUniques = new Set();
@@ -1032,6 +1034,9 @@ function getPageviewStats({ dateFrom, dateTo, country, device, site, utmSource }
       appStoreClicks,
       browserPlayClicks,
       audioFailures: audioFailures.length,
+      shares: shareEvents.length,
+      // How many different people shared, not just how many taps.
+      sharers: new Set(shareEvents.map(v => v.vid).filter(Boolean)).size,
     },
     timeSeries: {
       viewsOverTime: Object.entries(viewsOverTime).sort(),
@@ -1051,6 +1056,8 @@ function getPageviewStats({ dateFrom, dateTo, country, device, site, utmSource }
     ctaTargets: topEntries(ctaTargets),
     ctaSources: topEntries(ctaSources),
     ctaBreakdown: topEntries(ctaBreakdown),
+    sharePlacements: topEntries(countBy(shareEvents, v => v.target)),
+    shareClients: topEntries(countBy(shareEvents, v => v.os || 'unknown')),
     channels,
     funnelSteps: Object.entries(funnelStepUniques)
       .map(([step, set]) => [step, set.size, funnelSteps[step]])

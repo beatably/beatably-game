@@ -1121,6 +1121,11 @@ private struct GameOverOverlay: View {
                         BeatSecondaryLabel(title: "Return to Lobby")
                     }
                     .buttonStyle(PressScaleStyle(haptic: .light))
+                    ShareResultLink(
+                        placement: "scoreboard_multiplayer",
+                        message: vm.gameWinner.map { "\($0.name) won our game of Beatably!" }
+                            ?? "We just played Beatably — the music timeline party game!"
+                    )
                 }
                 .padding(.bottom, 40)
             }
@@ -1148,6 +1153,36 @@ private struct GameOverOverlay: View {
                 trophyRotation = -5
             }
         }
+    }
+}
+
+/// Share control for the end-of-game screens. Bragging is the cheapest growth
+/// we have, so it sits with the result rather than being buried in a menu.
+private struct ShareResultLink: View {
+    let placement: String
+    let message: String
+
+    var body: some View {
+        ShareLink(
+            item: URL(string: "https://beatably.app")!,
+            subject: Text("Beatably"),
+            message: Text(message)
+        ) {
+            HStack(spacing: 8) {
+                Image(systemName: "square.and.arrow.up")
+                Text("Share")
+            }
+            .font(.system(.body, design: .rounded).weight(.semibold))
+            .foregroundStyle(Color.beatText)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.beatBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("scoreboard.shareButton")
+        .simultaneousGesture(TapGesture().onEnded { Analytics.share(placement) })
     }
 }
 
@@ -1363,11 +1398,17 @@ private struct SoloScoreboardOverlay: View {
     }
 
     private var actionsBar: some View {
-        HStack(spacing: 12) {
-            Button { vm.restartGame() } label: { BeatPrimaryLabel(title: "Play Again") }
-                .buttonStyle(PressScaleStyle())
-            Button { vm.leaveGame() } label: { BeatSecondaryLabel(title: "Exit to Menu") }
-                .buttonStyle(PressScaleStyle(haptic: .light))
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                Button { vm.restartGame() } label: { BeatPrimaryLabel(title: "Play Again") }
+                    .buttonStyle(PressScaleStyle())
+                Button { vm.leaveGame() } label: { BeatSecondaryLabel(title: "Exit to Menu") }
+                    .buttonStyle(PressScaleStyle(haptic: .light))
+            }
+            ShareResultLink(
+                placement: "scoreboard_solo",
+                message: "I placed \(result.score) \(result.score == 1 ? "song" : "songs") in a row on Beatably!"
+            )
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)

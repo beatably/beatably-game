@@ -212,3 +212,52 @@ test('a player who never opts in is recorded with no id and no country', async (
   assert.deepEqual(session.playerVisitorIds, [null]);
   assert.deepEqual(session.countries, ['unknown']);
 });
+
+test('share taps are counted, by placement and platform', async () => {
+  // A real user-agent matters: the bot filter drops anything that says headless.
+  const ua = { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1' };
+  await request('POST', '/api/track', { body: { event: 'share', target: 'landing', site: 'game', visitorId: 'v-sharer-1' }, headers: ua });
+  await request('POST', '/api/track', { body: { event: 'share', target: 'scoreboard_solo', site: 'game', visitorId: 'v-sharer-1' }, headers: ua });
+  await request('POST', '/api/track', { body: { event: 'share', target: 'scoreboard_solo', site: 'game', visitorId: 'v-sharer-2' }, headers: ua });
+  // The app posts no visitor id at all; it must still be counted.
+  await request('POST', '/api/track', { body: { event: 'share', target: 'landing', site: 'game' }, headers: ua });
+
+  const { json } = await adminGet('/api/admin/website-stats');
+  assert.equal(json.overview.shares, 4, 'every tap counts');
+  assert.equal(json.overview.sharers, 2, 'only identified people count as sharers');
+  assert.deepEqual(json.sharePlacements, [['landing', 2], ['scoreboard_solo', 2]]);
+});
+
+test('an unknown event name is rejected rather than stored', async () => {
+  const before = (await adminGet('/api/admin/website-stats')).json.overview.totalViews;
+  await request('POST', '/api/track', {
+    body: { event: 'something_made_up', target: 'x', site: 'game' },
+    headers: { 'user-agent': 'Mozilla/5.0' },
+  });
+  const after = (await adminGet('/api/admin/website-stats')).json;
+  assert.equal(after.overview.totalViews, before, 'it is not counted as a pageview either');
+  assert.equal(after.overview.shares, 4, 'share count is unchanged');
+});
+
+test('stats honour an explicit dateFrom/dateTo window', async () => {
+  const code = newCode();
+  const host = connect({ client: 'web', tz: 'Europe/Stockholm' });
+  await emitAck(host, 'create_lobby', { name: 'RangeHost', code, settings: { winCondition: 10 } });
+  const started = waitFor(host, 'game_started');
+  host.emit('start_game', { code, realSongs: makeDeck() });
+  await started;
+  host.close();
+
+  const today = new Date();
+  const iso = (d) => d.toISOString().split('T')[0];
+  const yesterday = new Date(today.getTime() - 86400000);
+  const tomorrow = new Date(today.getTime() + 86400000);
+
+  const inside = await adminGet(
+    `/api/admin/usage-stats?dateFrom=${iso(yesterday)}T00:00:00.000Z&dateTo=${iso(tomorrow)}T00:00:00.000Z`);
+  assert.ok(inside.json.overview.totalGames >= 1, 'a window around today includes the game');
+
+  const outside = await adminGet(
+    '/api/admin/usage-stats?dateFrom=2020-01-01T00:00:00.000Z&dateTo=2020-01-02T00:00:00.000Z');
+  assert.equal(outside.json.overview.totalGames, 0, 'a window in 2020 excludes it');
+});

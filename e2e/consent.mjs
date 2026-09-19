@@ -41,7 +41,7 @@ async function run() {
   check('no bt_vid written before a choice', !(await storage(page)).bt_vid);
 
   console.log('\n▶ Declining');
-  await page.click('button:has-text("No thanks")');
+  await page.click('button:has-text("Decline")');
   await page.waitForTimeout(1000);
   check('banner closes', !(await page.isVisible(BANNER)));
   check('still no /api/track request', page._tracked.length === 0);
@@ -59,7 +59,7 @@ async function run() {
   await page.goto(`${BASE}/landing.html`);
   await settle(page);
   check('nothing sent while the banner is open', page._tracked.length === 0);
-  await page.click('button:has-text("Yes")');
+  await page.click('button:has-text("Accept")');
   await page.waitForTimeout(1200);
   check('the held pageview is sent on accept', page._tracked.length >= 1);
   store = await storage(page);
@@ -74,9 +74,9 @@ async function run() {
   await page.goto(`${BASE}/landing.html?privacy=settings`);
   await settle(page);
   check('?privacy=settings reopens the banner', await page.isVisible(BANNER));
-  await page.click('button:has-text("No thanks")');
+  await page.click('button:has-text("Decline")');
   await page.waitForTimeout(800);
-  check('switching to no deletes the visitor id', !(await storage(page)).bt_vid);
+  check('switching to Decline deletes the visitor id', !(await storage(page)).bt_vid);
   await page.context().close();
 
   console.log('\n▶ Game page');

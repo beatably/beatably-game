@@ -133,6 +133,14 @@ export function trackFunnel(step) {
   trackEvent('funnel', step, 'game');
 }
 
+/**
+ * Record that the player tapped a share button. `placement` says which one,
+ * e.g. 'landing' or 'scoreboard_solo'.
+ */
+export function trackShare(placement) {
+  trackEvent('share', String(placement || 'unknown').slice(0, 60), 'game');
+}
+
 /** Record that a preview clip refused to play, with a short reason. */
 export function trackAudioFailure(reason, meta) {
   trackEvent('audio_failure', String(reason || 'unknown').slice(0, 60), 'game', meta);

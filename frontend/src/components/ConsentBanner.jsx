@@ -32,6 +32,12 @@ const CSS = `
     width: 340px;
   }
 }
+.bt-consent h2 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
 .bt-consent p { margin: 0 0 12px; }
 .bt-consent a { color: #B388F5; }
 .bt-consent-actions { display: flex; gap: 8px; }
@@ -85,14 +91,15 @@ function ConsentBanner() {
     <>
       <style>{CSS}</style>
       <div className="bt-consent" role="dialog" aria-label="Analytics choice">
+        <h2>Cookies &amp; analytics</h2>
         <p>
-          Can we count your visit? It shows us how many people play and where they
-          found us. Our own counter — no ads, no third parties, no tracking across
-          other sites. <a href="/privacy.html">Privacy policy</a>
+          We store a random ID in your browser to count visits and see where
+          players come from. No ads, no third parties.{' '}
+          <a href="/privacy.html">Privacy policy</a>
         </p>
         <div className="bt-consent-actions">
-          <button type="button" onClick={() => answer(DENIED)}>No thanks</button>
-          <button type="button" onClick={() => answer(GRANTED)}>Yes, that&apos;s fine</button>
+          <button type="button" onClick={() => answer(DENIED)}>Decline</button>
+          <button type="button" onClick={() => answer(GRANTED)}>Accept</button>
         </div>
       </div>
     </>

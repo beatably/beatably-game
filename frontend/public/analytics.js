@@ -24,6 +24,9 @@
   var state = {
     tab: 'overview',
     rangeDays: 30,
+    // Custom interval. When both are set they win over rangeDays.
+    dateFrom: '',
+    dateTo: '',
     country: '',
     device: '',
     grain: 'daily',
@@ -92,6 +95,9 @@
     return flag + ' ' + (COUNTRY_NAMES[code] || code);
   }
 
+  function isoDay(ms) { return new Date(ms).toISOString().split('T')[0]; }
+  function todayISO() { return isoDay(Date.now()); }
+
   function showStatus(msg, type) {
     var el = $('status');
     el.style.display = 'block';
@@ -125,13 +131,21 @@
 
   // --- Query building ------------------------------------------------------
   function dateFromParam() {
+    if (state.dateFrom) return new Date(state.dateFrom + 'T00:00:00').toISOString();
     if (!state.rangeDays) return null;
     return new Date(Date.now() - state.rangeDays * 86400000).toISOString();
+  }
+  // Inclusive end: a "to" of the 5th must cover everything that happened on the 5th.
+  function dateToParam() {
+    if (!state.dateTo) return null;
+    return new Date(state.dateTo + 'T23:59:59.999').toISOString();
   }
   function baseQuery(extra) {
     var params = new URLSearchParams();
     var from = dateFromParam();
+    var to = dateToParam();
     if (from) params.set('dateFrom', from);
+    if (to) params.set('dateTo', to);
     if (state.country) params.set('country', state.country);
     if (state.device) params.set('device', state.device);
     Object.keys(extra || {}).forEach(function (k) {
@@ -337,6 +351,7 @@
     diffSelect.value = currentDiff;
 
     var note = [];
+    if (state.dateFrom && state.dateTo) note.push(state.dateFrom + ' → ' + state.dateTo);
     if (state.country) note.push('country ' + countryLabel(state.country));
     if (state.device) note.push('device ' + state.device);
     $('activeFilterNote').textContent = note.length ? 'Filtered by ' + note.join(' · ') : '';
@@ -414,6 +429,8 @@
     $('acqBrowser').textContent = num(wo.browserPlayClicks);
     $('acqBrowserSub').textContent = wo.uniqueVisitors
       ? Math.round((wo.browserPlayClicks / wo.uniqueVisitors) * 100) + '% of visitors' : '';
+    $('acqShares').textContent = num(wo.shares);
+    $('acqSharesSub').textContent = num(wo.sharers) + ' different people';
 
     var channels = web.channels || [];
     $('acqChannelsTbody').innerHTML = channels.length ? channels.map(function (c) {
@@ -443,6 +460,8 @@
     barList('acqUtmMediums', web.utmMediums || []);
     barList('acqUtmContents', web.utmContents || []);
     barList('acqTopPages', web.topPages || []);
+    barList('acqSharePlacements', web.sharePlacements || []);
+    barList('acqShareClients', web.shareClients || []);
     barList('acqCtaBreakdown', web.ctaBreakdown || [], { limit: 20 });
   }
 
@@ -733,7 +752,32 @@
     });
 
     wireChipGroup('range', function (v) {
+      var custom = v === 'custom';
+      $('customRange').hidden = !custom;
+      if (custom) {
+        // Seed the pickers with the range that was already showing, so Apply
+        // without editing anything is a no-op rather than a surprise.
+        if (!$('rangeTo').value) $('rangeTo').value = todayISO();
+        if (!$('rangeFrom').value) {
+          $('rangeFrom').value = isoDay(Date.now() - (state.rangeDays || 30) * 86400000);
+        }
+        return; // nothing reloads until they press Apply
+      }
+      state.dateFrom = '';
+      state.dateTo = '';
       state.rangeDays = v === 'all' ? null : Number(v);
+      state.page = 0;
+      loadAll();
+    });
+
+    $('applyRangeBtn').addEventListener('click', function () {
+      var from = $('rangeFrom').value;
+      var to = $('rangeTo').value;
+      if (!from || !to) { showStatus('Pick both a start and an end date.', 'warning'); return; }
+      if (from > to) { showStatus('The start date is after the end date.', 'warning'); return; }
+      state.dateFrom = from;
+      state.dateTo = to;
+      state.rangeDays = null;
       state.page = 0;
       loadAll();
     });
@@ -778,6 +822,8 @@
     $('clearFiltersBtn').addEventListener('click', function () {
       state.country = ''; state.device = ''; state.gameMode = ''; state.clientMix = '';
       state.status = ''; state.difficulty = ''; state.search = ''; state.page = 0;
+      state.dateFrom = ''; state.dateTo = '';
+      $('customRange').hidden = true;
       $('filterSearch').value = '';
       Array.prototype.forEach.call(document.querySelectorAll('[data-gamemode],[data-clientmix],[data-status]'), function (c) {
         c.classList.toggle('active', c.dataset.gamemode === '' || c.dataset.clientmix === '' || c.dataset.status === '');
