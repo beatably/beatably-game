@@ -2994,6 +2994,9 @@ function sweepStaleRooms(now = Date.now()) {
     const ttl = game.phase === 'game-over' ? FINISHED_GAME_TTL_MS : GAME_TTL_MS;
     if (now - game.lastActivity > ttl) {
       console.log('[Sweeper] Removing stale game:', code, game.phase === 'game-over' ? '(finished)' : '(abandoned)');
+      if (game.phase !== 'game-over') {
+        try { analytics.recordSessionEnd({ roomCode: code, completedNormally: false, endReason: 'timeout' }); } catch (e) {}
+      }
       delete games[code];
       removed++;
     }
@@ -3053,6 +3056,13 @@ function detectClient(socket) {
   return 'unknown';
 }
 
+// The browser/app sends the same random visitor id it uses for pageviews, so a
+// game session can be tied back to the visit that produced it. No personal data.
+function detectVisitorId(socket) {
+  const v = socket.handshake?.query?.vid;
+  return (typeof v === 'string' && v.trim()) ? v.trim().slice(0, 64) : null;
+}
+
 function detectCampaign(socket) {
   const q = socket.handshake?.query || {};
   const clean = (value) => typeof value === 'string' && value.trim()
@@ -3072,9 +3082,15 @@ function clientForPlayer(player) {
   return io.sockets.sockets.get(player?.id)?.data?.client || 'unknown';
 }
 
+// Visitor id of the socket a player is currently on (null when offline).
+function visitorIdForPlayer(player) {
+  return io.sockets.sockets.get(player?.id)?.data?.visitorId || null;
+}
+
 io.on('connection', (socket) => {
   socket.data.client = detectClient(socket);
   socket.data.campaign = detectCampaign(socket);
+  socket.data.visitorId = detectVisitorId(socket);
   console.log('A user connected:', socket.id, 'client:', socket.data.client);
 
   // Socket.io does not catch exceptions thrown by event handlers: a single
@@ -3837,6 +3853,7 @@ const lobby = lobbies[code];
       playerCount: lobby.players.length,
       playerNames: lobby.players.map(p => p.name),
       playerClients: lobby.players.map(clientForPlayer),
+      playerVisitorIds: lobby.players.map(visitorIdForPlayer),
       difficulty: lobby.settings?.difficulty || 'normal',
       musicMode: musicMode,
       winCondition: winCondition,
@@ -5037,7 +5054,7 @@ const lobby = lobbies[code];
     };
     const roomCode = code || Object.keys(games).find(c => games[c] === game);
     if (roomCode) {
-      analytics.recordSessionEnd({ roomCode, winnerName: player?.name, completedNormally: true });
+      analytics.recordSessionEnd({ roomCode, winnerName: player?.name, completedNormally: true, endReason: 'win' });
     }
     schedulePersist();
     return game.soloResult;
@@ -5089,7 +5106,8 @@ const lobby = lobbies[code];
           analytics.recordSessionEnd({
             roomCode,
             winnerName: winnerPlayer?.name,
-            completedNormally: true
+            completedNormally: true,
+            endReason: 'win'
           });
         }
         
@@ -5113,7 +5131,8 @@ const lobby = lobbies[code];
         analytics.recordSessionEnd({
           roomCode,
           winnerName: game.winner?.name,
-          completedNormally: true
+          completedNormally: true,
+          endReason: 'deck_exhausted'
         });
       }
       
@@ -5858,6 +5877,7 @@ const lobby = lobbies[code];
                   message: 'The host has left the game. You will be returned to the lobby.',
                   hostName: leavingPlayer.name
                 });
+                try { analytics.recordSessionEnd({ roomCode: code, completedNormally: false, endReason: 'host_left' }); } catch (e) {}
                 delete games[code];
               }
               if (lobbies[code]) {
@@ -5932,6 +5952,7 @@ const lobby = lobbies[code];
         } else if (game.players.length === 1) {
           // Last player left, clean up immediately
           console.log('[Disconnect] Last player left game, cleaning up:', code);
+          try { analytics.recordSessionEnd({ roomCode: code, completedNormally: false, endReason: 'all_left' }); } catch (e) {}
           delete games[code];
           delete lobbies[code];
           schedulePersist();
@@ -6112,10 +6133,25 @@ app.get('/api/admin/server-health', requireAdmin, (req, res) => {
 });
 
 // Get aggregated usage statistics
+// Filters the dashboard may apply to game-session queries.
+function sessionFiltersFromQuery(q = {}) {
+  return {
+    dateFrom: q.dateFrom,
+    dateTo: q.dateTo,
+    gameMode: q.gameMode || undefined,
+    clientMix: q.clientMix || undefined,
+    client: q.client || undefined,
+    difficulty: q.difficulty || undefined,
+    country: q.country || undefined,
+    status: q.status || undefined,
+    campaignSource: q.campaignSource || undefined,
+    search: q.search || undefined,
+  };
+}
+
 app.get('/api/admin/usage-stats', requireAdmin, (req, res) => {
   try {
-    const { dateFrom, dateTo } = req.query;
-    const stats = analytics.getStats({ dateFrom, dateTo });
+    const stats = analytics.getStats(sessionFiltersFromQuery(req.query));
     console.log('[Admin] Usage stats retrieved:', {
       totalGames: stats.overview?.totalGames,
       completedGames: stats.overview?.completedGames,
@@ -6131,9 +6167,9 @@ app.get('/api/admin/usage-stats', requireAdmin, (req, res) => {
 // Website visit statistics (pageviews + conversion funnel)
 app.get('/api/admin/website-stats', requireAdmin, (req, res) => {
   try {
-    const { dateFrom, dateTo } = req.query;
-    const pv = analytics.getPageviewStats({ dateFrom, dateTo });
-    const game = analytics.getStats({ dateFrom, dateTo });
+    const { dateFrom, dateTo, country, device, site, utmSource } = req.query;
+    const pv = analytics.getPageviewStats({ dateFrom, dateTo, country, device, site, utmSource });
+    const game = analytics.getStats({ dateFrom, dateTo, country });
     // Funnel: unique landing visitors → unique game-page visitors → games started → completed.
     const funnel = {
       landingVisitors: pv.overview.landingUniques,
@@ -6183,12 +6219,12 @@ app.post('/api/admin/test-analytics', requireAdmin, (req, res) => {
 // Get paginated list of game sessions
 app.get('/api/admin/game-sessions', requireAdmin, (req, res) => {
   try {
-    const { limit, offset, dateFrom, dateTo } = req.query;
+    const { limit, offset, sort } = req.query;
     const result = analytics.getSessions({
-      limit: Number(limit) || 50,
+      limit: Math.min(500, Number(limit) || 50),
       offset: Number(offset) || 0,
-      dateFrom,
-      dateTo
+      sort: sort || 'recent',
+      ...sessionFiltersFromQuery(req.query)
     });
     res.json({ ok: true, ...result });
   } catch (e) {
@@ -6212,6 +6248,28 @@ app.get('/api/admin/error-logs', requireAdmin, (req, res) => {
   } catch (e) {
     console.error('[Admin] Error logs failed:', e?.message);
     res.status(500).json({ ok: false, error: e?.message || 'Error logs failed' });
+  }
+});
+
+// Audience: returning visitors, retention cohorts, churn, countries
+app.get('/api/admin/visitor-stats', requireAdmin, (req, res) => {
+  try {
+    const { dateFrom, dateTo, country, device } = req.query;
+    res.json({ ok: true, ...analytics.getVisitorStats({ dateFrom, dateTo, country, device }) });
+  } catch (e) {
+    console.error('[Admin] Visitor stats failed:', e?.message, e?.stack);
+    res.status(500).json({ ok: false, error: e?.message || 'Visitor stats failed' });
+  }
+});
+
+// Health: crashes, abandoned games, audio failures, grouped top issues
+app.get('/api/admin/health-stats', requireAdmin, (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    res.json({ ok: true, ...analytics.getHealthStats({ dateFrom, dateTo }) });
+  } catch (e) {
+    console.error('[Admin] Health stats failed:', e?.message, e?.stack);
+    res.status(500).json({ ok: false, error: e?.message || 'Health stats failed' });
   }
 });
 
@@ -6244,14 +6302,41 @@ app.post('/api/track', publicRateLimit, (req, res) => {
       utmCampaign: b.utmCampaign,
       utmContent: b.utmContent,
       userAgent: req.get('user-agent'),
+      timezone: b.timezone,
+      headers: req.headers,
     };
     if (b.event) {
-      analytics.recordEvent({ ...record, event: b.event, target: b.target });
+      analytics.recordEvent({ ...record, event: b.event, target: b.target, meta: b.meta });
     } else {
       analytics.recordPageview(record);
     }
   } catch (e) {
     // Never let tracking failures affect the client.
+  }
+  res.status(204).end();
+});
+
+// Public: report a client-side crash so browser-only bugs are visible in admin
+// alongside server errors. Rate-limited and fire-and-forget like /api/track.
+const CLIENT_ERROR_TYPES = ['client_js', 'client_unhandled_rejection', 'client_render', 'client_audio', 'client_socket'];
+app.post('/api/client-error', publicRateLimit, (req, res) => {
+  try {
+    const b = req.body || {};
+    const errorType = CLIENT_ERROR_TYPES.includes(b.errorType) ? b.errorType : 'client_js';
+    analytics.logError({
+      errorType,
+      message: String(b.message || '').slice(0, 500),
+      roomCode: b.roomCode ? String(b.roomCode).slice(0, 16) : null,
+      playerName: b.playerName ? String(b.playerName).slice(0, 40) : null,
+      context: {
+        path: String(b.path || '').slice(0, 200),
+        stack: String(b.stack || '').slice(0, 1500),
+        visitorId: b.visitorId ? String(b.visitorId).slice(0, 64) : null,
+        userAgent: String(req.get('user-agent') || '').slice(0, 300),
+      },
+    });
+  } catch (e) {
+    // Never let error reporting cause an error.
   }
   res.status(204).end();
 });

@@ -51,6 +51,12 @@
   to = "/admin.html"
   status = 200
 
+# Serve the analytics dashboard static page (play.beatably.app/analytics)
+[[redirects]]
+  from = "/analytics"
+  to = "/analytics.html"
+  status = 200
+
 # SPA fallback for the game (play.beatably.app and the netlify subdomain)
 [[redirects]]
   from = "/*"

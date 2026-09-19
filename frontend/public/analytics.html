@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Beatably Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0; padding: 0; background: #0b0f14; color: #e6edf3;
+    }
+    header {
+      padding: 12px 16px; background: #111722; border-bottom: 1px solid #223045;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      position: sticky; top: 0; z-index: 20;
+    }
+    header h1 { font-size: 16px; margin: 0; }
+    .container { padding: 16px; }
+    .card {
+      background: #10161f; border: 1px solid #223045; border-radius: 8px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .card.tightcard { padding: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    input, select, button, textarea {
+      background: #0b0f14; color: #e6edf3; border: 1px solid #223045;
+      border-radius: 6px; padding: 8px 10px; outline: none; font-size: 13px;
+    }
+    input:focus, select:focus { border-color: #2ea043; box-shadow: 0 0 0 2px rgba(46,160,67,0.2); }
+    button { background: #1f6feb; border-color: #1f6feb; cursor: pointer; }
+    button.secondary { background: transparent; border-color: #223045; }
+    button.danger { background: #da3633; border-color: #da3633; }
+    button.small { font-size: 12px; padding: 6px 8px; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #223045; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 7px 10px; border-bottom: 1px solid #223045; vertical-align: top; font-size: 13px; }
+    th { background: #0b0f14; text-align: left; white-space: nowrap; position: sticky; top: 0; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .muted { color: #8b949e; font-size: 12px; }
+    .num { text-align: right; white-space: nowrap; }
+    .nowrap { white-space: nowrap; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+    .col-2 { grid-column: span 2; } .col-3 { grid-column: span 3; }
+    .col-4 { grid-column: span 4; } .col-6 { grid-column: span 6; }
+    .col-8 { grid-column: span 8; } .col-12 { grid-column: span 12; }
+    @media (max-width: 1100px) { .col-2, .col-3 { grid-column: span 4; } }
+    @media (max-width: 900px) { .col-2, .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; } }
+    .success { color: #3fb950; } .warning { color: #d29922; } .error { color: #f85149; }
+    .link { color: #58a6ff; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+
+    /* KPI tiles */
+    .kpi { background: #10161f; border: 1px solid #223045; border-radius: 8px; padding: 12px 14px; }
+    .kpi .label {
+      color: #8b949e; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.06em; font-weight: 600;
+    }
+    .kpi .value { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+    .kpi .sub { color: #8b949e; font-size: 11px; margin-top: 2px; }
+    .kpi.good .value { color: #3fb950; }
+    .kpi.bad .value { color: #f85149; }
+    .kpi.warn .value { color: #d29922; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+    .tab {
+      padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+      border: 1px solid transparent; color: #8b949e; user-select: none;
+    }
+    .tab:hover { background: #161d28; color: #e6edf3; }
+    .tab.active { background: #1f6feb; border-color: #1f6feb; color: #fff; font-weight: 600; }
+
+    /* Chips */
+    .chip {
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid #223045; font-size: 12px; cursor: pointer;
+      user-select: none; white-space: nowrap; background: #0b0f14;
+    }
+    .chip:hover { border-color: #3b4c66; }
+    .chip.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    .pill {
+      display: inline-block; padding: 1px 8px; border-radius: 999px;
+      border: 1px solid #223045; font-size: 11px; white-space: nowrap;
+    }
+    .pill.solo { border-color: #8957e5; color: #b388f5; }
+    .pill.multiplayer { border-color: #1f6feb; color: #58a6ff; }
+    .pill.completed { border-color: #2ea043; color: #3fb950; }
+    .pill.abandoned { border-color: #6e7681; color: #8b949e; }
+    .pill.in_progress { border-color: #d29922; color: #d29922; }
+
+    /* Funnel */
+    .funnel { display: flex; gap: 8px; flex-wrap: wrap; }
+    .funnel-step {
+      flex: 1 1 140px; background: #0b0f14; border: 1px solid #223045;
+      border-radius: 8px; padding: 12px;
+    }
+    .funnel-step .n { font-size: 24px; font-weight: 600; }
+    .funnel-step .bar { height: 4px; border-radius: 2px; background: #1f6feb; margin-top: 8px; }
+
+    /* Bar list */
+    .barlist { display: flex; flex-direction: column; gap: 6px; }
+    .barrow { position: relative; padding: 5px 8px; border-radius: 4px; font-size: 13px; overflow: hidden; }
+    .barrow .fill { position: absolute; inset: 0 auto 0 0; background: rgba(31,111,235,0.22); border-radius: 4px; }
+    .barrow .txt { position: relative; display: flex; justify-content: space-between; gap: 12px; }
+    .barrow .txt b { font-weight: 600; }
+
+    .chartbox { position: relative; width: 100%; }
+    .sectiontitle { font-size: 13px; font-weight: 600; color: #8b949e; margin-bottom: 10px; }
+    .auth-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none;
+      align-items: center; justify-content: center; z-index: 999;
+    }
+    .auth-dialog {
+      background: #10161f; border: 1px solid #223045; border-radius: 10px;
+      padding: 20px; width: 100%; max-width: 360px;
+    }
+    .status {
+      padding: 8px 12px; background: #10161f; border: 1px solid #223045;
+      border-radius: 6px; font-size: 13px; display: none;
+    }
+    .scrollbox { max-height: 420px; overflow: auto; }
+    .heat td { text-align: center; font-size: 12px; padding: 5px 4px; }
+    .heat td.label { text-align: left; white-space: nowrap; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header>
+    <div class="row" style="gap:16px;">
+      <h1>Beatably Analytics</h1>
+      <div class="tabs" id="tabBar">
+        <span class="tab active" data-tab="overview">Overview</span>
+        <span class="tab" data-tab="acquisition">Acquisition</span>
+        <span class="tab" data-tab="audience">Audience</span>
+        <span class="tab" data-tab="games">Games</span>
+        <span class="tab" data-tab="health">Health &amp; Bugs</span>
+      </div>
+    </div>
+    <div class="row" style="gap:8px;">
+      <span id="lastUpdated" class="muted"></span>
+      <button id="refreshBtn" class="small">Refresh</button>
+      <a class="link" href="/admin.html" style="font-size:13px;">Song admin →</a>
+      <button id="signOutBtn" class="secondary small">Sign out</button>
+    </div>
+  </header>
+
+  <div id="authModal" class="auth-modal">
+    <div class="auth-dialog">
+      <h3 style="margin-top:0;">Admin access</h3>
+      <p class="muted">Enter the admin password to continue.</p>
+      <input id="authInput" type="password" placeholder="Admin password" class="mono" style="width:100%; box-sizing:border-box; margin-top:8px;" />
+      <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+        <button id="authSubmitBtn">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" id="content" style="display:none;">
+    <div id="status" class="status"></div>
+
+    <!-- Global filters -->
+    <div class="card tightcard" style="position:sticky; top:53px; z-index:15;">
+      <div class="row" style="gap:10px;">
+        <div class="row" style="gap:6px; flex:0 0 auto;">
+          <span class="muted">Range:</span>
+          <span class="chip" data-range="1">24h</span>
+          <span class="chip" data-range="7">7d</span>
+          <span class="chip active" data-range="30">30d</span>
+          <span class="chip" data-range="90">90d</span>
+          <span class="chip" data-range="all">All</span>
+        </div>
+        <div class="row" style="gap:6px; flex:0 0 auto;">
+          <span class="muted">Country:</span>
+          <select id="filterCountry" style="min-width:150px;"><option value="">All countries</option></select>
+        </div>
+        <div class="row" style="gap:6px; flex:0 0 auto;">
+          <span class="muted">Device:</span>
+          <select id="filterDevice" style="min-width:120px;">
+            <option value="">All devices</option>
+            <option value="mobile">Mobile</option>
+            <option value="tablet">Tablet</option>
+            <option value="desktop">Desktop</option>
+          </select>
+        </div>
+        <div id="activeFilterNote" class="muted" style="flex:1 1 auto;"></div>
+        <button id="clearFiltersBtn" class="secondary small" style="flex:0 0 auto;">Clear filters</button>
+      </div>
+    </div>
+
+    <!-- ============ OVERVIEW ============ -->
+    <section id="tab-overview">
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="kpi col-2"><div class="label">Unique visitors</div><div class="value" id="kpiVisitors">–</div><div class="sub" id="kpiVisitorsSub"></div></div>
+        <div class="kpi col-2"><div class="label">Returning</div><div class="value" id="kpiReturning">–</div><div class="sub" id="kpiReturningSub"></div></div>
+        <div class="kpi col-2"><div class="label">Games played</div><div class="value" id="kpiGames">–</div><div class="sub" id="kpiGamesSub"></div></div>
+        <div class="kpi col-2"><div class="label">Repeat players</div><div class="value" id="kpiRepeat">–</div><div class="sub" id="kpiRepeatSub"></div></div>
+        <div class="kpi col-2"><div class="label">Finish rate</div><div class="value" id="kpiFinish">–</div><div class="sub" id="kpiFinishSub"></div></div>
+        <div class="kpi col-2"><div class="label">Problems</div><div class="value" id="kpiProblems">–</div><div class="sub" id="kpiProblemsSub"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="sectiontitle">Visitor → player funnel (unique people)</div>
+        <div class="funnel" id="overviewFunnel"></div>
+      </div>
+
+      <div class="grid">
+        <div class="card col-8">
+          <div class="row" style="justify-content:space-between;">
+            <span class="sectiontitle" style="margin:0;">Traffic and games over time</span>
+            <div class="row" style="gap:6px;">
+              <span class="chip active" data-grain="daily">Daily</span>
+              <span class="chip" data-grain="weekly">Weekly</span>
+            </div>
+          </div>
+          <div class="chartbox" style="height:110px; margin-top:10px;"><canvas id="overviewTrendChart"></canvas></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Top countries</div>
+          <div class="barlist" id="overviewCountries"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Top channels</div>
+          <div class="barlist" id="overviewChannels"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Devices</div>
+          <div class="chartbox" style="height:180px;"><canvas id="overviewDeviceChart"></canvas></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Solo vs multiplayer</div>
+          <div class="chartbox" style="height:180px;"><canvas id="overviewModeChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ACQUISITION ============ -->
+    <section id="tab-acquisition" style="display:none;">
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="kpi col-3"><div class="label">Page views</div><div class="value" id="acqViews">–</div></div>
+        <div class="kpi col-3"><div class="label">New visitors</div><div class="value" id="acqNew">–</div><div class="sub" id="acqNewSub"></div></div>
+        <div class="kpi col-3"><div class="label">App Store clicks</div><div class="value" id="acqAppStore">–</div><div class="sub" id="acqAppStoreSub"></div></div>
+        <div class="kpi col-3"><div class="label">Play-in-browser clicks</div><div class="value" id="acqBrowser">–</div><div class="sub" id="acqBrowserSub"></div></div>
+      </div>
+
+      <div class="card">
+        <div class="sectiontitle">Channel performance — which source actually produces players</div>
+        <div class="scrollbox">
+          <table>
+            <thead><tr>
+              <th>Channel</th><th class="num">Views</th><th class="num">Visitors</th>
+              <th class="num">CTA clicks</th><th class="num">App Store</th>
+              <th class="num">Browser play</th><th class="num">CTA rate</th>
+            </tr></thead>
+            <tbody id="acqChannelsTbody"><tr><td colspan="7" class="muted">No data</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card col-6">
+          <div class="sectiontitle">New vs returning visitors over time</div>
+          <div class="chartbox" style="height:130px;"><canvas id="acqVisitorTrendChart"></canvas></div>
+        </div>
+        <div class="card col-6">
+          <div class="sectiontitle">Games attributed to a campaign source</div>
+          <div class="barlist" id="acqCampaignGames"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Referrers</div>
+          <div class="barlist" id="acqReferrers"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">UTM sources</div>
+          <div class="barlist" id="acqUtmSources"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">UTM campaigns</div>
+          <div class="barlist" id="acqUtmCampaigns"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">UTM mediums</div>
+          <div class="barlist" id="acqUtmMediums"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">UTM content (creative)</div>
+          <div class="barlist" id="acqUtmContents"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Landing pages</div>
+          <div class="barlist" id="acqTopPages"></div>
+        </div>
+        <div class="card col-12">
+          <div class="sectiontitle">CTA clicks by source and placement</div>
+          <div class="barlist" id="acqCtaBreakdown"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AUDIENCE ============ -->
+    <section id="tab-audience" style="display:none;">
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="kpi col-2"><div class="label">Known visitors</div><div class="value" id="audTotal">–</div></div>
+        <div class="kpi col-2"><div class="label">Came back</div><div class="value" id="audReturn">–</div><div class="sub" id="audReturnSub"></div></div>
+        <div class="kpi col-2"><div class="label">Became players</div><div class="value" id="audPlayers">–</div><div class="sub" id="audPlayersSub"></div></div>
+        <div class="kpi col-2"><div class="label">Repeat players</div><div class="value" id="audRepeat">–</div><div class="sub" id="audRepeatSub"></div></div>
+        <div class="kpi col-2"><div class="label">Active last 7d</div><div class="value" id="audActive">–</div></div>
+        <div class="kpi col-2 bad"><div class="label">Churned (30d+)</div><div class="value" id="audChurned">–</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card col-4">
+          <div class="sectiontitle">Lifecycle — how long since each visitor was last here</div>
+          <div class="chartbox" style="height:200px;"><canvas id="audLifecycleChart"></canvas></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Return rate at day 1 / 7 / 30</div>
+          <div id="audDayN" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">How many days each visitor showed up</div>
+          <div class="barlist" id="audVisitFrequency"></div>
+        </div>
+        <div class="card col-12">
+          <div class="sectiontitle">Weekly cohorts — of everyone first seen that week, what share came back</div>
+          <div class="scrollbox">
+            <table class="heat">
+              <thead><tr>
+                <th>First seen (week of)</th><th class="num">People</th>
+                <th>Week 0</th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th>
+              </tr></thead>
+              <tbody id="audCohortTbody"><tr><td colspan="7" class="muted">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card col-6">
+          <div class="sectiontitle">Countries (unique visitors)</div>
+          <div class="barlist" id="audCountries"></div>
+        </div>
+        <div class="card col-3">
+          <div class="sectiontitle">Devices</div>
+          <div class="barlist" id="audDevices"></div>
+        </div>
+        <div class="card col-3">
+          <div class="sectiontitle">Browsers</div>
+          <div class="barlist" id="audBrowsers"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Games played per player</div>
+          <div class="barlist" id="audGamesPerPlayer"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">First touch — where they arrived from</div>
+          <div class="barlist" id="audFirstSource"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Operating systems</div>
+          <div class="barlist" id="audOS"></div>
+        </div>
+        <div class="card col-12">
+          <div class="row" style="justify-content:space-between;">
+            <span class="sectiontitle" style="margin:0;">Most engaged visitors</span>
+            <button id="exportVisitorsBtn" class="secondary small">Export CSV</button>
+          </div>
+          <div class="scrollbox" style="margin-top:10px;">
+            <table>
+              <thead><tr>
+                <th>Visitor</th><th>Country</th><th>Device</th><th>First source</th>
+                <th class="num">Active days</th><th class="num">Views</th><th class="num">Games</th>
+                <th>First seen</th><th>Last seen</th>
+              </tr></thead>
+              <tbody id="audVisitorsTbody"><tr><td colspan="9" class="muted">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GAMES ============ -->
+    <section id="tab-games" style="display:none;">
+      <div class="card tightcard">
+        <div class="row" style="gap:10px;">
+          <div class="row" style="gap:6px; flex:0 0 auto;">
+            <span class="muted">Mode:</span>
+            <span class="chip active" data-gamemode="">All</span>
+            <span class="chip" data-gamemode="multiplayer">Multiplayer</span>
+            <span class="chip" data-gamemode="solo">Solo</span>
+          </div>
+          <div class="row" style="gap:6px; flex:0 0 auto;">
+            <span class="muted">Platform:</span>
+            <span class="chip active" data-clientmix="">All</span>
+            <span class="chip" data-clientmix="web">Web only</span>
+            <span class="chip" data-clientmix="ios">iOS only</span>
+            <span class="chip" data-clientmix="mixed">Mixed</span>
+          </div>
+          <div class="row" style="gap:6px; flex:0 0 auto;">
+            <span class="muted">Outcome:</span>
+            <span class="chip active" data-status="">All</span>
+            <span class="chip" data-status="completed">Finished</span>
+            <span class="chip" data-status="abandoned">Abandoned</span>
+            <span class="chip" data-status="in_progress">Running</span>
+          </div>
+          <div class="row" style="gap:6px; flex:0 0 auto;">
+            <span class="muted">Difficulty:</span>
+            <select id="filterDifficulty"><option value="">Any</option></select>
+          </div>
+          <input id="filterSearch" placeholder="Room code, player or winner…" style="flex:1 1 200px; min-width:180px;" />
+          <select id="filterSort" style="flex:0 0 auto;">
+            <option value="recent">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="longest">Longest first</option>
+            <option value="rounds">Most rounds</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="kpi col-2"><div class="label">Games</div><div class="value" id="gmTotal">–</div><div class="sub" id="gmTotalSub"></div></div>
+        <div class="kpi col-2"><div class="label">Finished</div><div class="value" id="gmFinished">–</div><div class="sub" id="gmFinishedSub"></div></div>
+        <div class="kpi col-2"><div class="label">Distinct players</div><div class="value" id="gmPlayers">–</div><div class="sub" id="gmPlayersSub"></div></div>
+        <div class="kpi col-2"><div class="label">Median length</div><div class="value" id="gmDuration">–</div><div class="sub" id="gmDurationSub"></div></div>
+        <div class="kpi col-2"><div class="label">Avg rounds</div><div class="value" id="gmRounds">–</div><div class="sub" id="gmRoundsSub"></div></div>
+        <div class="kpi col-2"><div class="label">Abandon rate</div><div class="value" id="gmAbandon">–</div><div class="sub" id="gmAbandonSub"></div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card col-12">
+          <div class="row" style="justify-content:space-between;">
+            <span class="sectiontitle" style="margin:0;">Games over time (solo vs multiplayer)</span>
+            <div class="row" style="gap:6px;">
+              <span class="chip active" data-gamegrain="daily">Daily</span>
+              <span class="chip" data-gamegrain="weekly">Weekly</span>
+            </div>
+          </div>
+          <div class="chartbox" style="height:90px; margin-top:10px;"><canvas id="gmTrendChart"></canvas></div>
+        </div>
+        <div class="card col-3"><div class="sectiontitle">Players per game</div><div class="chartbox" style="height:190px;"><canvas id="gmPlayerCountChart"></canvas></div></div>
+        <div class="card col-3"><div class="sectiontitle">Difficulty</div><div class="chartbox" style="height:190px;"><canvas id="gmDifficultyChart"></canvas></div></div>
+        <div class="card col-3"><div class="sectiontitle">Music mode</div><div class="chartbox" style="height:190px;"><canvas id="gmMusicChart"></canvas></div></div>
+        <div class="card col-3"><div class="sectiontitle">Target score</div><div class="chartbox" style="height:190px;"><canvas id="gmWinConditionChart"></canvas></div></div>
+        <div class="card col-6"><div class="sectiontitle">When people play (hour, UTC)</div><div class="chartbox" style="height:150px;"><canvas id="gmHourChart"></canvas></div></div>
+        <div class="card col-6"><div class="sectiontitle">When people play (weekday, UTC)</div><div class="chartbox" style="height:150px;"><canvas id="gmDayChart"></canvas></div></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div>
+            <strong>Game sessions</strong>
+            <div id="gmSessionsCount" class="muted"></div>
+          </div>
+          <div class="row" style="gap:8px;">
+            <select id="gmPerPage">
+              <option value="25">25 / page</option>
+              <option value="50" selected>50 / page</option>
+              <option value="100">100 / page</option>
+              <option value="200">200 / page</option>
+            </select>
+            <button id="exportSessionsBtn" class="secondary small">Export CSV</button>
+          </div>
+        </div>
+        <div style="overflow:auto; margin-top:12px; max-height:600px;">
+          <table>
+            <thead><tr>
+              <th>Started</th><th>Room</th><th>Mode</th><th>Outcome</th>
+              <th class="num">Players</th><th>Names</th><th>Platform</th><th>Country</th>
+              <th>Campaign</th><th class="num">Rounds</th><th class="num">Target</th>
+              <th>Winner</th><th>Length</th><th>Difficulty</th><th>Music</th>
+            </tr></thead>
+            <tbody id="gmSessionsTbody"><tr><td colspan="15" class="muted">No data</td></tr></tbody>
+          </table>
+        </div>
+        <div class="row" style="justify-content:space-between; padding-top:10px;">
+          <span id="gmPageInfo" class="muted"></span>
+          <div class="row" style="gap:8px; flex:0 0 auto;">
+            <button id="gmPrevBtn" class="secondary small">&larr; Prev</button>
+            <button id="gmNextBtn" class="secondary small">Next &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ HEALTH ============ -->
+    <section id="tab-health" style="display:none;">
+      <div class="grid" style="margin-bottom:16px;">
+        <div class="kpi col-2"><div class="label">Total errors</div><div class="value" id="hlErrors">–</div><div class="sub" id="hlErrorsSub"></div></div>
+        <div class="kpi col-2 bad"><div class="label">Browser crashes</div><div class="value" id="hlCrashes">–</div><div class="sub">reported by the app</div></div>
+        <div class="kpi col-2 warn"><div class="label">Audio failures</div><div class="value" id="hlAudio">–</div><div class="sub">preview would not play</div></div>
+        <div class="kpi col-2 warn"><div class="label">Abandon rate</div><div class="value" id="hlAbandon">–</div><div class="sub" id="hlAbandonSub"></div></div>
+        <div class="kpi col-2 bad"><div class="label">Zero-round games</div><div class="value" id="hlZero">–</div><div class="sub" id="hlZeroSub"></div></div>
+        <div class="kpi col-2"><div class="label">Errors per game</div><div class="value" id="hlPerGame">–</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card col-8">
+          <div class="sectiontitle">Errors over time</div>
+          <div class="chartbox" style="height:110px;"><canvas id="hlErrorTrendChart"></canvas></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Error types</div>
+          <div class="barlist" id="hlErrorTypes"></div>
+        </div>
+        <div class="card col-12">
+          <div class="sectiontitle">Top issues — repeats grouped together, newest sample shown</div>
+          <div class="scrollbox">
+            <table>
+              <thead><tr>
+                <th class="num">Count</th><th>Type</th><th>Message</th>
+                <th>First seen</th><th>Last seen</th><th>Room</th>
+              </tr></thead>
+              <tbody id="hlIssuesTbody"><tr><td colspan="6" class="muted">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Where games are abandoned</div>
+          <div class="barlist" id="hlAbandonByRound"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Why games ended early</div>
+          <div class="barlist" id="hlAbandonReasons"></div>
+        </div>
+        <div class="card col-4">
+          <div class="sectiontitle">Audio failures by reason</div>
+          <div class="barlist" id="hlAudioReasons"></div>
+        </div>
+        <div class="card col-6">
+          <div class="sectiontitle">Abandoned games by platform</div>
+          <div class="barlist" id="hlAbandonByClient"></div>
+        </div>
+        <div class="card col-6">
+          <div class="sectiontitle">Audio failures by browser</div>
+          <div class="barlist" id="hlAudioBrowsers"></div>
+        </div>
+        <div class="card col-12">
+          <div class="row" style="justify-content:space-between;">
+            <span class="sectiontitle" style="margin:0;">Raw error log</span>
+            <div class="row" style="gap:8px;">
+              <select id="hlErrorTypeFilter"><option value="">All types</option></select>
+              <button id="exportErrorsBtn" class="secondary small">Export CSV</button>
+              <button id="clearOldBtn" class="danger small">Clear data older than 90 days</button>
+            </div>
+          </div>
+          <div class="scrollbox" style="margin-top:10px;">
+            <table>
+              <thead><tr><th>Time</th><th>Type</th><th>Message</th><th>Room</th><th>Player</th><th>Context</th></tr></thead>
+              <tbody id="hlErrorsTbody"><tr><td colspan="6" class="muted">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card col-12">
+          <div class="sectiontitle">Recent player feedback</div>
+          <div class="scrollbox">
+            <table>
+              <thead><tr><th>Time</th><th>Message</th><th>Context</th></tr></thead>
+              <tbody id="hlFeedbackTbody"><tr><td colspan="3" class="muted">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/analytics.js"></script>
+</body>
+</html>

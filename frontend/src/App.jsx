@@ -22,7 +22,7 @@ import './App.css';
 import WinnerView from "./WinnerView";
 import { API_BASE_URL, SOCKET_URL } from './config';
 import { usePreviewMode } from './contexts/PreviewModeContext';
-import { readCampaignParams } from './utils/track';
+import { readCampaignParams, getVisitorId, trackFunnel } from './utils/track';
 
 
 // Game phases: 'setup', 'player-turn', 'reveal', 'game-over'
@@ -519,7 +519,10 @@ const [, setChallengeResponseGiven] = useState(false);
       const campaignQuery = Object.fromEntries(
         Object.entries(readCampaignParams()).filter(([, value]) => value)
       );
-      socketRef.current = io(SOCKET_URL, { query: { client: 'web', ...campaignQuery } });
+      // vid ties this game back to the web visitor, so admin can tell a new
+      // player from someone starting their fifth game.
+      const vid = getVisitorId();
+      socketRef.current = io(SOCKET_URL, { query: { client: 'web', ...(vid ? { vid } : {}), ...campaignQuery } });
       socketRef.current.on("connect", () => {
         console.log("[Socket] Connected, id:", socketRef.current.id);
         setPlayerId(socketRef.current.id);
@@ -741,6 +744,7 @@ const [, setChallengeResponseGiven] = useState(false);
         setCurrentPlayerId(game.currentPlayerId || (game.players && game.players[0]?.id));
         // Reset game round to 1 when a new game starts
         setGameRound(1);
+        trackFunnel('game_started');
       });
 
   // Listen for game updates (real-time sync, per player)
@@ -1290,6 +1294,7 @@ const [, setChallengeResponseGiven] = useState(false);
 
   // Create game handler (calls backend)
   const handleCreate = (name) => {
+    trackFunnel('create_multiplayer');
     const code = randomCode();
     setPlayerName(name);
     setRoomCode(code);
@@ -1342,6 +1347,7 @@ const [, setChallengeResponseGiven] = useState(false);
   // the waiting room (solo has no settings and no one to wait for). The backend
   // builds the fixed progressive-difficulty deck from the solo gameMode.
   const handleCreateSolo = (name) => {
+    trackFunnel('create_solo');
     const code = randomCode();
     const soloSettings = { ...gameSettings, gameMode: 'solo' };
     setPlayerName(name);
@@ -1380,6 +1386,7 @@ const [, setChallengeResponseGiven] = useState(false);
 
   // Join game handler (calls backend)
   const handleJoin = (name, code) => {
+    trackFunnel('join_lobby');
     setPlayerName(name);
     setRoomCode(code);
     setIsCreator(false);

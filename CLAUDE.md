@@ -45,6 +45,9 @@ credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was re
 | `frontend/src/components/timeline/` | Timeline (iOS-parity rebuild, July 2026): layout engine, album-art nodes, spring placement animation, tap-based placement |
 | `frontend/src/components/design/` | Shared design primitives: SpaceBackground, BottomCard, CoinView, CoinFlightLayer, EventNotificationCard |
 | `backend/index.js` | All HTTP routes + Socket.io game logic (~5,300 lines) |
+| `frontend/public/analytics.html` + `analytics.js` | Analytics dashboard (standalone admin page, 5 tabs: Overview / Acquisition / Audience / Games / Health & Bugs) |
+| `backend/analytics.js` | Sessions, errors, pageviews **and visitor profiles**; aggregations for every dashboard tab |
+| `backend/visitorMeta.js` | Country from edge header or browser timezone (no IP stored) + device/browser/OS from the user-agent |
 | `backend/curatedDb.js` | File-backed song database (reads/writes `cache/curated-songs.json`); serves `applePreviewUrl`/`appleAlbumArt`/`apple_music_url` when present |
 | `backend/appleMusic.js` | Apple Music (MusicKit) client — ES256 dev token + ISRC catalog lookup, for `POST /api/admin/enrich-apple-music` |
 | `backend/config.js` | Feature flags: `CHART_MODE_ENABLE`, `MUSICBRAINZ_ENABLE`, `REMASTER_FILTER_ENABLE` |
@@ -71,6 +74,20 @@ credentials — no user OAuth, no Full Play/Web Playback SDK; all of that was re
 - **QR / link join (v1.1)**: lobbies show a QR code for `<origin>/join/<CODE>` (web: `qrcode.react` in `WaitingRoom.jsx`; iOS: `QRCodeView.swift` → `play.beatably.app/join/<code>`). Web `App.jsx` parses `/join/CODE` and `?join=CODE` on load into `pendingJoinCode`, suppresses auto-rejoin, and cleans the URL. The `/*`→`index.html` SPA fallback in `netlify.toml` serves this — but join links **must** use `play.beatably.app`, since the apex `beatably.app/*` rule 301s everything to the marketing home.
 - **Solo entry is landing-only**: solo is created from the landing screen (`handleCreateSolo` / iOS `createSolo`) which auto-starts and skips the waiting room. The old WaitingRoom solo toggle was removed; backend `join_lobby`/`update_settings` solo guards remain as defense.
 - **Mobile-Safari rendering**: don't use CSS `filter: blur()` on SVG children or inside `contain: paint` — WebKit drops it. Use SVG `feGaussianBlur` / radial-gradient glows (see `TimelinePath.jsx`, `SpaceBackground.jsx`). Verify with Playwright webkit.
+- **Analytics needs consent (EU/Swedish ePrivacy)**: Beatably's players are in Sweden, so
+  Lag 2022:482 ch. 9 § 28 applies regardless of where the servers are. It covers *any* device
+  storage, not just cookies. `bt_vid` is opt-in via `components/ConsentBanner.jsx`
+  (`utils/consent.js` holds the state). Reconnect data, solo best score and hint flags are exempt
+  — they are features the player asked for. **Never send a beacon or write `bt_vid` outside
+  `hasAnalyticsConsent()`.** Both banner buttons must stay visually identical; a prominent accept
+  next to a played-down reject makes the consent invalid. Regression test: `e2e/run.sh consent.mjs`.
+- **Fonts are self-hosted** (`frontend/public/fonts/`). Do not switch back to the Google Fonts CDN —
+  it sends every visitor's IP to Google, which is exactly the third-party transfer we avoid.
+- **Analytics lives on its own page**: `/analytics` (→ `analytics.html`), linked from admin. The old inline
+  "Usage Analytics" view inside `admin.html` was removed — don't re-add stats there.
+  Data comes from `/api/admin/{usage-stats,website-stats,visitor-stats,health-stats,game-sessions,error-logs}`.
+  Visitors are identified by a random `bt_vid` in localStorage (iOS: `beatably_visitor_id` in UserDefaults),
+  sent both on `/api/track` and in the socket handshake (`?vid=`) so games link back to a visitor.
 - **Unused packages**: `@radix-ui/react-slider`, `@radix-ui/react-switch`, `lucide-react`
 
 ---

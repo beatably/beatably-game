@@ -566,13 +566,25 @@ class GameViewModel {
         d.synchronize()
     }
 
+    /// Random per-install id sent with the socket handshake. It lets the admin
+    /// dashboard tell a brand-new player from someone starting their fifth game,
+    /// and matches the `bt_vid` the web client uses. No personal data.
+    private static let kVisitorId = "beatably_visitor_id"
+    private static func visitorId() -> String {
+        let d = UserDefaults.standard
+        if let existing = d.string(forKey: kVisitorId), !existing.isEmpty { return existing }
+        let fresh = UUID().uuidString
+        d.set(fresh, forKey: kVisitorId)
+        return fresh
+    }
+
     init() {
         manager = SocketManager(
             socketURL: URL(string: Config.backendURL)!,
             config: [
                 // Tell the backend which client this is, so analytics can report
                 // per-game platform mix (see detectClient in backend/index.js).
-                .connectParams(["client": "ios"]),
+                .connectParams(["client": "ios", "vid": Self.visitorId()]),
                 // Deterministic auto-reconnect: keep retrying with a bounded backoff
                 // so a dropped/ backgrounded socket comes back on its own.
                 .log(Config.socketLogging),

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { onAirPlayTargetChange } from '../utils/castUtils';
+import { trackAudioFailure } from '../utils/track';
 
 const PreviewModeContext = createContext();
 
@@ -166,6 +167,9 @@ export function PreviewModeProvider({ children }) {
       
       audioRef.current.addEventListener('error', (e) => {
         console.error('[PreviewMode] Audio error:', e);
+        // Silent failures here are the most common "the game is broken" report,
+        // so surface them in analytics rather than only the console.
+        trackAudioFailure('media_error', { code: audioRef.current?.error?.code || null });
         setIsPlaying(false);
       });
       
@@ -197,6 +201,7 @@ export function PreviewModeProvider({ children }) {
   const playPreview = async (previewUrl) => {
     if (!previewUrl) {
       console.warn('[PreviewMode] No preview URL provided');
+      trackAudioFailure('missing_preview_url');
       return false;
     }
     
@@ -298,6 +303,7 @@ export function PreviewModeProvider({ children }) {
       return true;
     } catch (error) {
       console.error('[PreviewMode] Error playing preview:', error);
+      trackAudioFailure(error?.name || 'play_failed');
       if (error.name === 'NotAllowedError') {
         console.warn('[PreviewMode] Audio blocked - user interaction required');
         isUnlockedRef.current = false;

@@ -46,9 +46,10 @@
     <!-- Immediate inline background to avoid white flash before external CSS loads -->
     <style>html,body,#root{background-color:#0C0A1A!important;margin:0;height:100%;min-height:100%}</style>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400..900&display=swap" rel="stylesheet">
+    <!-- Nunito is self-hosted: loading it from Google would send every visitor's
+         IP to a third party, which needs consent we do not ask for. -->
+    <link rel="preload" href="/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link href="/fonts/nunito.css" rel="stylesheet">
     <script>
       (function () {
         try {

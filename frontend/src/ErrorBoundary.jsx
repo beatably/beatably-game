@@ -1,4 +1,5 @@
 import React from "react";
+import { reportClientError } from "./utils/track";
 
 /**
  * Top-level error boundary. Without one, any render-time exception in a child
@@ -20,6 +21,8 @@ class ErrorBoundary extends React.Component {
     // Surface to the console; the existing debugLogger forwards console output
     // to the backend when debug logging is enabled.
     console.error("[ErrorBoundary] Caught render error:", error, info?.componentStack);
+    // Also send it to the backend so blank-screen crashes show up in admin.
+    reportClientError("client_render", error, { stack: info?.componentStack || error?.stack });
   }
 
   handleReload = () => {
