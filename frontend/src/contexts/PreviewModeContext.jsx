@@ -4,6 +4,15 @@ import { trackAudioFailure } from '../utils/track';
 
 const PreviewModeContext = createContext();
 
+// A requestAnimationFrame callback is handed the timestamp of the start of the
+// frame, which can be a fraction earlier than a performance.now() taken during
+// that same frame. Clamping keeps the eased curves in range: without it the
+// fade-in does Math.sqrt of a negative number and assigning the resulting NaN
+// to .volume throws.
+function clamp01(n) {
+  return Number.isFinite(n) ? Math.min(Math.max(n, 0), 1) : 0;
+}
+
 export function usePreviewMode() {
   const context = useContext(PreviewModeContext);
   if (!context) {
@@ -86,12 +95,12 @@ export function PreviewModeProvider({ children }) {
             
             const fadeOut = (currentTime) => {
               const elapsed = currentTime - startTime;
-              const progress = Math.min(elapsed / fadeOutDuration, 1);
+              const progress = clamp01(elapsed / fadeOutDuration);
               // Ease-in curve for smooth fade-out: (1-progress)^3 for very gradual start
               const remaining = 1 - progress;
               const easedProgress = remaining * remaining * remaining;
               const value = startValue * easedProgress;
-              audioRef.current.volume = Math.max(0, value);
+              audioRef.current.volume = clamp01(value);
               
               if (progress < 1 && audioRef.current.currentTime < audioRef.current.duration) {
                 fadeAnimationRef.current = requestAnimationFrame(fadeOut);
@@ -283,10 +292,10 @@ export function PreviewModeProvider({ children }) {
 
         const fadeIn = (currentTime) => {
           const elapsed = currentTime - startTime;
-          const progress = Math.min(elapsed / fadeInDuration, 1);
+          const progress = clamp01(elapsed / fadeInDuration);
           // Ease-out curve: sqrt for gentler, smoother rise
           const easedProgress = Math.sqrt(progress);
-          audioRef.current.volume = easedProgress;
+          audioRef.current.volume = clamp01(easedProgress);
 
           if (progress < 1) {
             fadeAnimationRef.current = requestAnimationFrame(fadeIn);
