@@ -109,9 +109,74 @@ async function run() {
   check('banner does not cover the Continue button', !overlaps);
   await mobile.close();
 
+  await crossSubdomain();
+
   const failed = results.filter((r) => !r.pass);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed.`);
   process.exit(failed.length ? 1 : 0);
+}
+
+/**
+ * The landing page and the game are separate origins (beatably.app and
+ * play.beatably.app), so localStorage alone cannot carry the consent choice
+ * between them — the banner used to appear twice and one person counted as two
+ * visitors. Both hostnames are mapped to the local build to prove the cookie
+ * on the parent domain closes that gap.
+ *
+ * Needs a host-agnostic server on E2E_STATIC_PORT (the Vite dev server refuses
+ * unknown hostnames); skipped when that is not running.
+ */
+async function crossSubdomain() {
+  const port = process.env.E2E_STATIC_PORT;
+  if (!port) {
+    console.log('\n▶ Cross-subdomain: skipped (set E2E_STATIC_PORT to a server for frontend/dist)');
+    return;
+  }
+  console.log('\n▶ Cross-subdomain (beatably.app → play.beatably.app)');
+  const browser = await chromium.launch({
+    headless: process.env.E2E_HEADED !== '1',
+    args: [`--host-resolver-rules=MAP beatably.app 127.0.0.1:${port}, MAP play.beatably.app 127.0.0.1:${port}`],
+  });
+  try {
+    const ctx = await browser.newContext();
+    await ctx.route('**://*.onrender.com/**', (r) => r.abort());
+    const page = await ctx.newPage();
+
+    await page.goto('http://beatably.app/landing.html');
+    await page.waitForTimeout(2500);
+    check('banner shows on the landing page', await page.isVisible(BANNER));
+    await page.click('button:has-text("Accept")');
+    await page.waitForTimeout(1000);
+
+    const cookies = await ctx.cookies();
+    check('consent is stored on the parent domain',
+      cookies.some((c) => c.name === 'bt_consent' && c.domain === '.beatably.app'));
+    const landingVid = await page.evaluate(() => localStorage.getItem('bt_vid'));
+
+    await page.goto('http://play.beatably.app/');
+    await page.waitForTimeout(3000);
+    check('the banner is not shown a second time on the game', !(await page.isVisible(BANNER)));
+    check('the visitor keeps one id across both sites',
+      !!landingVid && landingVid === await page.evaluate(() => localStorage.getItem('bt_vid')));
+
+    // A decline must travel too, and must not arrive as a grant.
+    await ctx.clearCookies();
+    await page.goto('http://beatably.app/landing.html');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.waitForTimeout(2500);
+    await page.click('button:has-text("Decline")');
+    await page.waitForTimeout(1000);
+    await page.goto('http://play.beatably.app/');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.waitForTimeout(3000);
+    check('a decline carries across as a decline',
+      await page.evaluate(() => localStorage.getItem('bt_consent')) === 'denied');
+    check('and leaves no visitor id', !(await page.evaluate(() => localStorage.getItem('bt_vid'))));
+  } finally {
+    await browser.close();
+  }
 }
 
 run().catch((e) => { console.error(e); process.exit(1); });

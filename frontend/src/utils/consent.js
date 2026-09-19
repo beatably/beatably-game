@@ -8,6 +8,8 @@
 // The choice itself is stored locally. That storage is strictly necessary: we
 // cannot honour a "no" without remembering it.
 
+import { readShared, writeShared, clearShared } from './domainStore';
+
 const CONSENT_KEY = 'bt_consent';
 // Kept in sync with utils/track.js. Duplicated rather than imported so consent
 // has no dependency on the thing it gates.
@@ -19,13 +21,10 @@ const listeners = new Set();
 
 /** 'granted' | 'denied' | null (null = not asked yet). */
 export function getConsent() {
-  try {
-    const value = localStorage.getItem(CONSENT_KEY);
-    return value === GRANTED || value === DENIED ? value : null;
-  } catch (e) {
-    // Storage blocked: treat as undecided, and never track.
-    return null;
-  }
+  // Shared across beatably.app and play.beatably.app, so answering on the
+  // landing page is not asked again when the player opens the game.
+  const value = readShared(CONSENT_KEY);
+  return value === GRANTED || value === DENIED ? value : null;
 }
 
 export function hasAnalyticsConsent() {
@@ -35,14 +34,10 @@ export function hasAnalyticsConsent() {
 /** Record the visitor's choice and tell everyone who is listening. */
 export function setConsent(value) {
   const next = value === GRANTED ? GRANTED : DENIED;
-  try {
-    localStorage.setItem(CONSENT_KEY, next);
-    // The privacy policy promises that saying no removes the id, not just that
-    // we stop using it. Honour that literally.
-    if (next === DENIED) localStorage.removeItem(VID_KEY);
-  } catch (e) {
-    // Nothing we can do; the in-memory listeners still fire for this page view.
-  }
+  writeShared(CONSENT_KEY, next);
+  // The privacy policy promises that saying no removes the id, not just that
+  // we stop using it. Honour that literally, on both origins.
+  if (next === DENIED) clearShared(VID_KEY);
   listeners.forEach((fn) => {
     try { fn(next); } catch (e) { /* a bad listener must not block the rest */ }
   });
@@ -51,7 +46,7 @@ export function setConsent(value) {
 
 /** Forget the choice so the banner asks again. Used by "change your choice". */
 export function resetConsent() {
-  try { localStorage.removeItem(CONSENT_KEY); } catch (e) { /* ignore */ }
+  clearShared(CONSENT_KEY);
   listeners.forEach((fn) => {
     try { fn(null); } catch (e) { /* ignore */ }
   });

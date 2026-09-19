@@ -9,6 +9,7 @@
 
 import { API_BASE_URL } from '../config';
 import { hasAnalyticsConsent, onConsentChange } from './consent';
+import { readShared, writeShared } from './domainStore';
 
 const VID_KEY = 'bt_vid';
 const CAMPAIGN_PARAM_MAP = {
@@ -49,17 +50,18 @@ export function getTimezone() {
 
 export function getVisitorId() {
   if (!hasAnalyticsConsent()) return null;
-  try {
-    let id = localStorage.getItem(VID_KEY);
-    if (!id) {
+  // Shared across our two origins: without this, someone who reads the landing
+  // page and then plays would be counted as two different visitors.
+  let id = readShared(VID_KEY);
+  if (!id) {
+    try {
       id = (crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-      localStorage.setItem(VID_KEY, id);
+    } catch (e) {
+      id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
-    return id;
-  } catch (e) {
-    // Private mode / storage disabled — visit still counts, just not as unique.
-    return null;
+    writeShared(VID_KEY, id);
   }
+  return id;
 }
 
 // Beacons raised before the visitor answered the banner. Flushed on "yes",
